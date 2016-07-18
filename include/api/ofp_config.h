@@ -79,7 +79,7 @@
 /** Packet pool buffer size. */
 #define SHM_PKT_POOL_BUFFER_SIZE	1856
 /** Packet pool user area size. */
-#define SHM_PKT_POOL_USER_AREA_SIZE	16
+#define SHM_PKT_POOL_USER_AREA_SIZE	32
 /** Packet pool name. */
 #define SHM_PKT_POOL_NAME "packet_pool"
 
@@ -192,4 +192,72 @@
  * packets. */
 /*#define OFP_IPv4_TCP_CSUM_VALIDATE*/
 
+
+/* IPsec related settings*/
+
+/** Enable static IPsec SPD configuration.
+ * It is meant to be used with application where SPD is not
+ * changed during intensive packet processing phase of
+ * application.
+ */
+/*#define OFP_STATIC_IPSEC_SPD_CONFIG */
+
+/** Enable static IPsec SAD configuration. It is meant to be
+ * used with application where SAD is not changed during
+ * intensive packet processing phase of application.
+ */
+/*#define OFP_STATIC_IPSEC_SAD_CONFIG */
+
+/** Enable static IPsec outgoing cache configuration. It is
+ * meant to be used with application where outgoing cache is not
+ * changed during intensive packet processing phase of
+ * application.
+ */
+/*#define OFP_STATIC_IPSEC_CACHE_OUT_CONFIG */
+
+/** Enable static IPsec inbound cache configuration. It is
+ * meant to be used with application where incoming cache is not
+ * changed during intensive packet processing phase of
+ * application.
+ */
+/*#define OFP_STATIC_IPSEC_CACHE_IN_CONFIG */
+
+/** Protected the updates of IPsec outboung caches
+ * It is meant to be used when packets are sent from multiple
+ * cores.
+ */
+#define OFP_IPSEC_CACHE_OUT_PROTECTED_UPDATE
+
+/** Protected the updates of IPsec inbound caches
+ * It is meant to be used when packets are recieved on
+ * multiple cores.
+ */
+/*#define OFP_IPSEC_CACHE_IN_PROTECTED_UPDATE*/
+
+/** Permit utilization of custom defined key management.
+ * OFP_STATIC_IPSEC_SAD_CONFIG must be undefined.
+ */
+/*#define OFP_IPSEC_CUSTOM_KEY_MANAGEMENT*/
+
+/** Enable checking of inbound traffic against SA selectors. */
+/*#define OFP_IPSEC_CHECK_INBOUND_SECURED_TRAFFIC */
+
+/**Maximum number of IPsec SPD entries */
+#define OFP_IPSEC_SPD_SIZE 32
+
+/**Maximum number of IPsec SAD entries */
+#define OFP_IPSEC_SAD_SIZE 32
+
+/**Maximum number of IPsec Outbound CACHE entries */
+#define OFP_IPSEC_CACHE_OUT_SIZE 32
+
+/**Maximum number of IPsec Inbound CACHE entries */
+#define OFP_IPSEC_CACHE_IN_SIZE 32
+
+/**Maximum number of IPsec Asynchronous completion queueus */
+#define OFP_IPSEC_ASYNC_QUEUE_SIZE 32
+
+/** Delay session creation until first packet needs to be
+ *  processed */
+/*#define OFP_IPSEC_SESSION_LAZY_CREATE*/
 #endif

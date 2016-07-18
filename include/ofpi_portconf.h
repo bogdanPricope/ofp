@@ -197,6 +197,9 @@ struct ofp_ifnet {
 	struct ofp_in_ifinfo ii_inet;
 	void	*if_afdata[OFP_AF_MAX];
 	struct	ofp_ifmultihead if_multiaddrs; /* multicast addresses configured */
+#ifdef OFP_IPSEC
+	odp_bool_t ipsec_boundary;
+#endif /* OFP_IPSEC */
 };
 
 #define outq_def out_queue_queue[0]
@@ -370,4 +373,8 @@ void ofp_join_device_to_multicat_group(struct ofp_ifnet *dev_root,
 void ofp_leave_multicast_group(struct ofp_ifnet *dev_vxlan);
 int ofp_local_interfaces_destroy(void);
 
+
+#ifdef OFP_IPSEC
+void ofp_show_interfaces_ipsec(int fd);
+#endif /*OFP_IPSEC*/
 #endif

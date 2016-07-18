@@ -90,3 +90,31 @@ Restrictions:
 set OFP_CONFIG to OFP_CONFIG_NETWRAP_WEBSERVER
 e.g.
 #define OFP_CONFIG OFP_CONFIG_NETWRAP_WEBSERVER
+
+
+ofp_ipsec_tunnel
+-------------------------------------------------------------------------------
+OFP running in scheduler mode is configured to perform IPsec ESP tunnel processing on
+inbound and outbound packets. Asynchronous mode can be enabled using -a command line
+option.
+
+OFP configuration files and ipsec-tools setkey configuration files are provided for
+testing against a remote host.
+Setup:
+	OFP host is configured with 192.168.100.1 address
+	Remote Linux target is configured with 192.168.100.2 address
+Four scenarios are presented:
+	OFP processes IPsec inbound traffic:
+		OFP - ofp_ipsec_in.conf
+		Remote target - setkey_ofp_ipsec_in.txt
+	OFP generates IPsec outbound traffic
+		OFP - ofp_ipsec_out.conf
+		Remote target: setkey_ofp_ipsec_out.txt
+	OFP processes inbound IPsec traffic and generates outbound traffic
+		OFP - ofp_ipsec.conf
+		Remote target - setkey_ofp_ipsec.txt
+	OFP bypass traffic
+		OFP - ofp_ipsec_bypass.conf
+Note: setkey configuration files are applied as follow:
+        setkey -f file_name
+Note: 'ping' can be used as testing application.

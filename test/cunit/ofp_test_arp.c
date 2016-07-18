@@ -67,7 +67,7 @@ static int init_suite(void)
 	pool_params.type        = ODP_POOL_PACKET;
 
 	(void) ofp_init_pre_global(pool_name, &pool_params, pkt_hook, &pool,
-				   ARP_AGE_INTERVAL, ARP_ENTRY_TIMEOUT);
+				   ARP_AGE_INTERVAL, ARP_ENTRY_TIMEOUT, NULL);
 
 	/*
 	 * Start a packet processing thread to service timer events.

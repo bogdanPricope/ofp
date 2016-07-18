@@ -34,7 +34,16 @@ include_HEADERS = \
 		$(top_srcdir)/include/api/ofp_if_vlan.h \
 		$(top_srcdir)/include/api/ofp_udp.h \
 		$(top_srcdir)/include/api/ofp_ip_var.h \
-		$(top_srcdir)/include/api/ofp_tcp.h
+		$(top_srcdir)/include/api/ofp_tcp.h \
+		$(top_srcdir)/include/api/ofp_ipsec.h \
+		$(top_srcdir)/include/api/ofp_ipsec_selectors.h \
+		$(top_srcdir)/include/api/ofp_ipsec_spd.h \
+		$(top_srcdir)/include/api/ofp_ipsec_sad.h \
+		$(top_srcdir)/include/api/ofp_ipsec_common.h \
+		$(top_srcdir)/include/api/ofp_ipsec_cache_in.h \
+		$(top_srcdir)/include/api/ofp_ipsec_cache_out.h \
+		$(top_srcdir)/include/api/ofp_ipsec_alg.h \
+		$(top_srcdir)/include/api/ofp_ipsec_pkt_processing.h
 
 noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_netlink.h \
@@ -109,6 +118,18 @@ noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_vxlan.h \
 		  $(top_srcdir)/include/ofpi_hook.h \
 		  $(top_srcdir)/include/ofpi_util.h \
-		  $(top_srcdir)/include/ofpi_tcp_shm.h
+		  $(top_srcdir)/include/ofpi_tcp_shm.h \
+		  $(top_srcdir)/include/ofpi_ipsec.h \
+		  $(top_srcdir)/include/ofpi_ipsec_spd.h \
+		  $(top_srcdir)/include/ofpi_ipsec_sad.h \
+		  $(top_srcdir)/include/ofpi_ipsec_cache_common.h \
+		  $(top_srcdir)/include/ofpi_ipsec_cache_in.h \
+		  $(top_srcdir)/include/ofpi_ipsec_cache_out.h \
+		  $(top_srcdir)/include/ofpi_ipsec_alg.h \
+		  $(top_srcdir)/include/ofpi_ipsec_session.h \
+		  $(top_srcdir)/include/ofpi_ipsec_pkt_processing.h \
+		  $(top_srcdir)/include/ofpi_ipsec_operation.h \
+		  $(top_srcdir)/include/ofpi_ipsec_pkt_ctx.h \
+		  $(top_srcdir)/include/ofpi_ipsec_util.h
 
 EXTRA_DIST = bootstrap .scmversion

@@ -51,6 +51,8 @@
 #include "ofpi_if_vxlan.h"
 #include "ofpi_vxlan.h"
 #include "api/ofp_init.h"
+#include "ofpi_ipsec.h"
+#include "ofpi_ipsec_pkt_processing.h"
 
 extern odp_pool_t ofp_packet_pool;
 
@@ -64,6 +66,10 @@ void *default_event_dispatcher(void *arg)
 	int event_cnt = 0;
 	ofp_pkt_processing_func pkt_func = (ofp_pkt_processing_func)arg;
 	odp_bool_t *is_running = NULL;
+	odp_crypto_compl_t crypto_compl;
+#ifdef OFP_IPSEC
+	odp_crypto_op_result_t crypto_result;
+#endif /* OFP_IPSEC */
 
 	if (ofp_init_local()) {
 		OFP_ERR("ofp_init_local failed");
@@ -105,6 +111,31 @@ void *default_event_dispatcher(void *arg)
 				continue;
 			}
 
+			if (odp_event_type(ev) == ODP_EVENT_CRYPTO_COMPL) {
+				crypto_compl = odp_crypto_compl_from_event(ev);
+#ifdef OFP_IPSEC
+				odp_crypto_compl_result(crypto_compl, &crypto_result);
+				odp_crypto_compl_free(crypto_compl);
+
+				pkt = crypto_result.pkt;
+				/*ctx = result.ctx;*/
+				if (!crypto_result.ok) {
+					OFP_ERR("Completion event error: (%d %d %d %d)."
+						" pkt dropped.\n",
+						crypto_result.auth_status.alg_err,
+						crypto_result.auth_status.hw_err,
+						crypto_result.cipher_status.alg_err,
+						crypto_result.cipher_status.hw_err);
+					odp_packet_free(pkt);
+					continue;
+				}
+				ofp_ipsec_crypto_compl(pkt);
+#else
+				odp_crypto_compl_free(crypto_compl);
+#endif /* OFP_IPSEC */
+				continue;
+			}
+
 			OFP_ERR("Unexpected event type: %u", odp_event_type(ev));
 
 			/* Free events by type */
@@ -112,13 +143,6 @@ void *default_event_dispatcher(void *arg)
 				odp_buffer_free(odp_buffer_from_event(ev));
 				continue;
 			}
-
-			if (odp_event_type(ev) == ODP_EVENT_CRYPTO_COMPL) {
-				odp_crypto_compl_free(
-					odp_crypto_compl_from_event(ev));
-				continue;
-			}
-
 		}
 		ofp_send_pending_pkt();
 	}
@@ -195,14 +219,12 @@ enum ofp_return_code ofp_eth_vlan_processing(odp_packet_t pkt)
 
 
 enum ofp_return_code
-ipv4_transport_classifier(odp_packet_t pkt, uint8_t ip_proto)
+ipv4_transport_classifier(odp_packet_t pkt, uint8_t ip_proto, int offset)
 {
-	struct ofp_ip *ip = (struct ofp_ip *)odp_packet_l3_ptr(pkt, NULL);
-
 	OFP_DBG("ip_proto=%d pr_input=%p",
 		ip_proto, ofp_inetsw[ofp_ip_protox[ip_proto]].pr_input);
 
-	return ofp_inetsw[ofp_ip_protox[ip_proto]].pr_input(pkt, ip->ip_hl << 2);
+	return ofp_inetsw[ofp_ip_protox[ip_proto]].pr_input(pkt, offset);
 }
 
 /*
@@ -214,10 +236,9 @@ ipv4_transport_classifier(odp_packet_t pkt, uint8_t ip_proto)
 
 #ifdef INET6
 enum ofp_return_code
-ipv6_transport_classifier(odp_packet_t pkt, uint8_t ip6_nxt)
+ipv6_transport_classifier(odp_packet_t pkt, uint8_t ip6_nxt, int offset)
 {
 	int nxt = ip6_nxt;
-	int offset = sizeof(struct ofp_ip6_hdr);
 	enum ofp_return_code ret = OFP_PKT_CONTINUE;
 
 	while (ret == OFP_PKT_CONTINUE && nxt != OFP_IPPROTO_SP)
@@ -283,7 +304,6 @@ enum ofp_return_code ofp_ipv4_processing(odp_packet_t pkt)
 	uint32_t is_ours;
 
 	ip = (struct ofp_ip *)odp_packet_l3_ptr(pkt, NULL);
-
 	if (odp_unlikely(ip == NULL)) {
 		OFP_DBG("ip is NULL");
 		return OFP_PKT_DROP;
@@ -356,7 +376,20 @@ enum ofp_return_code ofp_ipv4_processing(odp_packet_t pkt)
 			return res;
 		}
 
-		return ipv4_transport_classifier(pkt, ip->ip_p);
+#ifdef OFP_IPSEC
+		if (ofp_ipsec_boundary_crossing_get(pkt)) {
+			if (ip->ip_p != OFP_IPPROTO_ESP &&
+				ip->ip_p != OFP_IPPROTO_AH) {
+				res = ofp_ipsec_process_inbound_pkt_other(pkt);
+				if (res != OFP_PKT_CONTINUE) {
+					OFP_DBG("Packet dropped due IPsec policy");
+					return res;
+				}
+			}
+		}
+#endif /* OFP_IPSEC */
+
+		return ipv4_transport_classifier(pkt, ip->ip_p, ip->ip_hl << 2);
 	}
 
 	OFP_HOOK(OFP_HOOK_FWD_IPv4, pkt, nh, &res);
@@ -364,6 +397,16 @@ enum ofp_return_code ofp_ipv4_processing(odp_packet_t pkt)
 		OFP_DBG("OFP_HOOK_FWD_IPv4 returned %d", res);
 		return res;
 	}
+
+#ifdef OFP_IPSEC
+	if (ofp_ipsec_boundary_crossing_get(pkt)) {
+		res = ofp_ipsec_process_inbound_pkt_other(pkt);
+		if (res != OFP_PKT_CONTINUE) {
+			OFP_DBG("Packet dropped due IPsec policy");
+			return res;
+		}
+	}
+#endif /* OFP_IPSEC */
 
 	if (nh == NULL) {
 		OFP_DBG("nh is NULL, vrf=%d dest=%x", dev->vrf, ip->ip_dst.s_addr);
@@ -444,7 +487,8 @@ enum ofp_return_code ofp_ipv6_processing(odp_packet_t pkt)
 			return res;
 		}
 
-		return ipv6_transport_classifier(pkt, ipv6->ofp_ip6_nxt);
+		return ipv6_transport_classifier(pkt, ipv6->ofp_ip6_nxt,
+			sizeof(struct ofp_ip6_hdr));
 
 	}
 
@@ -1085,6 +1129,10 @@ enum ofp_return_code ofp_ip_output(odp_packet_t pkt,
 	struct ofp_ifnet *send_ctx = odp_packet_user_ptr(pkt);
 	struct ip_out odata;
 	enum ofp_return_code ret;
+#ifdef OFP_IPSEC
+	odp_bool_t ip_header_changed;
+	struct ofp_ifnet *ifnet_port;
+#endif /* OFP_IPSEC */
 
 	OFP_HOOK(OFP_HOOK_OUT_IPv4, pkt, NULL, &ret);
 	if (ret != OFP_PKT_CONTINUE) {
@@ -1099,6 +1147,29 @@ enum ofp_return_code ofp_ip_output(odp_packet_t pkt,
 
 	if ((ret = ofp_ip_output_find_route(pkt, &odata)) != OFP_PKT_CONTINUE)
 		return ret;
+
+
+#ifdef OFP_IPSEC
+	if (PHYS_PORT(odata.out_port)) {
+		ifnet_port = ofp_get_ifnet(odata.out_port, 0);
+		if (ifnet_port->ipsec_boundary) {
+			ret = ofp_ipsec_process_outbound_pkt(pkt, &ip_header_changed);
+			if (ret != OFP_PKT_CONTINUE) {
+				OFP_DBG("ofp_ipsec_process_outgoing_pkt returned %d", ret);
+				return ret;
+			}
+			if (ip_header_changed) {
+				odata.dev_out = NULL;
+				odata.nh = NULL;
+				odata.vrf = 0;
+				odata.is_local_address = 0;
+				if ((ret = ofp_ip_output_find_route(pkt,
+					&odata)) != OFP_PKT_CONTINUE)
+					return ret;
+			}
+		}
+	}
+#endif /* OFP_IPSEC */
 
 	switch (odata.out_port) {
 	case GRE_PORTS:
@@ -1409,6 +1480,10 @@ enum ofp_return_code ofp_packet_input(odp_packet_t pkt,
 
 	odp_packet_user_ptr_set(pkt, ifnet);
 
+#ifdef OFP_IPSEC
+	ofp_ipsec_boundary_crossing_set(pkt, ifnet->ipsec_boundary);
+#endif /*OFP_IPSEC*/
+
 	OFP_DEBUG_PACKET(OFP_DEBUG_PKT_RECV_NIC, pkt, ifnet->port);
 
 	OFP_UPDATE_PACKET_STAT(rx_fp, 1);
@@ -1450,3 +1525,51 @@ enum ofp_return_code ofp_sp_input(odp_packet_t pkt,
 	return OFP_PKT_DROP;
 #endif
 }
+
+enum ofp_return_code ofp_nlp_processing(odp_packet_t pkt,
+	int nloff, int nlp, int l3p)
+{
+	if (nlp == OFP_IPPROTO_IPV4)
+		return ofp_ipv4_processing(pkt);
+	else if (nlp == OFP_IPPROTO_IPV6)
+		return ofp_ipv6_processing(pkt);
+	else if (l3p == OFP_IPPROTO_IPV4)
+		return ipv4_transport_classifier(pkt, nlp, nloff);
+	else if (l3p == OFP_IPPROTO_IPV6)
+		return ipv6_transport_classifier(pkt, nlp, nloff);
+	return OFP_PKT_CONTINUE;
+}
+
+enum ofp_return_code ofp_packet_input_compl(odp_packet_t pkt,
+	int off, int nlp, int l3p)
+{
+	enum ofp_return_code res = OFP_PKT_CONTINUE;
+	struct ofp_ifnet *ifnet = (struct ofp_ifnet *)odp_packet_user_ptr(pkt);
+
+	res = ofp_nlp_processing(pkt, off, nlp, l3p);
+	if (res == OFP_PKT_DROP)
+		odp_packet_free(pkt);
+
+	if (res != OFP_PKT_CONTINUE)
+		return res;
+
+	/* Enqueue the packet for slowpath */
+	return ofp_sp_input(pkt, ifnet);
+}
+
+enum ofp_return_code ofp_packet_output_compl(odp_packet_t pkt)
+{
+	/* Right now, only ipv4 is supported*/
+	struct ip_out odata = {0};
+	enum ofp_return_code ret;
+
+	if ((ret = ofp_ip_output_find_route(pkt, &odata)) != OFP_PKT_CONTINUE)
+		return ret;
+
+	if ((ret = ofp_ip_output_add_eth(pkt, &odata)) != OFP_PKT_CONTINUE)
+			return ret;
+
+	return ofp_ip_output_send(pkt, &odata);
+}
+
+

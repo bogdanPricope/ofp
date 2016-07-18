@@ -353,6 +353,23 @@ void ofp_show_interfaces(int fd)
 				"	Link not configured\r\n\r\n");
 }
 
+#ifdef OFP_IPSEC
+void ofp_show_interfaces_ipsec(int fd)
+{
+	int i;
+	ofp_sendf(fd, "Protected/Unprotected boundary:\r\n");
+
+	/* fp interfaces */
+	for (i = 0; i < OFP_FP_INTERFACE_MAX; i++)
+		if (shm->ofp_ifnet_data[i].if_state == OFP_IFT_STATE_USED)
+			ofp_sendf(fd, "  %s%d %s\r\n",
+				OFP_IFNAME_PREFIX, shm->ofp_ifnet_data[i].port,
+				shm->ofp_ifnet_data[i].ipsec_boundary ?
+				"boundary" : "NOT boundary");
+	ofp_sendf(fd, "\r\n");
+}
+#endif /*OFP_IPSEC*/
+
 int free_key(void *key)
 {
 	free(key);
@@ -1446,6 +1463,17 @@ struct ofp_ifnet *ofp_get_ifnet_pktio(odp_pktio_t pktio)
 	return NULL;
 }
 
+struct ofp_ifnet *ofp_get_ifnet_name(char *if_name)
+{
+	int i;
+
+	for (i = 0; i < OFP_FP_INTERFACE_MAX; i++)
+		if (shm->ofp_ifnet_data[i].if_state == OFP_IFT_STATE_USED &&
+			!strcmp(shm->ofp_ifnet_data[i].if_name, if_name))
+			return &shm->ofp_ifnet_data[i];
+	return NULL;
+}
+
 odp_queue_t ofp_pktio_spq_get(odp_pktio_t pktio)
 {
 #ifdef SP
@@ -1546,6 +1574,9 @@ int ofp_portconf_init_global(void)
 		shm->ofp_ifnet_data[i].spq_def = ODP_QUEUE_INVALID;
 #endif /*SP*/
 		shm->ofp_ifnet_data[i].pkt_pool = ODP_POOL_INVALID;
+#ifdef OFP_IPSEC
+		shm->ofp_ifnet_data[i].ipsec_boundary = 0;
+#endif /* OFP_IPSEC */
 	}
 
 	memset(ofp_ifnet_locks_shm, 0, sizeof(*ofp_ifnet_locks_shm));

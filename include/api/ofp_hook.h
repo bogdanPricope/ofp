@@ -63,6 +63,10 @@ enum ofp_hook_id {
 					packets to be sent by OFP*/
 	OFP_HOOK_OUT_IPv6,	/**< Registers a function to handle all IPv6
 					packets to be sent by OFP*/
+	OFP_HOOK_IPSEC_CUSTOM_KEY_MGNT,/**< Registers a function to handle
+					key management throuh custom mechanism
+					e.g. IKEv2 implementation*/
+
 	OFP_HOOK_MAX
 };
 

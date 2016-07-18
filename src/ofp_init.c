@@ -39,6 +39,7 @@
 #include "ofpi_igmp_var.h"
 #include "ofpi_vxlan.h"
 #include "ofpi_uma.h"
+#include "ofpi_ipsec.h"
 
 #include "ofpi_log.h"
 #include "ofpi_debug.h"
@@ -100,14 +101,21 @@ odp_bool_t *ofp_get_processing_state(void)
 	return &shm->is_running;
 }
 
+void ofp_init_global_init(ofp_init_global_t *param)
+{
+	memset (param, 0, sizeof (*param));
+}
+
 int ofp_init_pre_global(const char *pool_name_unused,
 			odp_pool_param_t *pool_params_unused,
 			ofp_pkt_hook hooks[], odp_pool_t *pool_unused,
-			int arp_age_interval, int arp_entry_timeout)
+			int arp_age_interval, int arp_entry_timeout,
+			struct ofp_ipsec_config_param *ipsec_config)
 {
 	(void)pool_name_unused;
 	(void)pool_params_unused;
 	(void)pool_unused;
+	(void)ipsec_config;
 
 	/* Init shared memories */
 	HANDLE_ERROR(ofp_uma_init_global());
@@ -144,6 +152,10 @@ int ofp_init_pre_global(const char *pool_name_unused,
 	HANDLE_ERROR(ofp_portconf_init_global());
 
 	HANDLE_ERROR(ofp_vxlan_init_global());
+
+#ifdef OFP_IPSEC
+	HANDLE_ERROR(ofp_ipsec_init_global(ipsec_config));
+#endif /* OFP_IPSEC */
 
 	odp_pool_param_t pool_params;
 	/* Define pkt.seg_len so that l2/l3/l4 offset fits in first segment */
@@ -182,7 +194,8 @@ int ofp_init_global(odp_instance_t instance, ofp_init_global_t *params)
 
 	HANDLE_ERROR(ofp_init_pre_global(NULL, NULL,
 					 params->pkt_hook, NULL,
-					 ARP_AGE_INTERVAL, ARP_ENTRY_TIMEOUT));
+					 ARP_AGE_INTERVAL, ARP_ENTRY_TIMEOUT,
+					 params->ipsec_config));
 
 	/* cpu mask for slow path threads */
 	odp_cpumask_zero(&cpumask);
@@ -243,6 +256,9 @@ int ofp_init_local(void)
 	HANDLE_ERROR(ofp_tcp_var_lookup_shared_memory());
 	HANDLE_ERROR(ofp_send_pkt_out_init_local());
 
+#ifdef OFP_IPSEC
+	HANDLE_ERROR(ofp_ipsec_lookup_shared_memory());
+#endif /* OFP_IPSEC */
 	return 0;
 }
 
@@ -358,6 +374,11 @@ int ofp_term_post_global(const char *pool_name)
 
 	/* Cleanup of TCP content */
 	CHECK_ERROR(ofp_tcp_var_term_global(), rc);
+
+	/* Cleanup IPsec */
+#ifdef OFP_IPSEC
+	CHECK_ERROR(ofp_ipsec_term_global(), rc);
+#endif /* OFP_IPSEC */
 
 	/* Cleanup vxlan */
 	CHECK_ERROR(ofp_vxlan_term_global(), rc);

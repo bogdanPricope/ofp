@@ -44,6 +44,7 @@
 #include "ofpi_udp_var.h"
 #include "ofpi_tcp_var.h"
 #include "ofpi_socket.h"
+#include "ofpi_ipsec.h"
 
 extern	struct pr_usrreqs nousrreqs;
 
@@ -130,6 +131,32 @@ struct protosw ofp_inetsw[] = {
 		.pr_usrreqs =		&rip_usrreqs
 	},
 #endif
+#ifdef OFP_IPSEC
+	{
+		.pr_type =		OFP_SOCK_RAW,
+		.pr_domain =		&ofp_inetdomain,
+		.pr_protocol =		OFP_IPPROTO_AH,
+		.pr_flags =		PR_ATOMIC|PR_ADDR,
+		.pr_input =		ofp_ah4_input,
+		.pr_init =		NULL,
+		.pr_destroy =		NULL,
+		.pr_ctlinput =		ofp_ah4_ctlinput,
+		.pr_ctloutput =		NULL,
+		.pr_usrreqs =		&nousrreqs
+	},
+	{
+		.pr_type =		OFP_SOCK_RAW,
+		.pr_domain =		&ofp_inetdomain,
+		.pr_protocol =		OFP_IPPROTO_ESP,
+		.pr_flags =		PR_ATOMIC|PR_ADDR,
+		.pr_input =		ofp_esp4_input,
+		.pr_init =		NULL,
+		.pr_destroy =		NULL,
+		.pr_ctlinput =		ofp_esp4_ctlinput,
+		.pr_ctloutput =		NULL,
+		.pr_usrreqs =		&nousrreqs
+	},
+#endif /* OFP_IPSEC */
 	{
 		.pr_type =		OFP_SOCK_RAW,
 		.pr_domain =		&ofp_inetdomain,

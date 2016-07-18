@@ -279,6 +279,25 @@ static int ip6net_ok(char *val)
 
 	return 1;
 }
+#ifdef OFP_IPSEC
+static int ipsec_nlp_ok(char *val)
+{
+	if (int_ok(val))
+		return 1;
+	if (ofp_ipsec_nlp_token_ok(val))
+		return 1;
+	return 0;
+}
+
+static int ipsec_sa_flags_ok(char *val)
+{
+	if (ofp_ipsec_flags_token_ok(val))
+		return 1;
+
+/*ToDo: check type=value */
+	return 0;
+}
+#endif /*OFP_IPSEC*/
 
 static uint8_t txt_to_hex(char val)
 {
@@ -470,7 +489,11 @@ static void f_help(struct cli_conn *conn, const char *s)
 	ofp_sendf(conn->fd, "Display help information for CLI commands:\r\n"
 		"  help <command>\r\n"
 		"    command: alias, arp, debug, exit, ifconfig, loglevel, "
-		"route, show, stat\r\n\r\n");
+		"route, show, stat"
+#ifdef OFP_IPSEC
+		", ipsec"
+#endif /*OFP_IPSEC*/
+		"\r\n\r\n");
 	sendcrlf(conn);
 }
 
@@ -488,8 +511,12 @@ static void f_help_show(struct cli_conn *conn, const char *s)
 	(void)s;
 	ofp_sendf(conn->fd, "Display current status:\r\n"
 		"  show <command>\r\n"
-		"    command: alias, arp, debug, ifconfig, loglevel, route, "
-		"stat\r\n\r\n");
+		"    command: alias, arp, debug, ifconfig, loglevel, route"
+		", stat"
+#ifdef OFP_IPSEC
+		", ipsec"
+#endif /*OFP_IPSEC*/
+		"\r\n\r\n");
 	sendcrlf(conn);
 }
 
@@ -521,6 +548,15 @@ static char DEV[] = "<dev>";
 static char IP4NET[] = "<a.b.c.d/n>";
 static char IP6ADDR[] = "<a:b:c:d:e:f:g:h>";
 static char IP6NET[] = "<a:b:c:d:e:f:g:h/n>";
+#ifdef OFP_IPSEC
+static char IPSEC_NLP[] = "<number or any or apaque>";
+static char IPSEC_DEP_NLP[] = "<none or ports:src_port_range_list:dest_port_range_list or icmp:type:code_range_list>";
+static char IPSEC_PROTO[] = "<esp or ah>";
+static char IPSEC_MODE[] = "<tunnel or transport>";
+static char IPSEC_AUTH[] = "<authentication algorithm>";
+static char IPSEC_ENC[] = "<encryption algorithm>";
+static char IPSEC_SA_FLAGS[] = "<name=value:name=value>";
+#endif /*OFP_IPSEC*/
 
 /** Check if the given word is a built-in "Parameter Keyword",
  *  and if so returns the Parameter string address, used as an identifier in the parser;
@@ -551,7 +587,22 @@ static char *get_param_string(const char *str)
 		return IP6NET;
 	if IS_PARAM(str, IP6ADDR)
 		return IP6ADDR;
-
+#ifdef OFP_IPSEC
+	if IS_PARAM(str, IPSEC_NLP)
+		return IPSEC_NLP;
+	if IS_PARAM(str, IPSEC_DEP_NLP)
+		return IPSEC_DEP_NLP;
+	if IS_PARAM(str, IPSEC_PROTO)
+		return IPSEC_PROTO;
+	if IS_PARAM(str, IPSEC_MODE)
+		return IPSEC_MODE;
+	if IS_PARAM(str, IPSEC_AUTH)
+		return IPSEC_AUTH;
+	if IS_PARAM(str, IPSEC_ENC)
+		return IPSEC_ENC;
+	if IS_PARAM(str, IPSEC_SA_FLAGS)
+		return IPSEC_SA_FLAGS;
+#endif /* OFP_IPSEC*/
 #undef IS_PARAM
 	return NULL;
 }
@@ -942,6 +993,158 @@ struct cli_command commands[] = {
 		"Set sysctl variable",
 		f_sysctl_write
 	},
+#ifdef OFP_IPSEC
+	{
+		"ipsec",
+		"Display information",
+		f_ipsec_show
+	},
+	{
+		"ipsec spdadd STRING STRING IPSEC_NLP IPSEC_DEP_NLP -P in bypass",
+		"Add IPsec policy",
+		f_ipsec_spdadd_in_bypass
+	},
+	{
+		"ipsec spdadd STRING STRING IPSEC_NLP IPSEC_DEP_NLP -P in discard",
+		"Add IPsec policy",
+		f_ipsec_spdadd_in_discard
+	},
+	{
+		"ipsec spdadd STRING STRING IPSEC_NLP IPSEC_DEP_NLP -P out bypass",
+		"Add IPsec policy",
+		f_ipsec_spdadd_out_bypass
+	},
+	{
+		"ipsec spdadd STRING STRING IPSEC_NLP IPSEC_DEP_NLP -P out discard",
+		"Add IPsec policy",
+		f_ipsec_spdadd_out_discard
+	},
+	{
+		"ipsec spdadd STRING STRING IPSEC_NLP IPSEC_DEP_NLP -P out protect STRING",
+		"Add IPsec policy",
+		f_ipsec_spdadd_out_protect
+	},
+	{
+		"ipsec spddel STRING STRING IPSEC_NLP IPSEC_DEP_NLP -P in",
+		"Delete IPsec policy",
+		f_ipsec_spddel_in
+	},
+	{
+		"ipsec spddel STRING STRING IPSEC_NLP IPSEC_DEP_NLP -P out",
+		"Delete IPsec policy",
+		f_ipsec_spddel_out
+	},
+	{
+		"ipsec spdflush",
+		"Delete all IPsec policies",
+		f_ipsec_spdflush
+	},
+	{
+		"ipsec spddump",
+		"Print all IPsec policies",
+		f_ipsec_spddump
+	},
+	{
+		"ipsec sadadd IP4ADDR IP4ADDR IPSEC_NLP IPSEC_DEP_NLP IPSEC_PROTO NUMBER IPSEC_SA_FLAGS -A IPSEC_AUTH -E IPSEC_ENC out",
+		"Add IPsec Security Association",
+		f_ipsec_sadadd_out
+	},
+	{
+		"ipsec sadadd IP4ADDR IP4ADDR IPSEC_NLP IPSEC_DEP_NLP IPSEC_PROTO IPSEC_MODE NUMBER IPSEC_SA_FLAGS -A IPSEC_AUTH -E IPSEC_ENC in",
+		"Add IPsec Security Association",
+		f_ipsec_sadadd_in
+	},
+	{
+		"ipsec saddel IP4ADDR IP4ADDR IPSEC_NLP IPSEC_DEP_NLP IPSEC_PROTO NUMBER out",
+		"Delete IPsec Security Association",
+		f_ipsec_saddel_out
+	},
+	{
+		"ipsec saddel IP4ADDR IP4ADDR IPSEC_NLP IPSEC_DEP_NLP IPSEC_PROTO NUMBER in",
+		"Delete IPsec Security Association",
+		f_ipsec_saddel_in
+	},
+	{
+		"ipsec sadflush",
+		"Delete all IPsec Security Association",
+		f_ipsec_sadflush
+	},
+	{
+		"ipsec saddump",
+		"Print all IPsec Security Association",
+		f_ipsec_saddump
+	},
+	{
+		"ipsec cacheflush in",
+		"Delete all IPsec inbound cache entries",
+		f_ipsec_cacheflush_in
+	},
+	{
+		"ipsec cacheflush out",
+		"Delete all IPsec inbound cache entries",
+		f_ipsec_cacheflush_out
+	},
+	{
+		"ipsec cachedump in",
+		"Print all IPsec inbound cache entries",
+		f_ipsec_cachedump_in
+	},
+	{
+		"ipsec cachedump out",
+		"Print all IPsec inbound cache entries",
+		f_ipsec_cachedump_out
+	},
+	{
+		"ipsec cacheupd in",
+		"Update IPsec inbound cache entries",
+		f_ipsec_cacheupdate_in
+	},
+	{
+		"ipsec cacheupd out",
+		"Update IPsec outbound cache entries",
+		f_ipsec_cacheupdate_out
+	},
+	{
+		"ipsec boundary DEV true",
+		"Set IPsec boundary on an interface",
+		f_ipsec_boundary_set
+	},
+	{
+		"ipsec boundary DEV false",
+		"Clear IPsec boundary on an interface",
+		f_ipsec_boundary_clr
+	},
+	{
+		"show ipsec",
+		"Display information",
+		f_ipsec_show
+	},
+	{
+		"ipsec show",
+		"Display information",
+		f_ipsec_show
+	},
+	{
+		"ipsec dump",
+		"Display information",
+		f_ipsec_show
+	},
+	{
+		"ipsec flush",
+		"Delete all IPsec databases",
+		f_ipsec_flush
+	},
+	{
+		"ipsec help",
+		NULL,
+		f_ipsec_help
+	},
+	{
+		"help ipsec",
+		NULL,
+		f_ipsec_help
+	},
+#endif /*OFP_IPSEC*/
 	{ NULL, NULL, NULL }
 };
 
@@ -1211,7 +1414,22 @@ static struct cli_node *find_next_vertical(struct cli_node *s, char *word)
 			(s->word == IP4NET && ip4net_ok(word)) ||
 			(s->word == STRING) ||
 			(s->word == IP6ADDR && ip6addr_ok(word)) ||
-			(s->word == IP6NET && ip6net_ok(word))) {
+			(s->word == IP6NET && ip6net_ok(word))
+#ifdef OFP_IPSEC
+			|| (s->word == IPSEC_NLP && ipsec_nlp_ok(word)) ||
+			(s->word == IPSEC_DEP_NLP &&
+				ofp_ipsec_nlp_dep_token_ok(word)) ||
+			(s->word == IPSEC_PROTO &&
+				ofp_ipsec_proto_token_ok(word)) ||
+			(s->word == IPSEC_MODE &&
+				ofp_ipsec_mode_token_ok(word)) ||
+			(s->word == IPSEC_AUTH &&
+				ofp_ipsec_auth_token_ok(word)) ||
+			(s->word == IPSEC_ENC &&
+				ofp_ipsec_enc_token_ok(word)) ||
+			(s->word == IPSEC_SA_FLAGS && ipsec_sa_flags_ok(word))
+#endif /*OFP_IPSEC*/
+			) {
 			foundcnt++;
 			if (foundcnt > 1) return 0;
 			found = s;
@@ -1230,7 +1448,17 @@ static int is_parameter(struct cli_node *s)
 		(s->word == IP4NET) ||
 		(s->word == STRING) ||
 		(s->word == IP6ADDR) ||
-		(s->word == IP6NET));
+		(s->word == IP6NET)
+#ifdef OFP_IPSEC
+		|| (s->word == IPSEC_NLP) ||
+		(s->word == IPSEC_DEP_NLP) ||
+		(s->word == IPSEC_PROTO) ||
+		(s->word == IPSEC_MODE) ||
+		(s->word == IPSEC_AUTH) ||
+		(s->word == IPSEC_ENC) ||
+		(s->word == IPSEC_SA_FLAGS)
+#endif /*OFP_IPSEC*/
+		);
 }
 
 /** parse(): parse a Command line
@@ -1297,7 +1525,22 @@ static void parse(struct cli_conn *conn, int extra)
 				(found->word == IP4NET && ip4net_ok(*token)) ||
 				(found->word == STRING) ||
 				(found->word == IP6ADDR && ip6addr_ok(*token)) ||
-				(found->word == IP6NET && ip6net_ok(*token))) {
+				(found->word == IP6NET && ip6net_ok(*token))
+#ifdef OFP_IPSEC
+				|| (found->word == IPSEC_NLP && ipsec_nlp_ok(*token)) ||
+				(found->word == IPSEC_DEP_NLP &&
+					ofp_ipsec_nlp_dep_token_ok(*token)) ||
+				(found->word == IPSEC_PROTO &&
+					ofp_ipsec_proto_token_ok(*token)) ||
+				(found->word == IPSEC_MODE &&
+					ofp_ipsec_mode_token_ok(*token)) ||
+				(found->word == IPSEC_AUTH &&
+					ofp_ipsec_auth_token_ok(*token)) ||
+				(found->word == IPSEC_ENC &&
+					ofp_ipsec_enc_token_ok(*token)) ||
+				(found->word == IPSEC_SA_FLAGS && ipsec_sa_flags_ok(*token))
+#endif /*OFP_IPSEC*/
+				) {
 				paramlen += sprintf(paramlist + paramlen,
 						"%s ", *token);
 			}

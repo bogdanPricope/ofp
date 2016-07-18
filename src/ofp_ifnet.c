@@ -229,6 +229,10 @@ int ofp_ifnet_create(odp_instance_t instance,
 	ifnet->if_name[OFP_IFNAMSIZ-1] = 0;
 	ifnet->pkt_pool = ofp_packet_pool;
 
+#ifdef OFP_IPSEC
+	ifnet->ipsec_boundary = 0;
+#endif /* OFP_IPSEC */
+
 	if (!pktio_param) {
 		pktio_param = &pktio_param_local;
 		odp_pktio_param_init(&pktio_param_local);

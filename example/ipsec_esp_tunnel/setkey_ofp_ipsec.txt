@@ -1,0 +1,6 @@
+flush;
+spdflush;
+add 192.168.100.2 192.168.100.1 esp 500 -m tunnel -E 3des-cbc 0xdeadbeefdeadbeefb0b0b0b0b0b0b0b0c0c0c0c0c0c0c0c0 -A hmac-md5 0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b;
+spdadd 192.168.100.2 192.168.100.1 any -P out ipsec esp/tunnel/192.168.100.2-192.168.100.1/use;
+add 192.168.100.1 192.168.100.2 esp 700 -m tunnel -E 3des-cbc 0xdeadbeefdeadbeefb0b0b0b0b0b0b0b0c0c0c0c0c0d0d0d0 -A hmac-md5 0x0b0b0b0b0b0b0b0b0b0b0b0b0b0c0c0c;
+spdadd 192.168.100.1 192.168.100.2 any -P in ipsec esp/tunnel/192.168.100.1-192.168.100.2/require;

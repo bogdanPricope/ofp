@@ -32,6 +32,7 @@ cli/ofp_cli_alias.c \
 cli/ofp_cli_stat.c \
 cli/ofp_cli_ifconfig.c \
 cli/ofp_cli_sysctl.c \
+cli/ofp_cli_parse.c \
 cli/ofp_cli.c \
 ofp_hash.c \
 ofp_icmp.c \
@@ -117,4 +118,23 @@ ofp_rt_mtrie_lookup.c
 else
 __LIB__libofp_la_SOURCES += \
 ofp_rt_lookup.c
+endif
+
+if OFP_IPSEC
+AM_CFLAGS +=  -DOFP_IPSEC
+
+__LIB__libofp_la_SOURCES += \
+ipsec/ofp_ipsec.c \
+ipsec/ofp_ipsec_selectors.c \
+ipsec/ofp_ipsec_spd.c \
+ipsec/ofp_ipsec_sad.c \
+ipsec/ofp_ipsec_cache_out.c \
+ipsec/ofp_ipsec_cache_in.c \
+ipsec/ofp_ipsec_alg.c \
+ipsec/ofp_ipsec_session.c \
+ipsec/ofp_ipsec_proto_input.c \
+ipsec/ofp_ipsec_pkt_processing.c \
+ipsec/ofp_ipsec_esp_tunnel.c \
+ipsec/ofp_ipsec_util.c \
+cli/ofp_cli_ipsec.c
 endif

@@ -10,6 +10,7 @@
 #include <odp.h>
 
 #include "ofpi_hook.h"
+#include "ofpi_ipsec.h"
 
 #define SHM_NAME_GLOBAL_CONFIG "OfpGlobalConfigShMem"
 
@@ -19,7 +20,8 @@ extern odp_cpumask_t cpumask;
 int ofp_init_pre_global(const char *pool_name,
 			odp_pool_param_t *pool_params,
 			ofp_pkt_hook hooks[], odp_pool_t *pool,
-			int arp_age_interval, int arp_entry_timeout);
+			int arp_age_interval, int arp_entry_timeout,
+			struct ofp_ipsec_config_param *ipsec_config);
 
 int ofp_term_post_global(const char *pool_name);
 

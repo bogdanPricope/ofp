@@ -24,6 +24,7 @@
 #define __OFP_INIT_H__
 
 #include "ofp_hook.h"
+#include "ofp_ipsec.h"
 
 #if __GNUC__ >= 4
 #pragma GCC visibility push(default)
@@ -41,7 +42,13 @@ typedef struct ofp_init_global_t {
 						when value set is 1.
 						Interfaces use scheduling
 						when value set is 0. */
+	struct ofp_ipsec_config_param  *ipsec_config;
 } ofp_init_global_t;
+
+/**
+ * OFP global parameter initialization
+ */
+void ofp_init_global_init(ofp_init_global_t *);
 
 /**
  * OFP global initialization

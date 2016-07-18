@@ -110,6 +110,7 @@ AC_CONFIG_FILES([
 	example/udp_fwd_socket/Makefile
 	example/ofp_netwrap_proc/Makefile
 	example/ofp_netwrap_crt/Makefile
+	example/ipsec_esp_tunnel/Makefile
 	pkgconfig/libofp.pc
 	scripts/Makefile
 	test/Makefile
@@ -236,6 +237,15 @@ AC_ARG_ENABLE([mtrie],
     esac],[use_mtrie=true])
 AM_CONDITIONAL([OFP_MTRIE], [test x$use_mtrie = xtrue])
 
+# Enable/disable IPsec use
+AC_ARG_ENABLE([ipsec],
+    [  --enable-ipsec         Enable/disable use of IPsec],
+    [case "${enableval}" in
+        yes) use_ipsec=true ;;
+        no)  use_ipsec=false ;;
+        *) AC_MSG_ERROR([bad value ${enableval} for --enable-ipsec]) ;;
+    esac],[use_ipsec=false])
+AM_CONDITIONAL([OFP_IPSEC], [test x$use_ipsec = xtrue])
 
 ##########################################################################
 # Enable/disable Unit tests

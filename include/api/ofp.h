@@ -52,6 +52,15 @@ extern "C" {
 #include "ofp_udp.h"
 #include "ofp_ip_var.h"
 #include "ofp_tcp.h"
+#include "ofp_ipsec.h"
+#include "ofp_ipsec_common.h"
+#include "ofp_ipsec_selectors.h"
+#include "ofp_ipsec_alg.h"
+#include "ofp_ipsec_sad.h"
+#include "ofp_ipsec_spd.h"
+#include "ofp_ipsec_cache_in.h"
+#include "ofp_ipsec_cache_out.h"
+#include "ofp_ipsec_pkt_processing.h"
 
 #ifdef __cplusplus
 }
