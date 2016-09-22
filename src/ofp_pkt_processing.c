@@ -1566,6 +1566,21 @@ enum ofp_return_code ofp_packet_output_compl(odp_packet_t pkt)
 	if ((ret = ofp_ip_output_find_route(pkt, &odata)) != OFP_PKT_CONTINUE)
 		return ret;
 
+	switch (odata.out_port) {
+	case GRE_PORTS:
+		if ((ret = ofp_gre_update_target(pkt, &odata)) != OFP_PKT_CONTINUE)
+			return ret;
+		break;
+	case VXLAN_PORTS:
+		if ((ret = ofp_ip_output_add_eth(pkt, &odata)) != OFP_PKT_CONTINUE)
+			return ret;
+		if ((ret = ofp_ip_output_vxlan(pkt, &odata)) != OFP_PKT_CONTINUE)
+			return ret;
+		if ((ret = ofp_ip_output_find_route(pkt, &odata)) != OFP_PKT_CONTINUE)
+			return ret;
+		break;
+	}
+
 	if ((ret = ofp_ip_output_add_eth(pkt, &odata)) != OFP_PKT_CONTINUE)
 			return ret;
 

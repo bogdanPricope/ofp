@@ -16,6 +16,7 @@
 #include "ofpi_if_vlan.h"
 #include "ofpi_ethernet.h"
 #include "ofpi_portconf.h"
+#include "ofpi_ipsec_pkt_ctx.h"
 #include "ofpi_log.h"
 #include "ofpi_hook.h"
 #include "ofpi_util.h"
@@ -99,6 +100,10 @@ enum ofp_return_code ofp_gre_input(odp_packet_t pkt, int off0)
 	}
 
 	odp_packet_user_ptr_set(pkt, dev_in);
+
+#ifdef OFP_IPSEC
+	ofp_ipsec_boundary_crossing_set(pkt, dev_in->ipsec_boundary);
+#endif /*OFP_IPSEC*/
 
 	switch (odp_be_to_cpu_16(ptype)) {
 	case OFP_ETHERTYPE_IP:
