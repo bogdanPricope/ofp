@@ -74,12 +74,13 @@ test_global_resources_init_cleanup(void)
 	memset(pkt_hook, 0, sizeof(pkt_hook));
 	pool_params.pkt.seg_len = SHM_PKT_POOL_BUFFER_SIZE;
 	pool_params.pkt.len     = SHM_PKT_POOL_BUFFER_SIZE;
+	pool_params.pkt.max_len    = SHM_PKT_POOL_BUFFER_SIZE;
 	pool_params.pkt.num     = SHM_PKT_POOL_NB_PKTS;
 	pool_params.type        = ODP_POOL_PACKET;
 
 	CU_ASSERT_EQUAL(ofp_init_pre_global(
 				"packet_pool", &pool_params, pkt_hook, &pool,
-				ARP_AGE_INTERVAL, ARP_ENTRY_TIMEOUT,
+				ARP_AGE_INTERVAL, ARP_ENTRY_TIMEOUT, NULL,
 				ODP_SCHED_GROUP_ALL), 0);
 
 	CU_ASSERT_EQUAL(ofp_term_post_global("packet_pool"), 0);
