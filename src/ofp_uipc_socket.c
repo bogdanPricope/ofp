@@ -888,7 +888,7 @@ ofp_soconnect(struct socket *so, struct ofp_sockaddr *nam, struct thread *td)
 	 * Otherwise, if connected, try to disconnect first.  This allows
 	 * user to disconnect by connecting to, e.g., a null address.
 	 */
-	if (so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING) &&
+	if ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) &&
 	    ((so->so_proto->pr_flags & PR_CONNREQUIRED) ||
 	    (error = ofp_sodisconnect(so)))) {
 		error = OFP_EISCONN;
@@ -1317,7 +1317,7 @@ ofp_soreceive_generic(struct socket *so, struct ofp_sockaddr **psa, struct uio *
 	int flags, error, offset;
 	ofp_ssize_t len;
 	struct protosw *pr = so->so_proto;
-	int moff, /* type = 0, last_m_flags,*/ hole_break = 0;
+	int moff/*, type = 0, last_m_flags, hole_break = 0*/;
 	ofp_ssize_t orig_resid = uio->uio_resid;
 	uint32_t uio_off;
 
@@ -1327,13 +1327,11 @@ ofp_soreceive_generic(struct socket *so, struct ofp_sockaddr **psa, struct uio *
 	if (controlp != NULL)
 		*controlp = ODP_PACKET_INVALID;
 	if (flagsp != NULL) {
-		hole_break = *flagsp & OFP_MSG_HOLE_BREAK;
+/*		hole_break = *flagsp & OFP_MSG_HOLE_BREAK;*/
 		*flagsp &= ~OFP_MSG_HOLE_BREAK;
 		flags = *flagsp &~ OFP_MSG_EOR;
 	} else
 		flags = 0;
-
-	hole_break = hole_break;
 
 	/* HJo: FIX
 	if (flags & OFP_MSG_OOB)
@@ -1639,7 +1637,7 @@ dontblock:
 				 * each record.
 				 */
 				if (m != ODP_PACKET_INVALID &&
-				    pr->pr_flags & PR_ATOMIC &&
+				    (pr->pr_flags & PR_ATOMIC) &&
 				    ((flags & OFP_MSG_PEEK) == 0))
 					(void)ofp_sbdroprecord_locked(&so->so_rcv);
 				SOCKBUF_UNLOCK(&so->so_rcv);
@@ -1741,11 +1739,11 @@ dontblock:
 		 * short count but without error.  Keep sockbuf locked
 		 * against other readers.
 		 */
-		while (flags & OFP_MSG_WAITALL && m == ODP_PACKET_INVALID &&
+		while ((flags & OFP_MSG_WAITALL) && m == ODP_PACKET_INVALID &&
 		       uio->uio_resid > 0 &&
 		       !sosendallatonce(so) /* && nextrecord == NULL*/) {
 			SOCKBUF_LOCK_ASSERT(&so->so_rcv);
-			if (so->so_error || so->so_rcv.sb_state & SBS_CANTRCVMORE)
+			if (so->so_error || (so->so_rcv.sb_state & SBS_CANTRCVMORE))
 				break;
 			/*
 			 * Notify the protocol that some data has been
@@ -1774,7 +1772,7 @@ dontblock:
 	}
 
 	SOCKBUF_LOCK_ASSERT(&so->so_rcv);
-	if (m != ODP_PACKET_INVALID && pr->pr_flags & PR_ATOMIC) {
+	if (m != ODP_PACKET_INVALID && (pr->pr_flags & PR_ATOMIC)) {
 		flags |= OFP_MSG_TRUNC;
 		if ((flags & OFP_MSG_PEEK) == 0)
 			(void) ofp_sbdroprecord_locked(&so->so_rcv);
@@ -1885,7 +1883,7 @@ ofp_soreceive_dgram(struct socket *so, struct ofp_sockaddr **psa, struct uio *ui
 			SOCKBUF_UNLOCK(&so->so_rcv);
 			return (error);
 		}
-		if (so->so_rcv.sb_state & SBS_CANTRCVMORE ||
+		if ((so->so_rcv.sb_state & SBS_CANTRCVMORE) ||
 		    uio->uio_resid == 0) {
 			SOCKBUF_UNLOCK(&so->so_rcv);
 			return (0);
@@ -1982,7 +1980,6 @@ ofp_sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	return (0);
 }
 
-extern int ofp_ip_ctloutput(struct socket *so, struct sockopt *sopt);
 int
 ofp_sosetopt(struct socket *so, struct sockopt *sopt)
 {
@@ -2832,15 +2829,49 @@ ofp_send_sock_event(struct socket *head, struct socket *so, int event)
 	struct ofp_sigevent *ev = &head->so_sigevent;
 
 	if (ev->ofp_sigev_notify) {
-		struct ofp_sock_sigval *ss = ev->ofp_sigev_value.sival_ptr;
-		ss->event = event;
-		ss->sockfd = head->so_number;
-		ss->sockfd2 = so->so_number;
+		union ofp_sigval sv;
+		struct ofp_sock_sigval ss;
+
+		sv.sival_ptr = (void *)&ss;
+
+		ss.event = event;
+		ss.sockfd = head->so_number;
+		ss.sockfd2 = so->so_number;
+
 		so->so_state |= SS_EVENT;
 		head->so_state |= SS_EVENT;
-		ev->ofp_sigev_notify_function(ev->ofp_sigev_value);
+		ev->ofp_sigev_notify_function(sv);
 		so->so_state &= ~SS_EVENT;
 		head->so_state &= ~SS_EVENT;
 	}
 	return 0;
+}
+
+static inline int
+is_accepting_socket(struct socket *so)
+{
+	return (so->so_options & OFP_SO_ACCEPTCONN);
+}
+
+static inline int
+is_accepting_socket_readable(struct socket *so)
+{
+	return !(OFP_TAILQ_EMPTY(&so->so_comp));
+}
+
+static inline int
+is_listening_socket_readable(struct socket *so)
+{
+	return (so->so_rcv.sb_cc > 0);
+}
+
+int
+is_readable(int fd)
+{
+	struct socket *so = ofp_get_sock_by_fd(fd);
+
+	if (is_accepting_socket(so))
+		return is_accepting_socket_readable(so);
+
+	return is_listening_socket_readable(so);
 }

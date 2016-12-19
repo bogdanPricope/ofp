@@ -36,6 +36,7 @@
 #ifndef _SYS_SOCKETVAR_H_
 #define _SYS_SOCKETVAR_H_
 
+#include "ofp_epoll.h"
 #include "ofpi_queue.h"			/* for TAILQ macros */
 #include "ofpi_sockbuf.h"
 #include "ofpi_in_pcb.h"
@@ -144,6 +145,11 @@ struct socket {
 		struct inpcb dummy;
 	} pcb_space;
 	struct ofp_sigevent so_sigevent;
+
+	struct epoll_set {
+		int fd;
+		struct ofp_epoll_event event;
+	} epoll_set[EPOLL_SET_SIZE];
 };
 
 
@@ -423,5 +429,7 @@ int ofp_msleep(void *channel, odp_rwlock_t *mtx, int priority, const char *wmesg
 int ofp_wakeup(void *channel);
 int ofp_wakeup_one(void *channel);
 int ofp_send_sock_event(struct socket *head, struct socket *so, int event);
+
+int is_readable(int fd);
 
 #endif /* !_SYS_SOCKETVAR_H_ */

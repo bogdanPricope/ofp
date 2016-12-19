@@ -35,7 +35,7 @@
 #ifndef __OFP_SOCKET_H__
 #define __OFP_SOCKET_H__
 
-#include "odp.h"
+#include <odp.h>
 #include "ofp_socket_types.h"
 #include "ofp_config.h"
 
@@ -93,6 +93,7 @@ typedef	__ofp_uid_t		ofp_uid_t;
 #define	OFP_SOCK_RAW		3		/* raw-protocol interface */
 #define	OFP_SOCK_RDM		4		/* reliably-delivered message */
 #define	OFP_SOCK_SEQPACKET	5		/* sequenced packet stream */
+#define OFP_SOCK_EPOLL          6       /* epoll socket */
 
 /*
  * Option flags per-socket, kept in so_options.

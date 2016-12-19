@@ -61,6 +61,7 @@ extern "C" {
 #include "ofp_ipsec_cache_in.h"
 #include "ofp_ipsec_cache_out.h"
 #include "ofp_ipsec_pkt_processing.h"
+#include "ofp_epoll.h"
 
 #ifdef __cplusplus
 }

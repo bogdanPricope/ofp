@@ -11,6 +11,8 @@
 
 #include "ofpi_hook.h"
 #include "ofpi_ipsec.h"
+#include "api/ofp_init.h"
+#include <odp/helper/linux.h>
 
 #define SHM_NAME_GLOBAL_CONFIG "OfpGlobalConfigShMem"
 
@@ -21,7 +23,8 @@ int ofp_init_pre_global(const char *pool_name,
 			odp_pool_param_t *pool_params,
 			ofp_pkt_hook hooks[], odp_pool_t *pool,
 			int arp_age_interval, int arp_entry_timeout,
-			struct ofp_ipsec_config_param *ipsec_config);
+			struct ofp_ipsec_config_param *ipsec_config,
+			odp_schedule_group_t sched_group);
 
 int ofp_term_post_global(const char *pool_name);
 

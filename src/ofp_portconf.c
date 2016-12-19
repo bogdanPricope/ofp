@@ -115,7 +115,7 @@ static int vlan_ifnet_compare(void *compare_arg, void *a, void *b)
 	struct ofp_ifnet *a1 = a;
 	struct ofp_ifnet *b1 = b;
 
-	compare_arg = compare_arg;
+	(void)compare_arg;
 
 	return (a1->vlan - b1->vlan);
 }
@@ -421,7 +421,7 @@ const char *ofp_config_interface_up_v4(int port, uint16_t vlan, uint16_t vrf,
 	int ret = 0;
 #endif /* SP */
 	struct ofp_ifnet *data;
-	uint32_t mask;
+	uint32_t mask, mask_t;
 
 #ifdef SP
 	(void)ret;
@@ -492,13 +492,14 @@ const char *ofp_config_interface_up_v4(int port, uint16_t vlan, uint16_t vrf,
 		else
 			data->sp_status = OFP_SP_DOWN;
 
+		mask_t = odp_be_to_cpu_32(mask);
 		snprintf(cmd, sizeof(cmd), "ifconfig %s %s netmask %d.%d.%d.%d up",
 			 ofp_port_vlan_to_ifnet_name(port, vlan),
 			 ofp_print_ip_addr(addr),
-			(uint8_t)(mask >> 24),
-			(uint8_t)(mask >> 16),
-			(uint8_t)(mask >> 8),
-			(uint8_t)mask);
+			(uint8_t)(mask_t >> 24),
+			(uint8_t)(mask_t >> 16),
+			(uint8_t)(mask_t >> 8),
+			(uint8_t)mask_t);
 
 		ret = exec_sys_call_depending_on_vrf(cmd, vrf);
 #endif /* SP */
@@ -533,13 +534,14 @@ const char *ofp_config_interface_up_v4(int port, uint16_t vlan, uint16_t vrf,
 		else
 			data->sp_status = OFP_SP_DOWN;
 
+		mask_t = odp_be_to_cpu_32(mask);
 		snprintf(cmd, sizeof(cmd), "ifconfig %s %s netmask %d.%d.%d.%d up",
 			ofp_port_vlan_to_ifnet_name(port, 0),
 			ofp_print_ip_addr(addr),
-			(uint8_t)(mask >> 24),
-			(uint8_t)(mask >> 16),
-			(uint8_t)(mask >> 8),
-			(uint8_t)mask);
+			(uint8_t)(mask_t >> 24),
+			(uint8_t)(mask_t >> 16),
+			(uint8_t)(mask_t >> 8),
+			(uint8_t)mask_t);
 		ret = exec_sys_call_depending_on_vrf(cmd, vrf);
 #endif /* SP */
 	}
@@ -635,7 +637,7 @@ const char *ofp_config_interface_up_tun(int port, uint16_t greid,
 	return NULL;
 }
 
-void ofp_join_device_to_multicat_group(struct ofp_ifnet *dev_root,
+void ofp_join_device_to_multicast_group(struct ofp_ifnet *dev_root,
 				       struct ofp_ifnet *dev_vxlan,
 				       uint32_t group)
 {
@@ -700,7 +702,7 @@ const char *ofp_config_interface_up_vxlan(uint16_t vrf, uint32_t addr, int mlen,
 	data->ip_p2p = group;
 	data->ip_addr = addr;
 	data->masklen = mlen;
-	data->bcast_addr = addr | ~odp_cpu_to_be_32(~0 << (32 - mlen));
+	data->bcast_addr = addr | ~odp_cpu_to_be_32(0xFFFFFFFF << (32 - mlen));
 	data->if_mtu = dev_root->if_mtu - sizeof(struct ofp_vxlan_udp_ip);
 	data->physport = physport;
 	data->physvlan = physvlan;
@@ -713,7 +715,7 @@ const char *ofp_config_interface_up_vxlan(uint16_t vrf, uint32_t addr, int mlen,
 			     data->ip_addr & mask, data->masklen, 0, OFP_RTF_NET);
 
 	/* Join root device to multicast group. */
-	ofp_join_device_to_multicat_group(dev_root, data, group);
+	ofp_join_device_to_multicast_group(dev_root, data, group);
 
 #ifdef SP
 	if (data->vrf == 0)
@@ -1009,15 +1011,17 @@ const char *ofp_config_interface_down(int port, uint16_t vlan)
 
 		/* Remove interface from the if_addr v4 queue */
 		ofp_ifaddr_elem_del(data);
+#ifdef INET6
 		/* Remove interface from the if_addr v6 queue */
 		ofp_ifaddr6_elem_del(data);
+#endif
 #ifdef SP
 		vrf = data->vrf;
 #endif /*SP*/
 		if (data->ip_addr) {
 			uint32_t a = (data->port == GRE_PORTS) ?
 				data->ip_p2p : data->ip_addr;
-			a = odp_cpu_to_be_32(odp_be_to_cpu_32(a) & ((~0) << (32-data->masklen)));
+			a = odp_cpu_to_be_32(odp_be_to_cpu_32(a) & (0xFFFFFFFF << (32-data->masklen)));
 
 			if (data->port == LOCAL_PORTS)
 				ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, vlan, port,
@@ -1093,15 +1097,17 @@ const char *ofp_config_interface_down(int port, uint16_t vlan)
 
 		/* Remove interface from the if_addr v4 queue */
 		ofp_ifaddr_elem_del(data);
+#ifdef INET6
 		/* Remove interface from the if_addr v6 queue */
 		ofp_ifaddr6_elem_del(data);
+#endif
 #ifdef SP
 		vrf = data->vrf;
 #endif /*SP*/
 		if (data->ip_addr) {
 			uint32_t a = odp_cpu_to_be_32(
 				odp_be_to_cpu_32(data->ip_addr) &
-				((~0) << (32 - data->masklen)));
+				(0xFFFFFFFF << (32 - data->masklen)));
 			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, 0 /*vlan*/, port,
 					     data->ip_addr, 32, 0, 0);
 			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, 0 /*vlan*/, port,
@@ -1185,8 +1191,10 @@ struct ofp_ifnet *ofp_get_create_ifnet(int port, uint16_t vlan)
 #endif /* INET6 */
 			/* Add interface to the if_addr v4 queue */
 			ofp_ifaddr_elem_add(data);
+#ifdef INET6
 			/* Add interface to the if_addr v6 queue */
 			ofp_ifaddr6_elem_add(data);
+#endif
 			/* Multicast related */
 			OFP_TAILQ_INIT(&data->if_multiaddrs);
 			data->if_flags |= OFP_IFF_MULTICAST;

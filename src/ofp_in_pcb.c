@@ -63,8 +63,6 @@
 #define	HASH_NOWAIT	0x00000001
 #define	HASH_WAITOK	0x00000002
 extern void *ofp_hashinit(int count, void *type, uint64_t *hashmask);
-extern void *ofp_hashinit_flags(int elements, void *type, uint64_t *hashmask, int flags);
-extern void *ofp_phashinit(int count, void *type, uint64_t *nentries);
 extern void  ofp_hashdestroy(void *vhashtbl, void *type, uint64_t hashmask);
 
 extern struct inpcbinfo ofp_udbinfo;
@@ -973,8 +971,6 @@ ofp_in_pcbref(struct inpcb *inp)
 int
 ofp_in_pcbrele_rlocked(struct inpcb *inp)
 {
-	struct inpcbinfo *pcbinfo;
-
 	KASSERT(inp->inp_refcount.v > 0, ("%s: refcount 0", __func__));
 
 	INP_RLOCK_ASSERT(inp);
@@ -985,17 +981,13 @@ ofp_in_pcbrele_rlocked(struct inpcb *inp)
 	KASSERT(inp->inp_socket == NULL, ("%s: inp_socket != NULL", __func__));
 
 	INP_RUNLOCK(inp);
-	pcbinfo = inp->inp_pcbinfo;
-	pcbinfo = pcbinfo;
-	uma_zfree(pcbinfo->ipi_zone, inp);
+	uma_zfree(inp->inp_pcbinfo->ipi_zone, inp);
 	return (1);
 }
 
 int
 ofp_in_pcbrele_wlocked(struct inpcb *inp)
 {
-	struct inpcbinfo *pcbinfo;
-
 	KASSERT(inp->inp_refcount.v > 0, ("%s: refcount 0", __func__));
 
 	INP_WLOCK_ASSERT(inp);
@@ -1006,9 +998,7 @@ ofp_in_pcbrele_wlocked(struct inpcb *inp)
 	KASSERT(inp->inp_socket == NULL, ("%s: inp_socket != NULL", __func__));
 
 	INP_WUNLOCK(inp);
-	pcbinfo = inp->inp_pcbinfo;
-	pcbinfo = pcbinfo;
-	uma_zfree(pcbinfo->ipi_zone, inp);
+	uma_zfree(inp->inp_pcbinfo->ipi_zone, inp);
 	return (1);
 }
 

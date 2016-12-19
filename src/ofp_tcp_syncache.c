@@ -908,7 +908,7 @@ _syncache_add(struct in_conninfo *inc, struct tcpopt *to, struct ofp_tcphdr *th,
 	odp_packet_t ipopts = ODP_PACKET_INVALID;
 	uint32_t flowtmp = 0;
 	uint32_t ltflags;
-	int win, sb_hiwat, ip_ttl, ip_tos;
+	int win, ip_ttl, ip_tos;
 #ifdef INET6
 	int autoflowlabel = 0;
 #endif
@@ -936,8 +936,6 @@ _syncache_add(struct in_conninfo *inc, struct tcpopt *to, struct ofp_tcphdr *th,
 	ip_ttl = inp->inp_ip_ttl;
 	ip_tos = inp->inp_ip_tos;
 	win = sbspace(&so->so_rcv);
-	sb_hiwat = so->so_rcv.sb_hiwat;
-	sb_hiwat = sb_hiwat;
 	ltflags = (tp->t_flags & (TF_NOOPT | TF_SIGNATURE));
 
 	/* By the time we drop the lock these should no longer be used. */
@@ -1157,6 +1155,7 @@ syncache_respond(struct syncache *sc)
 	odp_packet_t m;
 	struct ofp_tcphdr *th = NULL;
 	int optlen, error = 0;	/* Make compiler happy */
+	enum ofp_return_code rc;
 	uint16_t hlen, tlen, mssopt;
 	struct tcpopt to;
 #ifdef INET6
@@ -1298,7 +1297,13 @@ syncache_respond(struct syncache *sc)
 		th->th_sum = 0;
 		th->th_sum = ofp_in4_cksum(m);
 
-		error = ofp_ip_output(m, NULL);
+		rc = ofp_ip_output(m, NULL);
+		if (rc == OFP_PKT_DROP) {
+			OFP_ERR("Drop packet");
+			odp_packet_free(m);
+		}
+		if (rc != OFP_PKT_PROCESSED)
+			error = -1;
 	}
 
 	return (error);

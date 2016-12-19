@@ -76,7 +76,8 @@ init_suite(void)
 	pool_params.type	= ODP_POOL_PACKET;
 
 	(void) ofp_init_pre_global("packet_pool", &pool_params, pkt_hook, &pool,
-				   ARP_AGE_INTERVAL, ARP_ENTRY_TIMEOUT, NULL);
+				   ARP_AGE_INTERVAL, ARP_ENTRY_TIMEOUT,
+				   ODP_SCHED_GROUP_ALL);
 
 	ofp_arp_init_local();
 
@@ -126,6 +127,8 @@ static void assert_dev(struct ofp_ifnet *dev, int port, uint16_t vlan,
 #ifdef INET6
 	if (memcmp(dev->link_local, link_local, 16))
 		CU_FAIL("Link local address");
+#else
+	(void)link_local;
 #endif /* INET6 */
 }
 

@@ -110,7 +110,8 @@ int ofp_init_pre_global(const char *pool_name_unused,
 			odp_pool_param_t *pool_params_unused,
 			ofp_pkt_hook hooks[], odp_pool_t *pool_unused,
 			int arp_age_interval, int arp_entry_timeout,
-			struct ofp_ipsec_config_param *ipsec_config)
+			struct ofp_ipsec_config_param *ipsec_config,
+			odp_schedule_group_t sched_group)
 {
 	(void)pool_name_unused;
 	(void)pool_params_unused;
@@ -141,7 +142,8 @@ int ofp_init_pre_global(const char *pool_name_unused,
 	HANDLE_ERROR(ofp_timer_init_global(OFP_TIMER_RESOLUTION_US,
 			OFP_TIMER_MIN_US,
 			OFP_TIMER_MAX_US,
-			OFP_TIMER_TMO_COUNT));
+			OFP_TIMER_TMO_COUNT,
+			sched_group));
 
 	HANDLE_ERROR(ofp_hook_init_global(hooks));
 
@@ -186,6 +188,7 @@ int ofp_init_global(odp_instance_t instance, ofp_init_global_t *params)
 {
 	int i;
 	odp_pktio_param_t pktio_param;
+	odp_pktin_queue_param_t pktin_param;
 #ifdef SP
 	odph_linux_thr_params_t thr_params;
 #endif /* SP */
@@ -195,7 +198,8 @@ int ofp_init_global(odp_instance_t instance, ofp_init_global_t *params)
 	HANDLE_ERROR(ofp_init_pre_global(NULL, NULL,
 					 params->pkt_hook, NULL,
 					 ARP_AGE_INTERVAL, ARP_ENTRY_TIMEOUT,
-					 params->ipsec_config));
+					 params->ipsec_config,
+					 params->sched_group));
 
 	/* cpu mask for slow path threads */
 	odp_cpumask_zero(&cpumask);
@@ -211,9 +215,12 @@ int ofp_init_global(odp_instance_t instance, ofp_init_global_t *params)
 						ODP_PKTIN_MODE_SCHED;
 	pktio_param.out_mode = ODP_PKTOUT_MODE_DIRECT;
 
+	ofp_pktin_queue_param_init(&pktin_param, pktio_param.in_mode,
+			params->sched_group);
+
 	for (i = 0; i < params->if_count; ++i)
 		HANDLE_ERROR(ofp_ifnet_create(instance, params->if_names[i],
-			&pktio_param, NULL, NULL));
+			&pktio_param, &pktin_param, NULL));
 
 #ifdef SP
 	/* Start Netlink server process */
@@ -450,6 +457,7 @@ static void schedule_shutdown(void)
 	odp_queue_t from;
 
 	while (1) {
+		/* should be called from a thread within OFP's schedule group */
 		evt = odp_schedule(&from, ODP_SCHED_NO_WAIT);
 		if (evt == ODP_EVENT_INVALID)
 			break;

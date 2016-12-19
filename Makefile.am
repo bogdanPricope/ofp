@@ -43,7 +43,8 @@ include_HEADERS = \
 		$(top_srcdir)/include/api/ofp_ipsec_cache_in.h \
 		$(top_srcdir)/include/api/ofp_ipsec_cache_out.h \
 		$(top_srcdir)/include/api/ofp_ipsec_alg.h \
-		$(top_srcdir)/include/api/ofp_ipsec_pkt_processing.h
+		$(top_srcdir)/include/api/ofp_ipsec_pkt_processing.h \
+		$(top_srcdir)/include/api/ofp_epoll.h
 
 noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_netlink.h \
@@ -130,6 +131,7 @@ noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_ipsec_pkt_processing.h \
 		  $(top_srcdir)/include/ofpi_ipsec_operation.h \
 		  $(top_srcdir)/include/ofpi_ipsec_pkt_ctx.h \
-		  $(top_srcdir)/include/ofpi_ipsec_util.h
+		  $(top_srcdir)/include/ofpi_ipsec_util.h \
+		  $(top_srcdir)/include/ofpi_epoll.h
 
 EXTRA_DIST = bootstrap .scmversion

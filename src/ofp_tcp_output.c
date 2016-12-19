@@ -171,15 +171,13 @@ ofp_tcp_output(struct tcpcb *tp)
 	int tso;
 	struct tcpopt to;
 
-	ipov = ipov;
+	(void)ipov;
 #if 0
 	int maxburst = OFP_TCP_MAXBURST;
 #endif
 #ifdef INET6
 	struct ofp_ip6_hdr *ip6 = NULL;
 	int isipv6;
-
-	(void)ipov;
 
 	isipv6 = (tp->t_inpcb->inp_vflag & INP_IPV6) != 0;
 #endif
@@ -584,7 +582,7 @@ dontupdate:
 	 * If our state indicates that FIN should be sent
 	 * and we have not yet done so, then we need to send.
 	 */
-	if (flags & OFP_TH_FIN &&
+	if ((flags & OFP_TH_FIN) &&
 	    ((tp->t_flags & TF_SENTFIN) == 0 || tp->snd_nxt == tp->snd_una))
 		goto send;
 
@@ -905,7 +903,7 @@ send:
 	 * window for use in delaying messages about window sizes.
 	 * If resending a FIN, be sure not to use a new sequence number.
 	 */
-	if (flags & OFP_TH_FIN && tp->t_flags & TF_SENTFIN &&
+	if ((flags & OFP_TH_FIN) && (tp->t_flags & TF_SENTFIN) &&
 	    tp->snd_nxt == tp->snd_max)
 		tp->snd_nxt--;
 	/*
