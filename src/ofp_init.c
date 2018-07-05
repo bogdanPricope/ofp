@@ -470,7 +470,7 @@ int ofp_init_local(void)
 	HANDLE_ERROR(ofp_pcap_lookup_shared_memory());
 	HANDLE_ERROR(ofp_stat_lookup_shared_memory());
 	HANDLE_ERROR(ofp_socket_lookup_shared_memory());
-	HANDLE_ERROR(ofp_timer_lookup_shared_memory());
+	HANDLE_ERROR(ofp_timer_init_local());
 	HANDLE_ERROR(ofp_hook_lookup_shared_memory());
 	HANDLE_ERROR(ofp_arp_lookup_shared_memory());
 	HANDLE_ERROR(ofp_vxlan_lookup_shared_memory());
