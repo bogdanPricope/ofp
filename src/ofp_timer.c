@@ -72,7 +72,6 @@ static void ofp_timer_shm_init(void)
 	memset(shm, 0, sizeof(*shm));
 	shm->pool = ODP_POOL_INVALID;
 	shm->buf_pool = ODP_POOL_INVALID;
-	shm->queue = ODP_QUEUE_INVALID;
 	for (cpu_id = 0; cpu_id < OFP_MAX_NUM_CPU; cpu_id++) {
 		shm->queue_per_cpu[cpu_id] = ODP_QUEUE_INVALID;
 		shm->short_timer_free[cpu_id] = ODP_QUEUE_INVALID;
@@ -141,7 +140,7 @@ void ofp_timer_init_prepare(void)
 	ofp_shared_memory_prealloc(SHM_NAME_TIMER, sizeof(*shm));
 }
 
-static odp_buffer_t alloc_short_timer_buffer(int timout_cpu_id)
+static odp_buffer_t alloc_short_timer_buffer(int cpu_id)
 {
 	odp_buffer_t buf;
 	struct ofp_timer_internal *bufdata;
@@ -159,7 +158,7 @@ static odp_buffer_t alloc_short_timer_buffer(int timout_cpu_id)
 	bufdata->buf = buf;
 	bufdata->next = NULL;
 	bufdata->id = 0;
-	bufdata->cpu_id = odp_cpu_id();
+	bufdata->cpu_id = cpu_id;
 
 	tmo = odp_timeout_alloc(shm->pool);
 	if (tmo == ODP_TIMEOUT_INVALID) {
@@ -169,7 +168,7 @@ static odp_buffer_t alloc_short_timer_buffer(int timout_cpu_id)
 	}
 	bufdata->t_ev = odp_timeout_to_event(tmo);
 
-	timer = ofp_timer_alloc(timout_cpu_id, bufdata);
+	timer = ofp_timer_alloc(cpu_id, bufdata);
 	if (timer == ODP_TIMER_INVALID) {
 		odp_timeout_free(tmo);
 		odp_buffer_free(buf);
@@ -191,7 +190,8 @@ static void free_short_timer_buffer(odp_buffer_t buf)
 	odp_buffer_free(buf);
 }
 
-static int ofp_timer_create_queues(odp_schedule_group_t sched_group)
+static int ofp_timer_create_queues(odp_schedule_group_t sched_group,
+				   odp_bool_t sched_timer_queues)
 {
 	odp_queue_param_t param;
 	uint32_t cpu_id = 0;
@@ -202,19 +202,20 @@ static int ofp_timer_create_queues(odp_schedule_group_t sched_group)
 	param.sched.sync  = ODP_SCHED_SYNC_PARALLEL;
 	param.sched.group = sched_group;
 
-	shm->queue = odp_queue_create("TimerQueue", &param);
-	if (shm->queue == ODP_QUEUE_INVALID) {
-		OFP_ERR("odp_queue_create failed");
-		return -1;
-	}
-
 	for (cpu_id = 0; cpu_id < OFP_MAX_NUM_CPU; cpu_id++) {
 		char queue_name_cpu[32];
 		odp_queue_param_init(&param);
 
-		param.type = ODP_QUEUE_TYPE_PLAIN;
-		param.enq_mode = ODP_QUEUE_OP_MT_UNSAFE;
-		param.deq_mode = ODP_QUEUE_OP_MT_UNSAFE;
+		if (sched_timer_queues) {  /* polling queue */
+			param.type = ODP_QUEUE_TYPE_SCHED;
+			param.sched.prio  = ODP_SCHED_PRIO_DEFAULT;
+			param.sched.sync  = ODP_SCHED_SYNC_PARALLEL;
+			param.sched.group = sched_group;
+		} else {
+			param.type = ODP_QUEUE_TYPE_PLAIN;
+			param.enq_mode = ODP_QUEUE_OP_MT_UNSAFE;
+			param.deq_mode = ODP_QUEUE_OP_MT_UNSAFE;
+		}
 
 		sprintf(queue_name_cpu,"TimerQueue_cpu_%u", cpu_id);
 
@@ -234,7 +235,8 @@ static int ofp_timer_create_queues(odp_schedule_group_t sched_group)
 int ofp_timer_init_global(int resolution_us,
 		int min_us, int max_us,
 		int tmo_count,
-		odp_schedule_group_t sched_group)
+		odp_schedule_group_t sched_group,
+		odp_bool_t sched_timer_queues)
 {
 	odp_pool_param_t pool_params;
 	odp_timer_pool_param_t timer_params;
@@ -290,7 +292,7 @@ int ofp_timer_init_global(int resolution_us,
 
 	odp_timer_pool_start();
 
-	HANDLE_ERROR(ofp_timer_create_queues(sched_group));
+	HANDLE_ERROR(ofp_timer_create_queues(sched_group, sched_timer_queues));
 
 	odp_spinlock_init(&shm->lock);
 
@@ -330,8 +332,6 @@ static int ofp_timer_term_queues(void)
 {
 	int rc;
 	int i;
-
-	rc = ofp_timer_term_queue(&shm->queue);
 
 	for (i = 0; i < OFP_MAX_NUM_CPU; i++)
 		rc = ofp_timer_term_queue(&shm->queue_per_cpu[i]);
@@ -436,7 +436,7 @@ int ofp_timer_init_local(void)
 
 	for (i = 0; i < TIMER_NUM_THR_TIMERS_DFLT; i++) {
 		/* Alloc short timer buffer */
-		buf = alloc_short_timer_buffer(-1);
+		buf = alloc_short_timer_buffer(cpu_id);
 		if (buf == ODP_BUFFER_INVALID) {
 			OFP_ERR("alloc_short_timer failed");
 			break;
@@ -460,9 +460,6 @@ int ofp_timer_init_local(void)
 
 static odp_timer_t ofp_timer_alloc(int cpu_id, struct ofp_timer_internal *buf)
 {
-	if (cpu_id == -1)
-		return odp_timer_alloc(shm->socket_timer_pool, shm->queue, buf);
-
 	return odp_timer_alloc(shm->socket_timer_pool,
 			shm->queue_per_cpu[cpu_id], buf);
 }
@@ -470,7 +467,7 @@ static odp_timer_t ofp_timer_alloc(int cpu_id, struct ofp_timer_internal *buf)
 odp_timer_t ofp_timer_start(uint64_t tmo_us, ofp_timer_callback callback,
 			void *arg, int arglen)
 {
-	return ofp_timer_start_cpu_id(tmo_us, callback, arg, arglen, -1);
+	return ofp_timer_start_cpu_id(tmo_us, callback, arg, arglen, odp_cpu_id());
 }
 
 odp_timer_t ofp_timer_start_cpu_id(uint64_t tmo_us, ofp_timer_callback callback,
@@ -526,7 +523,7 @@ odp_timer_t ofp_timer_start_cpu_id(uint64_t tmo_us, ofp_timer_callback callback,
 		uint64_t period_ns;
 		odp_timer_set_t t;
 
-		evt = odp_queue_deq(shm->short_timer_free[odp_cpu_id()]);
+		evt = odp_queue_deq(shm->short_timer_free[cpu_id]);
 		if (evt == ODP_EVENT_INVALID) {
 			buf = alloc_short_timer_buffer(cpu_id);
 			if (buf == ODP_BUFFER_INVALID) {
@@ -669,14 +666,8 @@ odp_timer_pool_t ofp_timer(int timer_num)
 
 odp_queue_t ofp_timer_queue_cpu(int cpu_id)
 {
-#if !((defined OFP_RSS) || (defined OFP_TCP_MULTICORE_TIMERS))
-	cpu_id = -1;
-#endif
-
-	if (!shm || cpu_id > OFP_MAX_NUM_CPU)
+	if (!shm || cpu_id > OFP_MAX_NUM_CPU || cpu_id < 0)
 		return ODP_QUEUE_INVALID;
-	else if (cpu_id == -1)
-		return shm->queue;
-	else
-		return shm->queue_per_cpu[cpu_id];
+
+	return shm->queue_per_cpu[cpu_id];
 }

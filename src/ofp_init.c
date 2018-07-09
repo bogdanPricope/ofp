@@ -245,6 +245,7 @@ static void read_conf_file(ofp_global_param_t *params, const char *filename)
 	GET_CONF_INT(bool, chksum_offload.ipv4_tx_ena);
 	GET_CONF_INT(bool, chksum_offload.udp_tx_ena);
 	GET_CONF_INT(bool, chksum_offload.tcp_tx_ena);
+	GET_CONF_INT(bool, sched_timer_queues);
 
 done:
 	config_destroy(&conf);
@@ -283,6 +284,7 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
 	params->chksum_offload.ipv4_tx_ena = OFP_CHKSUM_OFFLOAD_IPV4_TX;
 	params->chksum_offload.udp_tx_ena = OFP_CHKSUM_OFFLOAD_UDP_TX;
 	params->chksum_offload.tcp_tx_ena = OFP_CHKSUM_OFFLOAD_TCP_TX;
+	params->sched_timer_queues = 1;
 	read_conf_file(params, filename);
 }
 
@@ -358,7 +360,8 @@ static int ofp_init_pre_global(ofp_global_param_t *params)
 			OFP_TIMER_MIN_US,
 			OFP_TIMER_MAX_US,
 			OFP_TIMER_TMO_COUNT,
-			params->sched_group));
+			params->sched_group,
+			params->sched_timer_queues));
 
 	HANDLE_ERROR(ofp_hook_init_global(params->pkt_hook));
 

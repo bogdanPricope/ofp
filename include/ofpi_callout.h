@@ -92,6 +92,7 @@ void	_callout_init_lock(struct callout *, struct lock_object *, int);
 #define	callout_init_rw(c, rw, flags)					\
 	_callout_init_lock((c), ((rw) != NULL) ? &(rw)->lock_object :	\
 	   NULL, (flags))
+#if 0
 #define	callout_reset(c, on_tick, fn, arg)				\
     callout_reset_on((c), (on_tick), (fn), (arg), (c)->c_cpu)
 #define	callout_reset_curcpu(c, on_tick, fn, arg)			\
@@ -100,6 +101,7 @@ int	callout_schedule(struct callout *, int);
 int	callout_schedule_on(struct callout *, int, int);
 #define	callout_schedule_curcpu(c, on_tick)				\
     callout_schedule_on((c), (on_tick), PCPU_GET(cpuid))
+#endif
 
 #define callout_reset_on(_c, _ticks, _func, _arg, _cpu)			\
 	do {								\

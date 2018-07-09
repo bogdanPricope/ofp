@@ -106,12 +106,7 @@ OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, keepcnt, OFP_CTLFLAG_RW, &ofp_tcp_ke
 	/* max idle probes */
 int	ofp_tcp_maxpersistidle;
 
-
-#if (defined OFP_RSS) || (defined OFP_TCP_MULTICORE_TIMERS)
 #define	INP_CPU(inp) odp_cpu_id()
-#else
-#define	INP_CPU(inp) -1
-#endif
 
 /*
  * Tcp protocol timeout routine called every 500 ms.
@@ -128,11 +123,10 @@ ofp_tcp_slowtimo(void *notused)
 
 #ifndef OFP_RSS
 	shm_tcp->ofp_tcp_slow_timer =
-			ofp_timer_start(500000, ofp_tcp_slowtimo, NULL, 0);
+		ofp_timer_start(500000, ofp_tcp_slowtimo, NULL, 0);
 #else
-	uint32_t cpu_id = odp_cpu_id();
-	shm_tcp->ofp_tcp_slow_timer[cpu_id] = ofp_timer_start_cpu_id(500000,
-					ofp_tcp_slowtimo, NULL, 0, cpu_id);
+	shm_tcp->ofp_tcp_slow_timer[odp_cpu_id()] =
+		ofp_timer_start(500000, ofp_tcp_slowtimo, NULL, 0);
 #endif
 }
 

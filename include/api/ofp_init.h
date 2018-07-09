@@ -230,6 +230,15 @@ typedef struct ofp_global_param_t {
 	 */
 	ofp_chksum_offload_config_t chksum_offload;
 
+	/**
+	 * Receive timeout events on a scheduled queue
+	 *
+	 * If set, timeout events are received on scheduled queues.
+	 * If not set, timeout events are received on plain queues.
+	 *
+	 * Default value is 1.
+	 */
+	odp_bool_t sched_timer_queues;
 } ofp_global_param_t;
 
 /**
