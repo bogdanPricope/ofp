@@ -339,28 +339,17 @@ ofp_tcp_init(void)
 	EVENTHANDLER_REGISTER(maxsockets_change, tcp_zone_change, NULL,
 		EVENTHANDLER_PRI_ANY);
 #endif
-#ifndef OFP_RSS
-	shm_tcp->ofp_tcp_slow_timer = ofp_timer_start(500000, ofp_tcp_slowtimo, NULL, 0);
-#else
-	int32_t cpu_id = 0;
-	for (; cpu_id < odp_cpu_count(); cpu_id++)
-		shm_tcp->ofp_tcp_slow_timer[cpu_id] = ofp_timer_start_cpu_id(
-				500000,	ofp_tcp_slowtimo, NULL, 0, cpu_id);
-#endif
 }
 
 static void ofp_tcp_slow_timer_cancel(void)
 {
-#ifndef OFP_RSS
-	ofp_timer_cancel(shm_tcp->ofp_tcp_slow_timer);
-	shm_tcp->ofp_tcp_slow_timer = ODP_TIMER_INVALID;
-#else
-	int32_t cpu_id = 0;
-	for (; cpu_id < odp_cpu_count(); cpu_id++) {
-		ofp_timer_cancel(shm_tcp->ofp_tcp_slow_timer[cpu_id]);
-		shm_tcp->ofp_tcp_slow_timer[cpu_id] = ODP_TIMER_INVALID;
-	}
-#endif
+	int32_t cpu_id;
+
+	for (cpu_id = 0; cpu_id < OFP_MAX_NUM_CPU; cpu_id++)
+		if (shm_tcp->ofp_tcp_slow_timer[cpu_id] != ODP_TIMER_INVALID) {
+			ofp_timer_cancel(shm_tcp->ofp_tcp_slow_timer[cpu_id]);
+			shm_tcp->ofp_tcp_slow_timer[cpu_id] = ODP_TIMER_INVALID;
+		}
 }
 
 

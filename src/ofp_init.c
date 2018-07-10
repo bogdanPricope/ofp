@@ -478,7 +478,7 @@ int ofp_init_local(void)
 	HANDLE_ERROR(ofp_arp_lookup_shared_memory());
 	HANDLE_ERROR(ofp_vxlan_lookup_shared_memory());
 	HANDLE_ERROR(ofp_arp_init_local());
-	HANDLE_ERROR(ofp_tcp_var_lookup_shared_memory());
+	HANDLE_ERROR(ofp_tcp_var_init_local());
 	HANDLE_ERROR(ofp_send_pkt_out_init_local());
 	HANDLE_ERROR(ofp_ip_init_local());
 

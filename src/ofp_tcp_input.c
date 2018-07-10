@@ -3672,7 +3672,7 @@ static int ofp_tcp_var_free_shared_memory(void)
 	return rc;
 }
 
-int ofp_tcp_var_lookup_shared_memory(void)
+static int ofp_tcp_var_lookup_shared_memory(void)
 {
 	shm_tcp = ofp_shared_memory_lookup(SHM_NAME_TCP_VAR);
 	if (shm_tcp == NULL) {
@@ -3690,7 +3690,12 @@ void ofp_tcp_var_init_prepare(void)
 
 int ofp_tcp_var_init_global(void)
 {
+	int cpu_id;
+
 	HANDLE_ERROR(ofp_tcp_var_alloc_shared_memory());
+
+	for (cpu_id = 0; cpu_id < OFP_MAX_NUM_CPU; cpu_id++)
+		shm_tcp->ofp_tcp_slow_timer[cpu_id] = ODP_TIMER_INVALID;
 
 	return 0;
 }
@@ -3702,4 +3707,21 @@ int ofp_tcp_var_term_global(void)
 	CHECK_ERROR(ofp_tcp_var_free_shared_memory(), rc);
 
 	return rc;
+}
+
+int ofp_tcp_var_init_local(void)
+{
+	int cpu_id;
+
+	HANDLE_ERROR(ofp_tcp_var_lookup_shared_memory());
+
+	cpu_id = odp_cpu_id();
+	if ((shm_tcp->ofp_tcp_slow_timer[cpu_id] == ODP_TIMER_INVALID)) {
+		shm_tcp->ofp_tcp_slow_timer[cpu_id] = ofp_timer_start_cpu_id(
+				500000,	ofp_tcp_slowtimo, &cpu_id, sizeof(cpu_id), cpu_id);
+		if (shm_tcp->ofp_tcp_slow_timer[cpu_id] == ODP_TIMER_INVALID)
+			return -1;
+	}
+
+	return 0;
 }

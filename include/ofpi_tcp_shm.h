@@ -19,16 +19,15 @@
  * Shared data format
  */
 struct ofp_tcp_var_mem {
+	odp_timer_t ofp_tcp_slow_timer[OFP_MAX_NUM_CPU];
 #ifdef OFP_RSS
 	VNET_DEFINE(struct inpcbhead, ofp_tcb[OFP_MAX_NUM_CPU]);
 	VNET_DEFINE(struct inpcbinfo, ofp_tcbinfo[OFP_MAX_NUM_CPU]);
 	VNET_DEFINE(OFP_TAILQ_HEAD(, tcptw), twq_2msl[OFP_MAX_NUM_CPU]);
-	odp_timer_t ofp_tcp_slow_timer[OFP_MAX_NUM_CPU];
 #else
 	VNET_DEFINE(struct inpcbhead, ofp_tcb);/* queue of active tcpcb's */
 	VNET_DEFINE(struct inpcbinfo, ofp_tcbinfo);
 	VNET_DEFINE(OFP_TAILQ_HEAD(, tcptw), twq_2msl);
-	odp_timer_t ofp_tcp_slow_timer;
 #endif
 
 /* Target size of TCP PCB hash tables. Must be a power of two.*/

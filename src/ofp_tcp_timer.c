@@ -114,20 +114,16 @@ int	ofp_tcp_maxpersistidle;
  * causes finite state machine actions if timers expire.
  */
 void
-ofp_tcp_slowtimo(void *notused)
+ofp_tcp_slowtimo(void *arg)
 {
-	(void)notused;
+	int *cpu_id = (int *)arg;
+
 	INP_INFO_WLOCK(&V_tcbinfo);
 	(void) ofp_tcp_tw_2msl_scan(0);
 	INP_INFO_WUNLOCK(&V_tcbinfo);
 
-#ifndef OFP_RSS
-	shm_tcp->ofp_tcp_slow_timer =
-		ofp_timer_start(500000, ofp_tcp_slowtimo, NULL, 0);
-#else
-	shm_tcp->ofp_tcp_slow_timer[odp_cpu_id()] =
-		ofp_timer_start(500000, ofp_tcp_slowtimo, NULL, 0);
-#endif
+	shm_tcp->ofp_tcp_slow_timer[*cpu_id] = ofp_timer_start_cpu_id(
+		500000, ofp_tcp_slowtimo, cpu_id, sizeof(*cpu_id), *cpu_id);
 }
 
 int	ofp_tcp_syn_backoff[TCP_MAXRXTSHIFT + 1] =
