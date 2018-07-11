@@ -1691,7 +1691,7 @@ ofp_igmp_fasttimo(void *arg)
 	loop = 0;
 	uri_fasthz = 0;
 
-	ofp_igmp_fasttimo_timer = ofp_timer_start(200000UL, ofp_igmp_fasttimo,
+	ofp_igmp_fasttimo_timer = ofp_timer_global_start(200000UL, ofp_igmp_fasttimo,
 					NULL, 0);
 
 	/*
@@ -3582,7 +3582,7 @@ ofp_igmp_init(void)
 
 	ofp_m_raopt = igmp_ra_alloc();
 
-	ofp_igmp_fasttimo_timer = ofp_timer_start(200000UL, ofp_igmp_fasttimo,
+	ofp_igmp_fasttimo_timer = ofp_timer_global_start(200000UL, ofp_igmp_fasttimo,
 					NULL, 0);
 
 	// HJo netisr_register(&igmp_nh);

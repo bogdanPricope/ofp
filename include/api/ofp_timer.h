@@ -18,6 +18,8 @@ typedef void (*ofp_timer_callback)(void *arg);
 
 odp_timer_t ofp_timer_start(uint64_t tmo_us, ofp_timer_callback callback,
 		       void *arg, int arglen);
+odp_timer_t ofp_timer_global_start(uint64_t tmo_us, ofp_timer_callback callback,
+		       void *arg, int arglen);
 int ofp_timer_cancel(odp_timer_t tim);
 void ofp_timer_handle(odp_event_t buf);
 int ofp_timer_ticks(int timer_num);

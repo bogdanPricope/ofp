@@ -57,6 +57,7 @@ struct ofp_timer_mem {
 	odp_spinlock_t lock;
 	odp_timer_t timer_1s;
 	odp_queue_t short_timer_free[OFP_MAX_NUM_CPU];
+	int global_timer_core_id;
 };
 
 static odp_timer_t ofp_timer_alloc(int cpu_id, struct ofp_timer_internal *buf);
@@ -99,7 +100,7 @@ static void one_sec(void *arg)
 	}
 
 	/* Start one second timeout */
-	shm->timer_1s = ofp_timer_start(1000000UL, one_sec, NULL, 0);
+	shm->timer_1s = ofp_timer_global_start(1000000UL, one_sec, NULL, 0);
 }
 
 static int ofp_timer_alloc_shared_memory(void)
@@ -236,7 +237,8 @@ int ofp_timer_init_global(int resolution_us,
 		int min_us, int max_us,
 		int tmo_count,
 		odp_schedule_group_t sched_group,
-		odp_bool_t sched_timer_queues)
+		odp_bool_t sched_timer_queues,
+		int global_timer_core_id)
 {
 	odp_pool_param_t pool_params;
 	odp_timer_pool_param_t timer_params;
@@ -296,10 +298,12 @@ int ofp_timer_init_global(int resolution_us,
 
 	odp_spinlock_init(&shm->lock);
 
-	ofp_timer_init_local();
+	shm->global_timer_core_id = global_timer_core_id;
+
+	ofp_timer_init_local(global_timer_core_id);
 
 	/* Start one second timeouts */
-	shm->timer_1s = ofp_timer_start(1000000UL, one_sec, NULL, 0);
+	shm->timer_1s = ofp_timer_global_start(1000000UL, one_sec, NULL, 0);
 
 	return 0;
 }
@@ -403,10 +407,10 @@ int ofp_timer_term_global(void)
 	return rc;
 }
 
-int ofp_timer_init_local(void)
+int ofp_timer_init_local(int cpu_id)
 {
 	int rc;
-	uint32_t cpu_id, i;
+	uint32_t i;
 	odp_queue_param_t queue_param;
 	char queue_name_cpu[32];
 	odp_buffer_t buf;
@@ -415,8 +419,6 @@ int ofp_timer_init_local(void)
 	rc = ofp_timer_lookup_shared_memory();
 	if (rc)
 		return -1;
-
-	cpu_id = odp_cpu_id();
 
 	if (ODP_QUEUE_INVALID != shm->short_timer_free[cpu_id])
 		return 0;
@@ -468,6 +470,13 @@ odp_timer_t ofp_timer_start(uint64_t tmo_us, ofp_timer_callback callback,
 			void *arg, int arglen)
 {
 	return ofp_timer_start_cpu_id(tmo_us, callback, arg, arglen, odp_cpu_id());
+}
+
+odp_timer_t ofp_timer_global_start(uint64_t tmo_us, ofp_timer_callback callback,
+		       void *arg, int arglen)
+{
+	return ofp_timer_start_cpu_id(tmo_us, callback, arg, arglen,
+				      shm->global_timer_core_id);
 }
 
 odp_timer_t ofp_timer_start_cpu_id(uint64_t tmo_us, ofp_timer_callback callback,

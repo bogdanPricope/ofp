@@ -100,7 +100,8 @@ void initialize_ofp_timer(int resolution_us)
 						    OFP_TIMER_MIN_US,
 						    OFP_TIMER_MAX_US,
 						    OFP_TIMER_TMO_COUNT,
-						    ODP_SCHED_GROUP_ALL));
+						    ODP_SCHED_GROUP_ALL,
+						    1, 0));
 }
 
 void wait_until_timer_expires(int resolution_us)

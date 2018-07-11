@@ -246,6 +246,7 @@ static void read_conf_file(ofp_global_param_t *params, const char *filename)
 	GET_CONF_INT(bool, chksum_offload.udp_tx_ena);
 	GET_CONF_INT(bool, chksum_offload.tcp_tx_ena);
 	GET_CONF_INT(bool, sched_timer_queues);
+	GET_CONF_INT(int, global_timer_core_id);
 
 done:
 	config_destroy(&conf);
@@ -285,6 +286,7 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
 	params->chksum_offload.udp_tx_ena = OFP_CHKSUM_OFFLOAD_UDP_TX;
 	params->chksum_offload.tcp_tx_ena = OFP_CHKSUM_OFFLOAD_TCP_TX;
 	params->sched_timer_queues = 1;
+	params->global_timer_core_id = 0;
 	read_conf_file(params, filename);
 }
 
@@ -361,7 +363,8 @@ static int ofp_init_pre_global(ofp_global_param_t *params)
 			OFP_TIMER_MAX_US,
 			OFP_TIMER_TMO_COUNT,
 			params->sched_group,
-			params->sched_timer_queues));
+			params->sched_timer_queues,
+			params->global_timer_core_id));
 
 	HANDLE_ERROR(ofp_hook_init_global(params->pkt_hook));
 
@@ -473,7 +476,7 @@ int ofp_init_local(void)
 	HANDLE_ERROR(ofp_pcap_lookup_shared_memory());
 	HANDLE_ERROR(ofp_stat_lookup_shared_memory());
 	HANDLE_ERROR(ofp_socket_lookup_shared_memory());
-	HANDLE_ERROR(ofp_timer_init_local());
+	HANDLE_ERROR(ofp_timer_init_local(odp_cpu_id()));
 	HANDLE_ERROR(ofp_hook_lookup_shared_memory());
 	HANDLE_ERROR(ofp_arp_lookup_shared_memory());
 	HANDLE_ERROR(ofp_vxlan_lookup_shared_memory());

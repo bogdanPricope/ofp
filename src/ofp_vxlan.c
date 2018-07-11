@@ -160,7 +160,7 @@ static void ofp_vxlan_tmo(void *arg)
 
 	shm->tick++;
 	shm->next_check = (shm->next_check + 1) & (NUM_MAC_DST_ENTRIES - 1);
-	ofp_vxlan_timer = ofp_timer_start(VXLAN_TICK, ofp_vxlan_tmo, NULL, 0);
+	ofp_vxlan_timer = ofp_timer_global_start(VXLAN_TICK, ofp_vxlan_tmo, NULL, 0);
 	if (ODP_TIMER_INVALID == ofp_vxlan_timer)
 		OFP_ERR("Failed to restart VXLAN timer.");
 }
@@ -317,7 +317,7 @@ int ofp_vxlan_init_global(void)
 
 	memset(shm, 0, sizeof(*shm));
 
-	ofp_vxlan_timer = ofp_timer_start(VXLAN_TICK, ofp_vxlan_tmo, NULL, 0);
+	ofp_vxlan_timer = ofp_timer_global_start(VXLAN_TICK, ofp_vxlan_tmo, NULL, 0);
 	if (ODP_TIMER_INVALID == ofp_vxlan_timer) {
 		OFP_ERR("Failed to start VXLAN timer.");
 		return -1;

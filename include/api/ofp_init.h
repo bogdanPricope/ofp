@@ -239,6 +239,12 @@ typedef struct ofp_global_param_t {
 	 * Default value is 1.
 	 */
 	odp_bool_t sched_timer_queues;
+
+	/**
+	 * CPU core to which global timers are pinned (poll timer mode).
+	 * The default value is 0.
+	 */
+	uint16_t global_timer_core_id;
 } ofp_global_param_t;
 
 /**
