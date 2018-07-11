@@ -71,11 +71,12 @@ ofp_global_param_t app_init_params; /**< global OFP init parms */
 static int pkt_io_direct_mode_recv(void *arg)
 {
 	odp_packet_t pkt, pkt_tbl[PKT_BURST_SIZE];
-	odp_event_t events[PKT_BURST_SIZE], ev;
+	odp_event_t events[PKT_BURST_SIZE];
 	int pkt_idx, pkt_cnt, event_cnt;
 	struct worker_arg *thr_args;
 	int num_pktin, i;
 	odp_pktin_queue_t pktin[OFP_FP_INTERFACE_MAX];
+	odp_queue_t timer_queue;
 	uint8_t *ptr;
 
 	thr_args = arg;
@@ -88,25 +89,21 @@ static int pkt_io_direct_mode_recv(void *arg)
 		OFP_ERR("Error: OFP local init failed.\n");
 		return -1;
 	}
-	ptr = (uint8_t *)&pktin[0];
+	timer_queue = ofp_timer_queue_cpu(odp_cpu_id());
 
+	ptr = (uint8_t *)&pktin[0];
 	printf("PKT-IO receive starting on cpu: %i, %i, %x:%x\n", odp_cpu_id(),
 	       num_pktin, ptr[0], ptr[8]);
 
 	while (1) {
-		event_cnt = odp_schedule_multi(NULL, ODP_SCHED_NO_WAIT,
-			events, PKT_BURST_SIZE);
-		for (i = 0; i < event_cnt; i++) {
-			ev = events[i];
+		while (1) {
+			event_cnt = odp_queue_deq_multi(timer_queue, events, PKT_BURST_SIZE);
+			if (event_cnt <= 0 )
+				break;
 
-			if (ev == ODP_EVENT_INVALID)
-				continue;
-
-			if (odp_event_type(ev) == ODP_EVENT_TIMEOUT)
-				ofp_timer_handle(ev);
-			else
-				odp_buffer_free(odp_buffer_from_event(ev));
-		}
+			for (i = 0; i < event_cnt; i++)
+				ofp_timer_handle(events[i]);
+		} /* timer while(1) */
 		for (i = 0; i < num_pktin; i++) {
 			pkt_cnt = odp_pktin_recv(pktin[i], pkt_tbl,
 						 PKT_BURST_SIZE);
@@ -345,6 +342,9 @@ int main(int argc, char *argv[])
 	if (params.mode == EXEC_MODE_SCHEDULER) {
 		app_init_params.if_count = params.if_count;
 		app_init_params.if_names = params.if_names;
+	} else if (params.mode == EXEC_MODE_DIRECT_RSS) {
+		app_init_params.sched_timer_queues = 0;
+		app_init_params.global_timer_core_id = 1;
 	}
 
 	if (ofp_init_global(instance, &app_init_params)) {
