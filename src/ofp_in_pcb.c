@@ -122,11 +122,11 @@ void ofp_tcp_rss_in_pcbinfo_init( int hash_nelements, int porthash_nelements,
 		OFP_LIST_INIT(pcbinfo->ipi_listhead);
 		pcbinfo->ipi_count = 0;
 
-		pcbinfo->ipi_hashbase = shm_tcp->ofp_hashtbl;
+		pcbinfo->ipi_hashbase = shm_tcp->ofp_hashtbl[cpu_id];
 		ofp_tcp_hashinit(hash_nelements, &pcbinfo->ipi_hashmask,
 				pcbinfo->ipi_hashbase);
 
-		pcbinfo->ipi_porthashbase = shm_tcp->ofp_porthashtbl;
+		pcbinfo->ipi_porthashbase = shm_tcp->ofp_porthashtbl[cpu_id];
 		ofp_tcp_hashinit(porthash_nelements,
 			&pcbinfo->ipi_hashmask,
 			pcbinfo->ipi_porthashbase);
@@ -171,11 +171,20 @@ ofp_in_pcbinfo_init(struct inpcbinfo *pcbinfo, const char *name,
 	pcbinfo->ipi_count = 0;
 
 	if (strcmp(name, "tcp") == 0) {
+#ifdef OFP_RSS
+		pcbinfo->ipi_hashbase = shm_tcp->ofp_hashtbl[0];
+#else
 		pcbinfo->ipi_hashbase = shm_tcp->ofp_hashtbl;
+#endif
+
 		ofp_tcp_hashinit(hash_nelements, &pcbinfo->ipi_hashmask,
 			pcbinfo->ipi_hashbase);
 
+#ifdef OFP_RSS
+		pcbinfo->ipi_porthashbase = shm_tcp->ofp_porthashtbl[0];
+#else
 		pcbinfo->ipi_porthashbase = shm_tcp->ofp_porthashtbl;
+#endif
 		ofp_tcp_hashinit(porthash_nelements, &pcbinfo->ipi_hashmask,
                         pcbinfo->ipi_porthashbase);
 		pcb_size = global_param->pcb_tcp_max;

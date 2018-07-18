@@ -483,8 +483,7 @@ void	inp_4tuple_get(struct inpcb *inp, uint32_t *laddr, uint16_t *lp,
 #define	RA_RECURSED		0x08
 #define	RA_NOTRECURSED		0x10
 
-
-#ifdef OFP_STATIC_SOCKET_CONFIG
+#if (defined OFP_RSS) || (defined OFP_STATIC_SOCKET_CONFIG)
 # define INP_HASH_LOCK_INIT(ipi, d)
 # define INP_HASH_LOCK_DESTROY(ipi)
 

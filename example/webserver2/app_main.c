@@ -41,6 +41,8 @@ typedef struct {
 	uint16_t lport;
 } appl_args_t;
 
+appl_args_t params;
+
 struct worker_arg {
 	int num_pktin;
 	odp_pktin_queue_t pktin[OFP_FP_INTERFACE_MAX];
@@ -90,6 +92,11 @@ static int pkt_io_direct_mode_recv(void *arg)
 		return -1;
 	}
 	timer_queue = ofp_timer_queue_cpu(odp_cpu_id());
+
+	if (setup_webserver(params.root_dir, params.laddr, params.lport)) {
+		OFP_ERR("Error: Failed to setup webserver.\n");
+		return -1;
+	}
 
 	ptr = (uint8_t *)&pktin[0];
 	printf("PKT-IO receive starting on cpu: %i, %i, %x:%x\n", odp_cpu_id(),
@@ -287,7 +294,7 @@ static int create_interfaces_sched_rss(odp_instance_t instance,
 int main(int argc, char *argv[])
 {
 	odph_odpthread_t thread_tbl[MAX_WORKERS];
-	appl_args_t params;
+	/*appl_args_t params;*/
 	int num_workers, first_worker, linux_sp_core, i;
 	struct worker_arg workers_arg_direct_rss[MAX_WORKERS];
 	odp_cpumask_t cpu_mask;
@@ -379,6 +386,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	ofp_start_cli_thread(instance, app_init_params.linux_core_id, params.cli_file);
+
+	sleep(2);
+
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 
 	/* Create worker threads */
@@ -401,15 +412,15 @@ int main(int argc, char *argv[])
 	}
 
 	/* Start CLI */
-	ofp_start_cli_thread(instance, app_init_params.linux_core_id,
+	/*ofp_start_cli_thread(instance, app_init_params.linux_core_id,
 		params.cli_file);
 
-	sleep(2);
+	sleep(2);*/
 	/* webserver */
-	if (setup_webserver(params.root_dir, params.laddr, params.lport)) {
+	/*if (setup_webserver(params.root_dir, params.laddr, params.lport)) {
 		OFP_ERR("Error: Failed to setup webserver.\n");
 		exit(EXIT_FAILURE);
-	}
+	}*/
 
 	odph_odpthreads_join(thread_tbl);
 	printf("End Main()\n");
