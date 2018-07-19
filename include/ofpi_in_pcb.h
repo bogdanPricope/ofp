@@ -311,7 +311,11 @@ struct inpcb {
 	uint8_t	inp_ip_p;		/* (c) protocol proto */
 	uint8_t	inp_ip_minttl;		/* (i) minimum TTL or drop */
 	uint32_t inp_flowid;		/* (x) flow id / queue id */
+#ifdef OFP_RSS
+	int32_t inp_refcount;	/* (i) refcount */
+#else
 	odp_atomic_u32_t inp_refcount;	/* (i) refcount */
+#endif
 	void	*inp_pspare[5];		/* (x) route caching / general use */
 	uint32_t	inp_ispare[6];	/* (x) route caching / user cookie /
 					 *     general use */

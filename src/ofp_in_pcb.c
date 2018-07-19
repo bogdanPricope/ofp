@@ -82,18 +82,36 @@ refcount_init(odp_atomic_u32_t *count, uint32_t value)
 }
 
 static __inline void
-refcount_acquire(odp_atomic_u32_t *count)
+inpcb_refcount_acquire(struct inpcb *inp)
 {
-	odp_atomic_inc_u32(count);
+#ifdef OFP_RSS
+	KASSERT(inp->inp_refcount > 0, ("%s: refcount 0", __func__));
+
+	inp->inp_refcount++;
+#else
+	KASSERT(inp->inp_refcount.v > 0, ("%s: refcount 0", __func__));
+
+	odp_atomic_inc_u32(&inp->inp_refcount);
+#endif
 }
 
 static __inline int
-refcount_release(odp_atomic_u32_t *count)
+inpcb_refcount_release(struct inpcb *inp)
 {
 	uint32_t old;
 
-	old = odp_atomic_fetch_sub_u32(count, 1);
-	KASSERT(old > 0, ("negative refcount %p", count));
+#ifdef OFP_RSS
+	KASSERT(inp->inp_refcount > 0, ("%s: refcount 0", __func__));
+
+	old = inp->inp_refcount;
+	inp->inp_refcount--;
+#else
+	KASSERT(inp->inp_refcount.v > 0, ("%s: refcount 0", __func__));
+
+	old = odp_atomic_fetch_sub_u32(&inp->inp_refcount, 1);
+#endif
+	KASSERT(old > 0, ("negative refcount %p", &inp->inp_refcount));
+
 	return (old == 1);
 }
 
@@ -298,7 +316,11 @@ ofp_in_pcballoc(struct socket *so, struct inpcbinfo *pcbinfo)
 #endif
 	INP_WLOCK(inp);
 	inp->inp_gencnt = ++pcbinfo->ipi_gencnt;
+#ifdef OFP_RSS
+	inp->inp_refcount = 1;
+#else
 	refcount_init(&inp->inp_refcount, 1);	/* Reference from inpcbinfo */
+#endif
 	return (error);
 }
 
@@ -960,10 +982,7 @@ ofp_in_pcbdetach(struct inpcb *inp)
 void
 ofp_in_pcbref(struct inpcb *inp)
 {
-
-	KASSERT(inp->inp_refcount.v > 0, ("%s: refcount 0", __func__));
-
-	refcount_acquire(&inp->inp_refcount);
+	inpcb_refcount_acquire(inp);
 }
 
 /*
@@ -981,11 +1000,9 @@ ofp_in_pcbref(struct inpcb *inp)
 int
 ofp_in_pcbrele_rlocked(struct inpcb *inp)
 {
-	KASSERT(inp->inp_refcount.v > 0, ("%s: refcount 0", __func__));
-
 	INP_RLOCK_ASSERT(inp);
 
-	if (refcount_release(&inp->inp_refcount) == 0)
+	if (inpcb_refcount_release(inp) == 0)
 		return (0);
 
 	KASSERT(inp->inp_socket == NULL, ("%s: inp_socket != NULL", __func__));
@@ -998,11 +1015,9 @@ ofp_in_pcbrele_rlocked(struct inpcb *inp)
 int
 ofp_in_pcbrele_wlocked(struct inpcb *inp)
 {
-	KASSERT(inp->inp_refcount.v > 0, ("%s: refcount 0", __func__));
-
 	INP_WLOCK_ASSERT(inp);
 
-	if (refcount_release(&inp->inp_refcount) == 0)
+	if (inpcb_refcount_release(inp) == 0)
 		return (0);
 
 	KASSERT(inp->inp_socket == NULL, ("%s: inp_socket != NULL", __func__));
