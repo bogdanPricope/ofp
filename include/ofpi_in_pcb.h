@@ -523,8 +523,13 @@ void	inp_4tuple_get(struct inpcb *inp, uint32_t *laddr, uint16_t *lp,
 #define	INP_GROUP_LOCK_ASSERT(ipg)	mtx_assert(&(ipg)->ipg_lock, MA_OWNED)
 #define	INP_GROUP_UNLOCK(ipg)		mtx_unlock(&(ipg)->ipg_lock)
 
+#ifdef OFP_RSS
+#define INP_PCBHASH(faddr, lport, fport, mask) \
+	(odp_be_to_cpu_16(fport) & (mask))
+#else
 #define INP_PCBHASH(faddr, lport, fport, mask) \
 	(((faddr) ^ ((faddr) >> 16) ^ odp_be_to_cpu_16((lport) ^ (fport))) & (mask))
+#endif
 #define INP_PCBPORTHASH(lport, mask) \
 	(odp_be_to_cpu_16((lport)) & (mask))
 

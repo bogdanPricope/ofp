@@ -31,7 +31,7 @@ struct ofp_tcp_var_mem {
 #endif
 
 /* Target size of TCP PCB hash tables. Must be a power of two.*/
-#define TCBHASHSIZE			1024
+#define TCBHASHSIZE			8192
 #ifdef OFP_RSS
 	struct inpcbhead	ofp_hashtbl[OFP_MAX_NUM_CPU][TCBHASHSIZE];
 	struct inpcbporthead	ofp_porthashtbl[OFP_MAX_NUM_CPU][TCBHASHSIZE];
@@ -40,7 +40,7 @@ struct ofp_tcp_var_mem {
 	struct inpcbporthead	ofp_porthashtbl[TCBHASHSIZE];
 #endif
 
-#define TCP_SYNCACHE_HASHSIZE		1024
+#define TCP_SYNCACHE_HASHSIZE		8192
 	struct syncache_head	syncache[TCP_SYNCACHE_HASHSIZE];
 
 	VNET_DEFINE(uma_zone_t, tcp_reass_zone);
