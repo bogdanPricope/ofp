@@ -13,8 +13,9 @@
 
 /* Set www_dir to point to your web directory. */
 static const char *www_dir;
-static __thread char bufo_in[512];
 static __thread char bufo_out[1024];
+static __thread odp_packet_t ref_pkt;
+static __thread char ref_name[200];
 
 /* Sending function with some debugging. */
 static int mysend(int s, char *p, int len)
@@ -48,14 +49,33 @@ static int sendf(int fd, const char *fmt, ...)
 	return ret;
 }
 
-/* Send one file. */
-static void get_file(int s, char *url)
-{
-	int n, w;
+extern odp_pool_t ofp_packet_pool;
 
+static int pkt_add_data(odp_packet_t *pkt, uint32_t *pkt_offset,
+					void *data, uint32_t data_size)
+{
+	if (odp_packet_extend_tail(pkt, data_size, NULL, NULL) < 0)
+		return -1;
+
+	if (odp_packet_copy_from_mem(*pkt, *pkt_offset, data_size, data) < 0) {
+		odp_packet_pull_tail(*pkt, data_size);
+		return -1;
+	}
+	*pkt_offset += data_size;
+
+	return 0;
+}
+
+/* Send one file. */
+static odp_packet_t get_file(int s, char *url)
+{
+	odp_packet_t pkt = ODP_PACKET_INVALID;
+	uint32_t pkt_offset;
+	int n;
 	const char *mime = NULL;
 	const char *p = url;
 	char *p2;
+	char bufo_in[512];
 
 	if (*p == 0)
 		p = "index.html";
@@ -94,21 +114,59 @@ static void get_file(int s, char *url)
 
 	if (!f) {
 		sendf(s, "HTTP/1.0 404 NOK\r\n\r\n");
-		return;
+		return ODP_PACKET_INVALID;
 	}
 
-	sendf(s, "HTTP/1.0 200 OK\r\n");
+	pkt = odp_packet_alloc(ofp_packet_pool, 1);
+	if (pkt == ODP_PACKET_INVALID)
+		return ODP_PACKET_INVALID;
+	pkt_offset = 0;
+
+	strcpy(bufo_in, "HTTP/1.0 200 OK\r\n");
+	pkt_add_data(&pkt, &pkt_offset, bufo_in, strlen(bufo_in));
+
 	if (mime)
-		sendf(s, "Content-Type: %s\r\n\r\n", mime);
+		sprintf(bufo_in, "Content-Type: %s\r\n\r\n", mime);
 	else
-		sendf(s, "\r\n");
+		strcpy(bufo_in, "\r\n");
+	pkt_add_data(&pkt, &pkt_offset, bufo_in, strlen(bufo_in));
 
 	while ((n = fread(bufo_in, 1, sizeof(bufo_in), f)) > 0) {
-		w = mysend(s, bufo_in, n);
-		if (w < 0)
+		if (pkt_add_data(&pkt, &pkt_offset, bufo_in, n) < 0)
 			break;
 	}
 	fclose(f);
+
+	return pkt;
+}
+
+static void get_url(int s, char *url)
+{
+	odp_packet_t pkt;
+
+	if (strcmp(url, ref_name)) {
+		if (ref_pkt != ODP_PACKET_INVALID)
+			odp_packet_free(ref_pkt);
+#if 0
+		const char *resp = "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n<html>\r\n<body>Sample: basic html</body>\r\n</html>\r\n";
+
+		ref_pkt = odp_packet_alloc(ofp_packet_pool, strlen(resp));
+		if (ref_pkt == ODP_PACKET_INVALID) {
+			sendf(s, "HTTP/1.0 404 NOK\r\n\r\n");
+			return;
+		}
+		odp_memcpy(odp_packet_data(ref_pkt), resp, strlen(resp));
+#else
+		ref_pkt = get_file(s, url);
+		if (ref_pkt == ODP_PACKET_INVALID)
+			return;
+#endif
+		strcpy(ref_name, url);
+	}
+
+	pkt = odp_packet_ref_static(ref_pkt);
+
+	ofp_tcp_pkt_send(s, pkt);
 }
 
 static int analyze_http(char *http, int s)
@@ -125,7 +183,7 @@ static int analyze_http(char *http, int s)
 			*p = 0;
 		else
 			return -1;
-		get_file(s, url);
+		get_url(s, url);
 	} else if (!strncmp(http, "POST ", 5)) {
 		/* Post is not supported. */
 		OFP_INFO("%s", http);
@@ -196,6 +254,7 @@ static void notify(union ofp_sigval sv)
 	 */
 	ss->pkt = ODP_PACKET_INVALID;
 }
+extern odp_pool_t ofp_packet_pool;
 
 int setup_webserver(char *root_dir, char *laddr, uint16_t lport)
 {
@@ -208,6 +267,9 @@ int setup_webserver(char *root_dir, char *laddr, uint16_t lport)
 		www_dir = root_dir;
 	else
 		www_dir = DEFAULT_ROOT_DIRECTORY;
+
+	ref_pkt = ODP_PACKET_INVALID;
+	ref_name[0] = 0;
 
 	serv_fd = ofp_socket(OFP_AF_INET, OFP_SOCK_STREAM, OFP_IPPROTO_TCP);
 	if (serv_fd  < 0) {

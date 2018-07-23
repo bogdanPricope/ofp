@@ -62,7 +62,7 @@ ofp_global_param_t app_init_params; /**< global OFP init parms */
 #define NO_PATH(file_name) (strrchr((file_name), '/') ? \
 				strrchr((file_name), '/') + 1 : (file_name))
 
-#define PKT_BURST_SIZE 16
+#define PKT_BURST_SIZE 32
 
 /** pkt_io_direct_mode_recv() Custom event dispatcher
  *
@@ -122,7 +122,6 @@ static int pkt_io_direct_mode_recv(void *arg)
 					ofp_eth_vlan_processing);
 			}
 		}
-		ofp_send_pending_pkt();
 	}
 
 	/* Never reached */
@@ -386,6 +385,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	/* Start CLI */
 	ofp_start_cli_thread(instance, app_init_params.linux_core_id, params.cli_file);
 
 	sleep(2);
@@ -411,16 +411,11 @@ int main(int argc, char *argv[])
 				       &thr_params);
 	}
 
-	/* Start CLI */
-	/*ofp_start_cli_thread(instance, app_init_params.linux_core_id,
-		params.cli_file);
-
-	sleep(2);*/
-	/* webserver */
-	/*if (setup_webserver(params.root_dir, params.laddr, params.lport)) {
+	if (params.mode != EXEC_MODE_DIRECT_RSS &&
+		setup_webserver(params.root_dir, params.laddr, params.lport)) {
 		OFP_ERR("Error: Failed to setup webserver.\n");
 		exit(EXIT_FAILURE);
-	}*/
+	}
 
 	odph_odpthreads_join(thread_tbl);
 	printf("End Main()\n");

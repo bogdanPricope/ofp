@@ -161,8 +161,13 @@ struct socket {
  */
 #define	ACCEPT_LOCK_ASSERT()		//mtx_assert(&accept_mtx, MA_OWNED)
 #define	ACCEPT_UNLOCK_ASSERT()		//mtx_assert(&accept_mtx, MA_NOTOWNED)
+#ifdef OFP_RSS
+#define	ACCEPT_LOCK()
+#define	ACCEPT_UNLOCK()
+#else
 #define	ACCEPT_LOCK()			ofp_accept_lock()
 #define	ACCEPT_UNLOCK()			ofp_accept_unlock()
+#endif
 
 /*
  * Per-socket mutex: we reuse the receive socket buffer mutex for space

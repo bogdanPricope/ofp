@@ -488,6 +488,27 @@ ofp_udp_pkt_sendto(int sockfd, odp_packet_t pkt,
 	return 0;
 }
 
+ofp_ssize_t ofp_tcp_pkt_send(int sockfd, odp_packet_t pkt)
+{
+	struct socket *so = ofp_get_sock_by_fd(sockfd);
+	struct thread td;
+
+	if (!so) {
+		ofp_errno = OFP_EBADF;
+		return -1;
+	}
+
+	td.td_proc.p_fibnum = so->so_fibnum;
+	td.td_ucred = NULL;
+
+	ofp_errno = so->so_proto->pr_usrreqs->pru_sosend(so, NULL, NULL, pkt,
+						     ODP_PACKET_INVALID, 0, &td);
+	if (ofp_errno)
+		return -1;
+
+	return 0;
+}
+
 int ofp_socket_sigevent(struct ofp_sigevent *ev)
 {
 	struct ofp_sock_sigval *ss = ev->ofp_sigev_value.sival_ptr;

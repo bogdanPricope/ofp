@@ -1261,8 +1261,8 @@ restart:
 
 			if (error)
 				goto release;
-
-			uio->uio_resid -= cancopy;
+			if (uio)
+				uio->uio_resid -= cancopy;
 		} while (resid && space > 0);
 	} while (resid);
 

@@ -477,6 +477,7 @@ void	*ofp_udp_packet_parse(odp_packet_t, int *,
 				ofp_socklen_t *);
 ofp_ssize_t ofp_udp_pkt_sendto(int, odp_packet_t,
 				   const struct ofp_sockaddr *, ofp_socklen_t);
+ofp_ssize_t ofp_tcp_pkt_send(int, odp_packet_t);
 
 #if 0 /* Not implemented */
 int	ofp_getpeername(int, struct ofp_sockaddr * __restrict, ofp_socklen_t * __restrict);
