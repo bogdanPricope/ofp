@@ -156,7 +156,7 @@ cc_after_idle(struct tcpcb *tp)
 int
 ofp_tcp_output(struct tcpcb *tp)
 {
-	struct socket *so = tp->t_inpcb->inp_socket;
+	struct socket *so;
 	long len, recwin, sendwin;
 	int off, flags, error = 0;	/* Keep compiler happy */
 	odp_packet_t m;
@@ -172,6 +172,11 @@ ofp_tcp_output(struct tcpcb *tp)
 	struct tcpopt to;
 
 	(void)ipov;
+
+
+	if (!tp || !tp->t_inpcb)
+		return 0;
+	so = tp->t_inpcb->inp_socket;
 #if 0
 	int maxburst = OFP_TCP_MAXBURST;
 #endif
