@@ -362,6 +362,9 @@ int ofp_ifnet_create(odp_instance_t instance,
 #endif /* INET6 */
 
 #endif /* SP */
+
+	HANDLE_ERROR(ofp_update_ifnetsw_lookup_tab(ifnet));
+
 	/* Start packet receiver or transmitter */
 	if (odp_pktio_start(ifnet->pktio) != 0) {
 		OFP_ERR("Failed to start pktio.");

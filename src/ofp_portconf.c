@@ -38,12 +38,15 @@
 #endif /*SP*/
 
 #define PORT_UNDEF 0xFFFF
+#define MAX_PKTIO_IDX  512
+#define IFNETSW_SIZE (MAX_PKTIO_IDX + 1)
 
 /*
  * Shared data
  */
 struct ofp_portconf_mem {
 	struct ofp_ifnet ofp_ifnet_data[NUM_PORTS];
+	struct ofp_ifnet *ofp_ifnetsw[IFNETSW_SIZE];
 	odp_atomic_u32_t free_port;
 	int ofp_num_ports;
 
@@ -1362,6 +1365,18 @@ struct ofp_ifnet *ofp_get_ifnet_by_linux_ifindex(int ix)
 }
 #endif /* SP */
 
+int ofp_update_ifnetsw_lookup_tab(struct ofp_ifnet *ifnet)
+{
+	int idx = odp_pktio_index(ifnet->pktio);
+	if (idx < 0 )
+		return -1;
+
+	shm->ofp_ifnetsw[idx] = ifnet;
+
+	return 0;
+}
+
+
 struct ofp_ifnet *ofp_get_ifnet_match(uint32_t ip,
 		uint16_t vrf,
 		uint16_t vlan)
@@ -1535,15 +1550,7 @@ struct ofp_ifnet *ofp_get_ifnet_by_tunnel(uint32_t tun_loc,
 
 struct ofp_ifnet *ofp_get_ifnet_pktio(odp_pktio_t pktio)
 {
-	int i;
-
-	for (i = 0; i < NUM_PORTS; i++) {
-		if (shm->ofp_ifnet_data[i].if_state == OFP_IFT_STATE_USED &&
-			shm->ofp_ifnet_data[i].pktio == pktio)
-				return &shm->ofp_ifnet_data[i];
-	}
-
-	return NULL;
+	return shm->ofp_ifnetsw[odp_pktio_index(pktio)];
 }
 
 odp_queue_t ofp_pktio_spq_get(odp_pktio_t pktio)
@@ -1697,6 +1704,13 @@ int ofp_portconf_init_global(void)
 #endif /*SP*/
 		shm->ofp_ifnet_data[i].pkt_pool = ODP_POOL_INVALID;
 	}
+
+	if (MAX_PKTIO_IDX < odp_pktio_max_index()) {
+		OFP_ERR("Max pktio index (%u) is too large", odp_pktio_max_index());
+		return -1;
+	}
+	for (i = 0; i < IFNETSW_SIZE; i++)
+		shm->ofp_ifnetsw[i] = NULL;
 
 	memset(ofp_ifnet_locks_shm, 0, sizeof(*ofp_ifnet_locks_shm));
 

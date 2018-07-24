@@ -368,6 +368,7 @@ int ofp_vlan_term_global(void);
 void ofp_update_ifindex_lookup_tab(struct ofp_ifnet *ifnet);
 #endif /* SP */
 
+int ofp_update_ifnetsw_lookup_tab(struct ofp_ifnet *ifnet);
 int ofp_vlan_get_by_key(void *root, void *key, void **value_address);
 int vlan_ifnet_insert(void *root, void *elem);
 int vlan_ifnet_delete(void *root, void *elem, int (*free_key_fun)(void *arg));
