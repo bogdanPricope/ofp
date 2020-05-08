@@ -246,6 +246,18 @@ typedef struct ofp_global_param_t {
 } ofp_global_param_t;
 
 /**
+ * OFP parameters
+ *
+ * @see ofp_get_parameters()
+ */
+typedef struct ofp_param_t {
+	/**
+	 * OFP API initialization data
+	 */
+	ofp_global_param_t global_param;
+} ofp_param_t;
+
+/**
  * Initialize ofp_global_param_t to its default values.
  *
  * This function should be called to initialize the supplied parameter
@@ -423,6 +435,17 @@ void ofp_stop_processing(void);
  */
 
 odp_bool_t *ofp_get_processing_state(void);
+
+/**
+ * Get OFP parameters
+ *
+ * @param params Structure to be filled with OFP global parameters
+ *
+ * @retval 0 on success
+ * @retval -1 on failure
+ */
+
+int ofp_get_parameters(ofp_param_t *params);
 
 #if __GNUC__ >= 4
 #pragma GCC visibility pop

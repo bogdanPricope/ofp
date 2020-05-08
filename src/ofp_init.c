@@ -108,6 +108,21 @@ odp_bool_t *ofp_get_processing_state(void)
 	return &shm->is_running;
 }
 
+int ofp_get_parameters(ofp_param_t *params)
+{
+	if (!params)
+		return -1;
+
+	if (ofp_global_config_lookup_shared_memory() == -1)
+		return -1;
+
+	memset(params, 0, sizeof(*params));
+
+	params->global_param = *global_param;
+
+	return 0;
+}
+
 #ifdef OFP_USE_LIBCONFIG
 
 #include <ctype.h>
