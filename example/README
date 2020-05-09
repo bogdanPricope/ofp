@@ -111,6 +111,9 @@ Execution:
  or
 # export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:<OFP install path>/lib
 
+ - Set OFP netwrap configuration file
+# export OFP_CONF_FILE=<Your path>/ofp/config/ofp_flv_netwrap_default.conf
+
  - Set OFP execution parameters (interfaces, cores, cli file)
 # export OFP_NETWRAP_ENV="-i 0 -f <Your path>/ofp/scripts/ofp_netwrap.cli"
 
@@ -120,6 +123,7 @@ Execution:
 Restrictions:
  - Application needs to run as super user
  - Slow path support needs to be disabled (use --enable-sp=no in configuration line)
- - Specific socket configuration needs to be activated (use --with-config-flv=netwrap-webserver)
 e.g.
-./configure --enable-sp=no --with-config-flv=netwrap-webserver
+./configure --enable-sp=no
+ - Specific socket configuration needs to be activated (use one of netwrap
+configuration file e.g. ofp_flv_netwrap_default.conf)

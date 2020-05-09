@@ -210,23 +210,6 @@ AM_CPPFLAGS="$AM_CPPFLAGS $ODP_CFLAGS $ODPHELPER_CFLAGS"
 # prepending lib to the files to link
 OFP_LIBS="$ODP_LIBS $ODPHELPER_LIBS $OFP_LIBS"
 
-##########################################################################
-# Introduce optional configure parameter for ofp configuration flavor
-##########################################################################
-OFP_CONFIG_FLV=default
-AC_ARG_WITH([config-flv],
-    [AS_HELP_STRING([--with-config-flv=NAME],
-	[OFP configuration flavor: default, webserver, netwrap-webserver])],
-    [OFP_CONFIG_FLV=$withval],
-    [])
-
-case "${OFP_CONFIG_FLV}" in
-	default) AM_CFLAGS="$AM_CFLAGS -DOFP_CONFIG_DEFAULT" ;;
-	webserver) AM_CFLAGS="$AM_CFLAGS -DOFP_CONFIG_WEBSERVER" ;;
-	netwrap-webserver) AM_CFLAGS="$AM_CFLAGS -DOFP_CONFIG_NETWRAP_WEBSERVER" ;;
-	*) AC_MSG_ERROR([bad value '${OFP_CONFIG_FLV}' for --with-config-flv]) ;;
-esac
-
 AM_CPPFLAGS="$AM_CPPFLAGS -DINET"
 
 # Enable/disable OFP_DEBUG

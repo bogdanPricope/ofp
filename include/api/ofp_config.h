@@ -62,35 +62,17 @@
 
 /**Socket handle values returned are in the interval:
  * [OFP_SOCK_NUM_OFFSET, OFP_SOCK_NUM_OFFSET + OFP_NUM_SOCKETS_MAX] */
-#if defined(OFP_CONFIG_WEBSERVER)
+
 /**Maximum number of sockets. */
-# define OFP_NUM_SOCKETS_MAX 60000
+#define OFP_NUM_SOCKETS_MAX 1024
+
 /**First socket number value. */
-# define OFP_SOCK_NUM_OFFSET 1024
+#define OFP_SOCK_NUM_OFFSET 0
 
 /**Maximum number of TCP PCBs. */
-# define OFP_NUM_PCB_TCP_MAX 60000
+#define OFP_NUM_PCB_TCP_MAX 1024
 
-# define OFP_TCP_MAX_CONNECTION_RATE
-
-#elif defined(OFP_CONFIG_NETWRAP_WEBSERVER)
-/**Maximum number of sockets. */
-# define OFP_NUM_SOCKETS_MAX 1000
-/**First socket number value. */
-# define OFP_SOCK_NUM_OFFSET 300
-/**Maximum number of TCP PCBs. */
-# define OFP_NUM_PCB_TCP_MAX 65534
-# define OFP_TCP_MAX_CONNECTION_RATE
-
-#else /*OFP_CONFIG_DEFAULT*/
-/**Maximum number of sockets. */
-# define OFP_NUM_SOCKETS_MAX 1024
-/**First socket number value. */
-# define OFP_SOCK_NUM_OFFSET 1024
-
-/**Maximum number of TCP PCBs. */
-# define OFP_NUM_PCB_TCP_MAX 2048
-#endif /* OFP_CONFIGS*/
+#define OFP_TCP_MAX_CONNECTION_RATE
 
 /** Epoll set size */
 #define EPOLL_SET_SIZE 16
