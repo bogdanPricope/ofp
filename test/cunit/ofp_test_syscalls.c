@@ -47,6 +47,7 @@ static int init(void)
 
 	global_param = &oig;
 	global_param->socket.num_max = OFP_NUM_SOCKETS_MAX;
+	global_param->socket.sd_offset = OFP_SOCK_NUM_OFFSET;
 	return 0;
 }
 

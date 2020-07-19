@@ -287,7 +287,7 @@ int ofp_socket_init_global(odp_pool_t pool)
 		so = &shm->socket_list[i];
 		so->next = (i == global_param->socket.num_max - 1) ?
 			NULL : &(shm->socket_list[i + 1]);
-		so->so_number = i + OFP_SOCK_NUM_OFFSET;
+		so->so_number = i + global_param->socket.sd_offset;
 	}
 	shm->free_sockets = &(shm->socket_list[0]);
 
@@ -333,7 +333,7 @@ int ofp_socket_term_global(void)
 
 struct socket *ofp_get_sock_by_fd(int fd)
 {
-	return &shm->socket_list[fd - OFP_SOCK_NUM_OFFSET];
+	return &shm->socket_list[fd - global_param->socket.sd_offset];
 }
 
 /*
