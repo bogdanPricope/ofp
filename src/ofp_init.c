@@ -276,6 +276,7 @@ static void read_conf_file(ofp_global_param_t *params, const char *filename)
 	GET_CONF_STR(ipsec_op_mode, ipsec.outbound_op_mode);
 
 	GET_CONF_INT(int, socket.num_max);
+	GET_CONF_INT(int, socket.sd_offset);
 
 done:
 	config_destroy(&conf);
@@ -317,6 +318,7 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
 	ofp_ipsec_param_init(&params->ipsec);
 
 	params->socket.num_max = OFP_NUM_SOCKETS_MAX;
+	params->socket.sd_offset = OFP_SOCK_NUM_OFFSET;
 
 	read_conf_file(params, filename);
 }
