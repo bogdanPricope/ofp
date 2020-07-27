@@ -9,16 +9,24 @@
 #include "httpd.h"
 
 int sigreceived = 0;
-static uint32_t myaddr;
+
+#define NUM_EPOLL_EVT 10
 
 /* Table of concurrent connections */
-#define NUM_CONNECTIONS 16
-static struct {
+#define NUM_CONNECTIONS 1024
+
+typedef struct {
 	int fd;
 	uint32_t addr;
-	int closed;
-	FILE *post;
-} connections[NUM_CONNECTIONS];
+} connection_t;
+
+static connection_t connections[NUM_CONNECTIONS];
+
+/* Webserver thread argument */
+static webserver_arg_t web_arg;
+
+static int webserver_select(int server_fd);
+static int webserver_epoll(int server_fd);
 
 /* Sending function with some debugging. */
 static int mysend(int s, char *p, int len)
@@ -56,18 +64,18 @@ static int sendf(int fd, const char *fmt, ...)
 /* Send one file. */
 static void get_file(int s, char *url)
 {
-	/* Set www_dir to point to your web directory. */
-	char *www_dir = NULL;
 	char bufo[512];
 	int n, w;
 
 	const char *mime = NULL;
-	const char *p = url + 1;
+	const char *file_name = url;
 
-	if (*p == 0)
-		p = "index.html";
+	if (!file_name || *file_name == '\0')
+		file_name = "index.html";
+	else if (*file_name == '/')
+		file_name++;
 
-	char *p2 = strrchr(p, '.');
+	char *p2 = strrchr(file_name, '.');
 	if (p2) {
 		p2++;
 		if (!strcmp(p2, "html")) mime = "text/html";
@@ -84,9 +92,7 @@ static void get_file(int s, char *url)
 		else if (!strcmp(p2, "js")) mime = "text/javascript";
 	}
 
-	www_dir = getenv("www_dir");
-
-	snprintf(bufo, sizeof(bufo), "%s/%s", www_dir, p);
+	snprintf(bufo, sizeof(bufo), "%s/%s", web_arg.root_dir, file_name);
 	FILE *f = fopen(bufo, "rb");
 
 	if (!f) {
@@ -106,6 +112,7 @@ static void get_file(int s, char *url)
 	while ((n = fread(bufo, 1, sizeof(bufo), f)) > 0)
 		if ((w = mysend(s, bufo, n)) < 0)
 			break;
+
 	/* flush the file */
 	state = 0;
 	ofp_setsockopt(s, OFP_IPPROTO_TCP, OFP_TCP_NOPUSH, &state, sizeof(state));
@@ -135,78 +142,82 @@ static int analyze_http(char *http, int s) {
 	return 0;
 }
 
-#ifndef USE_EPOLL
 static void monitor_connections(ofp_fd_set *fd_set)
 {
 	int i;
 
 	for (i = 0; i < NUM_CONNECTIONS; ++i)
-		if (connections[i].fd)
+		if (connections[i].fd != -1)
 			OFP_FD_SET(connections[i].fd, fd_set);
 }
-#endif
 
-static inline int accept_connection(int serv_fd)
+static inline int accept_connection(int serv_fd, int *con_id)
 {
 	int tmp_fd, i;
 	struct ofp_sockaddr_in caller;
 	unsigned int alen = sizeof(caller);
 
-	if ((tmp_fd = ofp_accept(serv_fd, (struct ofp_sockaddr *)&caller, &alen)) > 0) {
-		OFP_INFO("accept fd=%d", tmp_fd);
+	for (i = 0; i < NUM_CONNECTIONS; i++)
+		if (connections[i].fd == -1)
+			break;
 
-		for (i = 0; i < NUM_CONNECTIONS; i++)
-			if (connections[i].fd == 0)
-				break;
+	if (i >= NUM_CONNECTIONS) {
+		OFP_ERR("Node cannot accept new connections!");
+		return -1;
+	}
 
-		if (i >= NUM_CONNECTIONS) {
-			OFP_ERR("Node cannot accept new connections!");
-			ofp_close(tmp_fd);
-			return -1;
-		}
+	tmp_fd = ofp_accept(serv_fd, (struct ofp_sockaddr *)&caller, &alen);
+	if (tmp_fd < 0)
+		return -1;
+
+	OFP_INFO("accept fd=%d", tmp_fd);
 
 #if 0
-		struct ofp_linger so_linger;
-		so_linger.l_onoff = 1;
-		so_linger.l_linger = 0;
-		int r1 = ofp_setsockopt(tmp_fd,
-					  OFP_SOL_SOCKET,
-					  OFP_SO_LINGER,
-					  &so_linger,
-					  sizeof so_linger);
-		if (r1) OFP_ERR("SO_LINGER failed!");
-#endif
-		struct ofp_timeval tv;
-		tv.tv_sec = 3;
-		tv.tv_usec = 0;
-		int r2 = ofp_setsockopt(tmp_fd,
-					  OFP_SOL_SOCKET,
-					  OFP_SO_SNDTIMEO,
-					  &tv,
-					  sizeof tv);
-		if (r2) OFP_ERR("SO_SNDTIMEO failed!");
+	struct ofp_linger so_linger;
 
-		connections[i].fd = tmp_fd;
-		connections[i].addr = caller.sin_addr.s_addr;
-		connections[i].closed = FALSE;
-	}
+	so_linger.l_onoff = 1;
+	so_linger.l_linger = 0;
+	int r1 = ofp_setsockopt(tmp_fd,
+					OFP_SOL_SOCKET,
+					OFP_SO_LINGER,
+					&so_linger,
+					sizeof(so_linger));
+	if (r1)
+		OFP_ERR("SO_LINGER failed!");
+#endif
+	struct ofp_timeval tv;
+
+	tv.tv_sec = 3;
+	tv.tv_usec = 0;
+	int r2 = ofp_setsockopt(tmp_fd,
+					OFP_SOL_SOCKET,
+					OFP_SO_SNDTIMEO,
+					&tv,
+					sizeof(tv));
+	if (r2)
+		OFP_ERR("SO_SNDTIMEO failed!");
+
+	connections[i].fd = tmp_fd;
+	connections[i].addr = caller.sin_addr.s_addr;
+
+	if (con_id)
+		*con_id = i;
 
 	return tmp_fd;
 }
 
 static int handle_connection(int i)
 {
-	int fd, r;
+	int r;
 	static char buf[1024];
 
-	if (connections[i].fd == 0)
-		return 0;
+	if (connections[i].fd == -1)
+		return -1;
 
-	fd = connections[i].fd;
 	r = ofp_recv(connections[i].fd, buf, sizeof(buf)-1, 0);
 
 	if (r < 0)
-		return 0;
+		return -1;
 
 	if (r > 0) {
 		buf[r] = 0;
@@ -226,26 +237,197 @@ static int handle_connection(int i)
 			sleep(1);
 		}
 		OFP_INFO("closed fd=%d", connections[i].fd);
-		connections[i].fd = 0;
+		connections[i].fd = -1;
 	} else if (r == 0) {
-		if (connections[i].post) {
-			OFP_INFO("File download finished");
-			fclose(connections[i].post);
-			connections[i].post = NULL;
-		}
 		ofp_close(connections[i].fd);
-		connections[i].fd = 0;
+		connections[i].fd = -1;
 	}
 
-	return fd;
+	return 0;
+}
+
+static int webserver_select(int serv_fd)
+{
+	int tmp_fd, nfds, i, r;
+	ofp_fd_set read_fd;
+	struct ofp_timeval timeout;
+	odp_bool_t *is_running = NULL;
+
+	OFP_INFO("Using ofp_select");
+
+	OFP_FD_ZERO(&read_fd);
+	nfds = serv_fd;
+
+	is_running = ofp_get_processing_state();
+	if (is_running == NULL) {
+		OFP_ERR("ofp_get_processing_state failed");
+		return -1;
+	}
+
+	while (*is_running) {
+		timeout.tv_sec = 0;
+		timeout.tv_usec = 200000;
+
+		OFP_FD_SET(serv_fd, &read_fd);
+		monitor_connections(&read_fd);
+		r = ofp_select(nfds + 1, &read_fd, NULL, NULL, &timeout);
+
+		if (r <= 0) {
+			if (r == 0)
+				continue;
+			else
+				break;
+		}
+
+		if (OFP_FD_ISSET(serv_fd, &read_fd)) {
+			tmp_fd = accept_connection(serv_fd, NULL);
+
+			if (tmp_fd > nfds)
+				nfds = tmp_fd;
+		}
+
+		for (i = 0; i < NUM_CONNECTIONS; i++)
+			if (connections[i].fd != -1 &&
+			    OFP_FD_ISSET(connections[i].fd, &read_fd)) {
+				tmp_fd = connections[i].fd;
+
+				handle_connection(i);
+
+				OFP_FD_CLR(tmp_fd, &read_fd);
+			}
+	}
+
+	/* cleanup */
+	for (i = 0; i < NUM_CONNECTIONS; i++) {
+		if (connections[i].fd == -1)
+			continue;
+
+		OFP_FD_CLR(connections[i].fd, &read_fd);
+
+		ofp_close(connections[i].fd);
+		connections[i].fd = -1;
+	}
+
+	return 0;
+}
+
+static int webserver_epoll(int serv_fd)
+{
+	int i, r;
+	int tmp_fd, conn_id;
+	int epfd = -1;
+	struct ofp_epoll_event events[NUM_EPOLL_EVT];
+	struct ofp_epoll_event e;
+	connection_t *conn = NULL;
+	odp_bool_t *is_running = NULL;
+
+	OFP_INFO("Using ofp_epoll");
+
+	epfd = ofp_epoll_create(1);
+	if (epfd == -1) {
+		OFP_ERR("Cannot create epoll (%s)!", ofp_strerror(ofp_errno));
+		return -1;
+	}
+
+	conn = &connections[0];
+	conn->fd = serv_fd;
+	e.events = OFP_EPOLLIN;
+	e.data.ptr = conn;
+	ofp_epoll_ctl(epfd, OFP_EPOLL_CTL_ADD, serv_fd, &e);
+
+	is_running = ofp_get_processing_state();
+	if (is_running == NULL) {
+		OFP_ERR("ofp_get_processing_state failed");
+		return -1;
+	}
+
+	while (*is_running) {
+		r = ofp_epoll_wait(epfd, events, NUM_EPOLL_EVT, 200);
+		if (r < 0)
+			break;
+
+		for (i = 0; i < r; ++i) {
+			conn = (connection_t *)events[i].data.ptr;
+
+			if (conn->fd == serv_fd) {
+				tmp_fd = accept_connection(serv_fd, &conn_id);
+				if (tmp_fd == -1)
+					continue;
+
+				e.events = OFP_EPOLLIN;
+				e.data.ptr = &connections[conn_id];
+
+				ofp_epoll_ctl(epfd, OFP_EPOLL_CTL_ADD,
+					      tmp_fd, &e);
+			} else {
+				tmp_fd = conn->fd;
+				conn_id = conn - connections;
+
+				handle_connection(conn_id);
+
+				ofp_epoll_ctl(epfd, OFP_EPOLL_CTL_DEL,
+					      tmp_fd, NULL);
+			}
+		}
+	}
+
+	/* cleanup */
+	for (i = 0; i < NUM_CONNECTIONS; i++) {
+		if (connections[i].fd == -1)
+			continue;
+
+		ofp_epoll_ctl(epfd, OFP_EPOLL_CTL_DEL, connections[i].fd, NULL);
+
+		ofp_close(connections[i].fd);
+		connections[i].fd = -1;
+	}
+
+	return 0;
+}
+
+static int create_server_socket(void)
+{
+	int serv_fd = -1;
+	uint32_t myaddr;
+	struct ofp_sockaddr_in my_addr;
+
+	myaddr = ofp_port_get_ipv4_addr(0, 0, OFP_PORTCONF_IP_TYPE_IP_ADDR);
+
+	if ((serv_fd = ofp_socket(OFP_AF_INET, OFP_SOCK_STREAM, OFP_IPPROTO_TCP)) < 0) {
+		OFP_ERR("ofp_socket failed");
+		return -1;
+	}
+
+	memset(&my_addr, 0, sizeof(my_addr));
+	my_addr.sin_family = OFP_AF_INET;
+	my_addr.sin_port = odp_cpu_to_be_16(web_arg.lport);
+	my_addr.sin_addr.s_addr = myaddr;
+	my_addr.sin_len = sizeof(my_addr);
+
+	if (ofp_bind(serv_fd, (struct ofp_sockaddr *)&my_addr,
+		       sizeof(struct ofp_sockaddr)) < 0) {
+		OFP_ERR("Cannot bind http socket (%s)!", ofp_strerror(ofp_errno));
+		ofp_close(serv_fd);
+		return -1;
+	}
+
+	if (ofp_listen(serv_fd, 10)) {
+		OFP_ERR("Cannot listen http socket (%s)!",
+			ofp_strerror(ofp_errno));
+		ofp_close(serv_fd);
+		return -1;
+	}
+
+	return serv_fd;
 }
 
 static int webserver(void *arg)
 {
-	int serv_fd, tmp_fd;
-	struct ofp_sockaddr_in my_addr;
+	int serv_fd, i;
+	int ret = 0;
 
-	(void)arg;
+	if (!arg)
+		return -1;
 
 	OFP_INFO("HTTP thread started");
 
@@ -255,89 +437,32 @@ static int webserver(void *arg)
 	}
 	sleep(1);
 
-	myaddr = ofp_port_get_ipv4_addr(0, 0, OFP_PORTCONF_IP_TYPE_IP_ADDR);
+	web_arg = *(webserver_arg_t *)arg;
 
-	if ((serv_fd = ofp_socket(OFP_AF_INET, OFP_SOCK_STREAM, OFP_IPPROTO_TCP)) < 0) {
-		OFP_ERR("ofp_socket failed");
-		perror("serv socket");
+	for (i = 0; i < NUM_CONNECTIONS; i++)
+		connections[i].fd = -1;
+
+	serv_fd = create_server_socket();
+	if (serv_fd == -1) {
+		OFP_ERR("Error: create_server_socket() failed.\n");
+		ofp_term_local();
 		return -1;
 	}
 
-	memset(&my_addr, 0, sizeof(my_addr));
-	my_addr.sin_family = OFP_AF_INET;
-	my_addr.sin_port = odp_cpu_to_be_16(2048);
-	my_addr.sin_addr.s_addr = myaddr;
-	my_addr.sin_len = sizeof(my_addr);
-
-	if (ofp_bind(serv_fd, (struct ofp_sockaddr *)&my_addr,
-		       sizeof(struct ofp_sockaddr)) < 0) {
-		OFP_ERR("Cannot bind http socket (%s)!", ofp_strerror(ofp_errno));
-		return -1;
-	}
-
-	ofp_listen(serv_fd, 10);
-
-#ifndef USE_EPOLL
-	OFP_INFO("Using ofp_select");
-	ofp_fd_set read_fd;
-	OFP_FD_ZERO(&read_fd);
-	int nfds = serv_fd;
-#else
-	OFP_INFO("Using ofp_epoll");
-	int epfd = ofp_epoll_create(1);
-	struct ofp_epoll_event e = { OFP_EPOLLIN, { .fd = serv_fd } };
-	ofp_epoll_ctl(epfd, OFP_EPOLL_CTL_ADD, serv_fd, &e);
-#endif
-
-	for ( ; ; )
-	{
-#ifndef USE_EPOLL
-		int r, i;
-		struct ofp_timeval timeout;
-
-		timeout.tv_sec = 0;
-		timeout.tv_usec = 200000;
-
-		OFP_FD_SET(serv_fd, &read_fd);
-		monitor_connections(&read_fd);
-		r = ofp_select(nfds + 1, &read_fd, NULL, NULL, &timeout);
-
-		if (r <= 0)
-			continue;
-
-		if (OFP_FD_ISSET(serv_fd, &read_fd))
-			if ((tmp_fd = accept_connection(serv_fd)) > nfds)
-				nfds = tmp_fd;
-
-		for (i = 0; i < NUM_CONNECTIONS; i++)
-			if (OFP_FD_ISSET(connections[i].fd, &read_fd) &&
-			   (tmp_fd = handle_connection(i)))
-				OFP_FD_CLR(tmp_fd, &read_fd);
-#else
-		int r, i;
-		struct ofp_epoll_event events[10];
-
-		r = ofp_epoll_wait(epfd, events, 10, 200);
-
-		for (i = 0; i < r; ++i) {
-			if (events[i].data.fd == serv_fd) {
-				tmp_fd = accept_connection(serv_fd);
-				struct ofp_epoll_event e = { OFP_EPOLLIN, { .u32 = i } };
-				ofp_epoll_ctl(epfd, OFP_EPOLL_CTL_ADD, tmp_fd, &e);
-			}
-			else if ((tmp_fd = handle_connection(events[i].data.u32)))
-				ofp_epoll_ctl(epfd, OFP_EPOLL_CTL_DEL, tmp_fd, NULL);
-		}
-#endif
-	}
+	if (web_arg.use_epoll)
+		ret = webserver_epoll(serv_fd);
+	else
+		ret = webserver_select(serv_fd);
 
 	OFP_INFO("httpd exiting");
-	return 0;
+	ofp_term_local();
+	return ret;
 }
 
-void ofp_start_webserver_thread(odp_instance_t instance, int core_id)
+void ofp_start_webserver_thread(odp_instance_t instance, int core_id,
+				odph_odpthread_t *webserver_pthread,
+				webserver_arg_t *arg)
 {
-	static odph_odpthread_t test_linux_webserver_pthread;
 	odp_cpumask_t cpumask;
 	odph_odpthread_params_t thr_params;
 
@@ -345,10 +470,10 @@ void ofp_start_webserver_thread(odp_instance_t instance, int core_id)
 	odp_cpumask_set(&cpumask, core_id);
 
 	thr_params.start = webserver;
-	thr_params.arg = NULL;
+	thr_params.arg = (void *)arg;
 	thr_params.thr_type = ODP_THREAD_CONTROL;
 	thr_params.instance = instance;
-	odph_odpthreads_create(&test_linux_webserver_pthread,
+	odph_odpthreads_create(webserver_pthread,
 			       &cpumask,
 			       &thr_params);
 }

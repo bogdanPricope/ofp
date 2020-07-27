@@ -47,21 +47,14 @@ webserver
 -------------------------------------------------------------------------------
 This is a simple web server that uses ofp sockets.
 
-To setup the web server:
-Set the environment variable www_dir to the path of the folder containing
-the web pages:
-export www_dir=/path/to/your/www
-
 To run the web server:
-# ./webserver -i <interface_name> -c <core_number>
+# ./webserver -i <interface_name> -c <core_number> -r <www_dir>
 
 By default the webserver uses ofp_select to monitor the file descriptors. By
-defining CPPFLAGS='-DUSE_EPOLL' when running configure the webserver can be set to
-use the ofp epoll implementation, e.g.:
+using '-e' option the webserver can be set to use the ofp epoll
+implementation, e.g.:
 
-./configure <typical-ofp-flags> CPPFLAGS='-DUSE_EPOLL'
-make clean
-make
+# ./webserver -i <interface_name> -c <core_number> -r <www_dir> -e
 
 webserver2
 -------------------------------------------------------------------------------

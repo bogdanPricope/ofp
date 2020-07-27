@@ -12,6 +12,7 @@
 
 #include "ofp.h"
 #include "httpd.h"
+#include "linux_sigaction.h"
 
 #define MAX_WORKERS		32
 
@@ -23,6 +24,9 @@ typedef struct {
 	int if_count;		/**< Number of interfaces to be used */
 	char **if_names;	/**< Array of pointers to interface names */
 	char *cli_file;
+	char *root_dir;
+	uint16_t lport;
+	odp_bool_t use_epoll;
 } appl_args_t;
 
 /* helper funcs */
@@ -36,20 +40,18 @@ ofp_global_param_t app_init_params; /**< global OFP init parms */
 #define NO_PATH(file_name) (strrchr((file_name), '/') ? \
 				strrchr((file_name), '/') + 1 : (file_name))
 
-
-/** local hook
+/**
+ * Signal handler function
  *
- * @param pkt odp_packet_t
- * @param protocol int
- * @return int
+ * @param signum int
+ * @return void
  *
  */
-static enum ofp_return_code fastpath_local_hook(odp_packet_t pkt, void *arg)
+static void sig_func_stop(int signum)
 {
-	int protocol = *(int *)arg;
-	(void) pkt;
-	(void) protocol;
-	return OFP_PKT_CONTINUE;
+	printf("Signal handler (signum = %d) ... exiting.\n", signum);
+
+	ofp_stop_processing();
 }
 
 /** main() Application entry point
@@ -65,6 +67,8 @@ static enum ofp_return_code fastpath_local_hook(odp_packet_t pkt, void *arg)
 int main(int argc, char *argv[])
 {
 	odph_odpthread_t thread_tbl[MAX_WORKERS];
+	odph_odpthread_t webserver_pthread = {0};
+	webserver_arg_t webserver_pthread_arg = {0};
 	appl_args_t params;
 	int core_count, num_workers;
 	odp_cpumask_t cpumask;
@@ -80,6 +84,12 @@ int main(int argc, char *argv[])
 
 	/* Parse and store the application arguments */
 	parse_args(argc, argv, &params);
+
+	/* add handler for Ctr+C */
+	if (ofp_sigactions_set(sig_func_stop)) {
+		printf("Error: failed to set signal actions.\n");
+		return EXIT_FAILURE;
+	}
 
 	if (odp_init_global(&instance, NULL, NULL)) {
 		OFP_ERR("Error: ODP global init failed.\n");
@@ -119,7 +129,6 @@ int main(int argc, char *argv[])
 
 	app_init_params.if_count = params.if_count;
 	app_init_params.if_names = params.if_names;
-	app_init_params.pkt_hook[OFP_HOOK_LOCAL] = fastpath_local_hook;
 	if (ofp_init_global(instance, &app_init_params)) {
 		OFP_ERR("Error: OFP global init failed.\n");
 		exit(EXIT_FAILURE);
@@ -141,9 +150,19 @@ int main(int argc, char *argv[])
 	ofp_start_cli_thread(instance, app_init_params.linux_core_id, params.cli_file);
 
 	/* webserver */
-	ofp_start_webserver_thread(instance, app_init_params.linux_core_id);
+	webserver_pthread_arg.root_dir = params.root_dir;
+	webserver_pthread_arg.lport = params.lport;
+	webserver_pthread_arg.use_epoll = params.use_epoll;
+	ofp_start_webserver_thread(instance, app_init_params.linux_core_id,
+				   &webserver_pthread, &webserver_pthread_arg);
 
 	odph_odpthreads_join(thread_tbl);
+	odph_odpthreads_join(&webserver_pthread);
+
+	if (params.root_dir) {
+		free(params.root_dir);
+		params.root_dir = NULL;
+	}
 	printf("End Main()\n");
 
 	return 0;
@@ -164,18 +183,22 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 	size_t len;
 	int i;
 	static struct option longopts[] = {
-		{"count", required_argument, NULL, 'c'},
+		{"core_count", required_argument, NULL, 'c'},
 		{"interface", required_argument, NULL, 'i'},	/* return 'i' */
 		{"help", no_argument, NULL, 'h'},		/* return 'h' */
 		{"cli-file", required_argument,
 			NULL, 'f'},/* return 'f' */
+		{"root", required_argument, NULL, 'r'},	/* return 'r' */
+		{"lport", required_argument, NULL, 'p'},	/* return 'p' */
+		{"epoll", no_argument, NULL, 'e'}, /* return 'e' */
 		{NULL, 0, NULL, 0}
 	};
 
 	memset(appl_args, 0, sizeof(*appl_args));
+	appl_args->use_epoll = 0;
 
 	while (1) {
-		opt = getopt_long(argc, argv, "+c:i:hf:",
+		opt = getopt_long(argc, argv, "+c:i:hf:r:ep:",
 				  longopts, &long_index);
 
 		if (opt == -1)
@@ -249,7 +272,26 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 
 			strcpy(appl_args->cli_file, optarg);
 			break;
+		case 'r':
+			len = strlen(optarg);
+			if (len == 0) {
+				usage(argv[0]);
+				exit(EXIT_FAILURE);
+			}
+			appl_args->root_dir = strdup(optarg);
+			break;
+		case 'e':
+			appl_args->use_epoll = 1;
+			break;
+		case 'p':
+			len = strlen(optarg);
+			if (len == 0) {
+				usage(argv[0]);
+				exit(EXIT_FAILURE);
+			}
 
+			appl_args->lport = (uint16_t)atoi(optarg);
+			break;
 		default:
 			break;
 		}
@@ -259,6 +301,10 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		usage(argv[0]);
 		exit(EXIT_FAILURE);
 	}
+	if (!appl_args->root_dir)
+		appl_args->root_dir = strdup(DEFAULT_ROOT_DIRECTORY);
+	if (!appl_args->lport)
+		appl_args->lport = DEFAULT_BIND_PORT;
 
 	optind = 1;		/* reset 'extern optind' from the getopt lib */
 }
@@ -310,7 +356,13 @@ static void usage(char *progname)
 		   "\n"
 		   "Optional OPTIONS\n"
 		   "  -c, --count <number> Core count.\n"
-		   "  -h, --help           Display help and exit.\n"
-		   "\n", NO_PATH(progname), NO_PATH(progname)
+		   "  -r, --root <web root folder> Webserver root folder.\n"
+		   "\tDefault: " DEFAULT_ROOT_DIRECTORY "\n"
+		   "  -p, --lport <port> Port address were webserver binds.\n"
+			"\tDefault: %d\n"
+		   "  -e, --epoll Use epoll method.\n"
+		   "\tDefault: select method.\n"
+		   "  -h, --help  Display help and exit.\n"
+		   "\n", NO_PATH(progname), NO_PATH(progname), DEFAULT_BIND_PORT
 		);
 }
