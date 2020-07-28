@@ -1,3 +1,18 @@
+OpenFastPathGen2 is a spin-off of OpenFastPath project.
+===============================================================================
+
+Intent and purpose:
+-------------------------------------------------------------------------------
+
+OpenFastPathGen2 is a code design exercise intended to provide a overall
+improvement of functionality offered by OpenFastPath project while exploring
+utilization in small devices.
+
+OpenFastPathGen2 does not target the API or design compatibility with
+OpenFastPath project. More, rapid API or design changes are expected as part of
+the new incubation phase.
+
+
 OpenFastPath general info [![Build Status](https://travis-ci.org/OpenFastPath/ofp.svg?branch=master)](https://travis-ci.org/OpenFastPath/ofp)
 ===============================================================================
 
@@ -22,6 +37,7 @@ for more details about OpenFastPath architecture and main features.
 
 Directory structure
 -------------------------------------------------------------------------------
+./config/      - Example configuration files<br>
 ./docs/        - This is where you can find more detailed documentation<br>
 ./example/     - Example applications that use the project library<br>
 ./include/api/ - Public interface headers used by an application.<br>
@@ -72,7 +88,7 @@ Download and build OpenDataPlane (ODP) library:
 
     git clone https://git.linaro.org/lng/odp.git
     cd odp
-    git checkout v1.19.0.2
+    git checkout <v1.23.1 commit>
     ./bootstrap
     ./configure --prefix=<INSTALL ODP TO THIS DIR>
     make
