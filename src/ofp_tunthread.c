@@ -337,3 +337,26 @@ drop_pkg:
 	ofp_term_local();
 	return 0;
 }
+
+int ofp_get_linuxindex(const char *name)
+{
+	int gen_fd;
+	struct ifreq ifr = {0};
+
+	gen_fd = socket(PF_INET, SOCK_DGRAM, 0);
+	if (gen_fd == -1)
+		return -1;
+
+	strncpy(ifr.ifr_name, name, IFNAMSIZ);
+	ifr.ifr_name[IFNAMSIZ - 1] = 0;
+
+	if (ioctl(gen_fd, SIOCGIFINDEX, &ifr) == -1) {
+		close(gen_fd);
+		return -1;
+	}
+
+	close(gen_fd);
+
+	return ifr.ifr_ifindex;
+}
+

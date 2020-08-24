@@ -250,7 +250,7 @@ int ofp_rt_rule_add(uint16_t vrf, uint32_t addr_be, uint32_t masklen, struct ofp
 			rule->u1.s1.vrf,
 			ofp_print_ip_addr(odp_cpu_to_be_32(rule->u1.s1.addr)),
 			rule->u1.s1.masklen);
-		return -1;
+		return 0;
 	}
 
 	if ((rule = rt_rule_alloc()) == NULL) {

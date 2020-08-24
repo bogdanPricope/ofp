@@ -1,4 +1,5 @@
 debug 0
 loglevel set info
+ifconfig lo0 127.0.0.1/8
 ifconfig fp0 192.168.100.1/24
 ifconfig -A inet6 fp0 fd00:1baf::1/64

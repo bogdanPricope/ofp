@@ -936,6 +936,7 @@ const char *ofp_config_interface_up_local(uint16_t id, uint16_t vrf,
 #ifdef SP
 	char cmd[200];
 	int ret = 0;
+	int linux_index = -1;
 #endif /* SP */
 	struct ofp_ifnet *data;
 	uint32_t mask;
@@ -946,6 +947,20 @@ const char *ofp_config_interface_up_local(uint16_t id, uint16_t vrf,
 
 	if (vrf >= global_param->num_vrf)
 		return "VRF ID too big";
+
+#ifdef SP	/* force only one loopback interface for 'lo' */
+	linux_index = ofp_get_linuxindex("lo");
+	if (linux_index == -1)
+		return "Interface 'lo' not found.";
+
+	if (!((shm->linux_interface_table[linux_index].port == PORT_UNDEF) ||
+	      ((shm->linux_interface_table[linux_index].port == LOCAL_PORTS) &&
+	       (shm->linux_interface_table[linux_index].vlan == id))))
+		return "Interface 'lo' already configured.";
+
+	if (shm->linux_interface_table[linux_index].port == PORT_UNDEF)
+		exec_sys_call_depending_on_vrf("ip addr flush  dev lo", vrf);
+#endif /* SP */
 
 	mask = ~0;
 	mask = odp_cpu_to_be_32(mask << (32 - masklen));
@@ -969,8 +984,11 @@ const char *ofp_config_interface_up_local(uint16_t id, uint16_t vrf,
 	ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, id, LOCAL_PORTS,
 				addr, masklen, 0,
 				OFP_RTF_LOCAL | OFP_RTF_HOST);
-	ofp_ifnet_ip_find_update_fields(data, addr, masklen, addr | ~mask);
+
 #ifdef SP
+	data->linux_index = linux_index;
+	ofp_update_ifindex_lookup_tab(data);
+
 	if (vrf == 0)
 		data->sp_status = OFP_SP_UP;
 	else
@@ -980,6 +998,10 @@ const char *ofp_config_interface_up_local(uint16_t id, uint16_t vrf,
 	snprintf(cmd, sizeof(cmd), "ip addr add %s/%d dev lo",
 		 ofp_print_ip_addr(addr), masklen);
 	ret = exec_sys_call_depending_on_vrf(cmd, vrf);
+#else
+	ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, data->vlan, data->port,
+			     addr, 32, 0, OFP_RTF_LOCAL);
+	ofp_ifnet_ip_find_update_fields(data, addr, masklen, addr | ~mask);
 #endif /* SP */
 
 	return NULL;
@@ -1218,10 +1240,18 @@ const char *ofp_config_interface_down(int port, uint16_t vlan)
 			uint32_t a = (ofp_if_type(data) == OFP_IFT_GRE) ?
 				data->ip_p2p : data->ip_addr_info[0].ip_addr;
 			int m = data->ip_addr_info[0].masklen;
+#ifdef SP
+			uint32_t dest = a;
+#endif /* SP */
+
 			a = odp_cpu_to_be_32(odp_be_to_cpu_32(a) & (0xFFFFFFFFULL << (32-data->ip_addr_info[0].masklen)));
-			if (ofp_if_type(data) == OFP_IFT_LOOP)
+			if (ofp_if_type(data) == OFP_IFT_LOOP) {
 				ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, vlan, port,
 					data->ip_addr_info[0].ip_addr, data->ip_addr_info[0].masklen, 0, 0);
+				/*ofp_set_route_params(OFP_ROUTE_DEL,
+						       data->vrf, vlan, port,
+						       dest, 32, 0, 0);*/
+			}
 			else if (ofp_if_type(data) != OFP_IFT_GRE)
 				ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, vlan, port,
 					data->ip_addr_info[0].ip_addr, 32, 0, 0);
@@ -1232,7 +1262,7 @@ const char *ofp_config_interface_down(int port, uint16_t vlan)
 			if (port == LOCAL_PORTS)
 				snprintf(cmd, sizeof(cmd),
 					 "ip addr del %s/%d dev lo",
-					 ofp_print_ip_addr(a),
+					 ofp_print_ip_addr(dest),
 					 m);
 			else
 				snprintf(cmd, sizeof(cmd),
@@ -1276,6 +1306,16 @@ const char *ofp_config_interface_down(int port, uint16_t vlan)
 		}
 
 		free(data->ii_inet.ii_igmp);
+
+#ifdef SP
+		if (port == LOCAL_PORTS &&
+		    data->linux_index < NUM_LINUX_INTERFACES) {
+			int idx = data->linux_index;
+
+			shm->linux_interface_table[idx].port = PORT_UNDEF;
+		}
+#endif /*SP*/
+
 		vlan_ifnet_delete(
 			shm->ofp_ifnet_data[port].vlan_structs,
 			&key,

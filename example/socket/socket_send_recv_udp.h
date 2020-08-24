@@ -10,9 +10,11 @@
 
 int init_udp_local_ip(int *pfd_thread1, int *pfd_thread2);
 int init_udp_any(int *pfd_thread1, int *pfd_thread2);
+int init_udp_loopback(int *pfd_thread1, int *pfd_thread2);
 
 int send_udp_local_ip(int fd);
 int send_udp_any(int fd);
+int send_udp_loopback(int fd);
 int recv_udp(int fd);
 int recvfrom_udp(int fd);
 int recvfrom_udp_null_addr(int fd);

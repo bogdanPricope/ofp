@@ -249,6 +249,13 @@ typedef struct ofp_global_param_t {
 		 */
 		uint32_t sd_offset;
 	} socket;
+
+	/**
+	 * Create default loopback interface lo0, 127.0.0.1/8.
+	 * Interface can also be created with CLI or
+	 * ofp_config_interface_up_local() API.
+	 */
+	odp_bool_t if_loopback;
 } ofp_global_param_t;
 
 /**

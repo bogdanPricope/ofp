@@ -81,6 +81,41 @@ int init_udp_any(int *pfd_thread1, int *pfd_thread2)
 	return 0;
 }
 
+int init_udp_loopback(int *pfd_thread1, int *pfd_thread2)
+{
+	struct ofp_sockaddr_in addr = {0};
+
+	*pfd_thread1 = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
+				  OFP_IPPROTO_UDP);
+	if (*pfd_thread1 == -1) {
+		OFP_ERR("Failed to create SEND socket (errno = %d)\n",
+			ofp_errno);
+		return -1;
+	}
+
+	*pfd_thread2 = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
+				  OFP_IPPROTO_UDP);
+	if (*pfd_thread2 == -1) {
+		OFP_ERR("Failed to create RCV socket (errno = %d)\n",
+			ofp_errno);
+		return -1;
+	}
+
+	addr.sin_len = sizeof(struct ofp_sockaddr_in);
+	addr.sin_family = OFP_AF_INET;
+	addr.sin_port = odp_cpu_to_be_16(TEST_PORT + 1);
+	addr.sin_addr.s_addr = IP4(127, 0, 0, 1);
+
+	if (ofp_bind(*pfd_thread2, (const struct ofp_sockaddr *)&addr,
+		     sizeof(struct ofp_sockaddr_in)) == -1) {
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
+			ofp_errno);
+		return -1;
+	}
+
+	return 0;
+}
+
 int send_udp_local_ip(int fd)
 {
 	const char *buf = "socket_test";
@@ -95,6 +130,28 @@ int send_udp_local_ip(int fd)
 		(struct ofp_sockaddr *)&dest_addr,
 		sizeof(dest_addr)) == -1) {
 		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		return -1;
+	}
+
+	OFP_INFO("Data (%s) sent successfully.\n", buf);
+	OFP_INFO("SUCCESS.\n");
+	return 0;
+}
+
+int send_udp_loopback(int fd)
+{
+	const char *buf = "socket_test";
+	struct ofp_sockaddr_in dest_addr = {0};
+
+	dest_addr.sin_len = sizeof(struct ofp_sockaddr_in);
+	dest_addr.sin_family = OFP_AF_INET;
+	dest_addr.sin_port = odp_cpu_to_be_16(TEST_PORT + 1);
+	dest_addr.sin_addr.s_addr = IP4(127, 0, 0, 1);
+
+	if (ofp_sendto(fd, buf, strlen(buf), 0,
+		       (struct ofp_sockaddr *)&dest_addr,
+			sizeof(dest_addr)) == -1) {
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 

@@ -281,6 +281,12 @@ int main(int argc, char *argv[])
 	end_suite();
 	OFP_INFO("Test ended.\n");
 
+	OFP_INFO("\n\nSuite: IPv4 UDP bind loopback IP: sendto + recv.\n\n");
+	if (!init_suite(init_udp_loopback))
+		run_suite(instance, send_udp_loopback, recv_udp);
+	end_suite();
+	OFP_INFO("Test ended.\n");
+
 	OFP_INFO("\n\nSuite: IPv4 UDP bind local IP: sendto + recvfrom.\n\n");
 	if (!init_suite(init_udp_bind_local_ip))
 		run_suite(instance, send_udp_local_ip, recvfrom_udp);

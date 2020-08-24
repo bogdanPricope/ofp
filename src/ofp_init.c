@@ -278,6 +278,7 @@ static void read_conf_file(ofp_global_param_t *params, const char *filename)
 	GET_CONF_INT(int, socket.num_max);
 	GET_CONF_INT(int, socket.sd_offset);
 
+	GET_CONF_INT(bool, if_loopback);
 done:
 	config_destroy(&conf);
 }
@@ -319,6 +320,8 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
 
 	params->socket.num_max = OFP_NUM_SOCKETS_MAX;
 	params->socket.sd_offset = OFP_SOCK_NUM_OFFSET;
+
+	params->if_loopback = 0;
 
 	read_conf_file(params, filename);
 }
@@ -443,6 +446,7 @@ int ofp_init_global(odp_instance_t instance, ofp_global_param_t *params)
 	int i;
 	odp_pktio_param_t pktio_param;
 	odp_pktin_queue_param_t pktin_param;
+	const char *err;
 
 	ofp_init_global_called = 1;
 
@@ -491,6 +495,15 @@ int ofp_init_global(odp_instance_t instance, ofp_global_param_t *params)
 	}
 #endif /* SP */
 
+	if (params->if_loopback) {
+		uint32_t loop_addr = odp_cpu_to_be_32(OFP_INADDR_LOOPBACK);
+
+		err = ofp_config_interface_up_local(0, 0, loop_addr, 8);
+		if (err != NULL) {
+			OFP_ERR("Failed to create the interface: %s.", err);
+			return -1;
+		}
+	}
 	odp_schedule_resume();
 	return 0;
 }

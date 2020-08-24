@@ -544,9 +544,12 @@ enum ofp_return_code ofp_gre_processing(odp_packet_t *pkt)
 enum ofp_return_code send_pkt_loop(struct ofp_ifnet *dev,
 	odp_packet_t pkt)
 {
-	if (odp_queue_enq(ofp_get_ifnet(dev->port, 0)->loopq_def,
-		odp_packet_to_event(pkt)))
+	if (dev->port != LOCAL_PORTS)
+		dev = ofp_get_ifnet(dev->port, 0);
+
+	if (odp_queue_enq(dev->loopq_def, odp_packet_to_event(pkt)))
 		return OFP_PKT_DROP;
+
 	return OFP_PKT_PROCESSED;
 }
 
