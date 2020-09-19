@@ -47,7 +47,6 @@
 /**OFP configured to send ICMP redirect*/
 /* #define OFP_SEND_ICMP_REDIRECT */
 
-
 /* Configure values */
 /** Packet pool size. */
 # define SHM_PKT_POOL_NB_PKTS		10240
@@ -71,6 +70,12 @@
 
 /**Maximum number of TCP PCBs. */
 #define OFP_NUM_PCB_TCP_MAX 1024
+
+/**Maximum number of TCP SACK holes. */
+#define OFP_SACK_HOLE_MAX (4 * OFP_NUM_PCB_TCP_MAX)
+
+/**Maximum number of UDP PCBs. */
+#define OFP_NUM_PCB_UDP_MAX 1024
 
 #define OFP_TCP_MAX_CONNECTION_RATE
 

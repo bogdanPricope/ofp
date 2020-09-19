@@ -100,6 +100,7 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/netinet6/udp6_usrreq.c 238247 2012-07-08 1
 #include "ofpi_in_pcb.h"
 #include "ofpi_udp.h"
 #include "ofpi_udp_var.h"
+#include "ofpi_udp_shm.h"
 #include "ofpi_ip.h"
 
 #include "ofpi_ip6protosw.h"
@@ -122,7 +123,6 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/netinet6/udp6_usrreq.c 238247 2012-07-08 1
 #define log(...)
 
 extern struct protosw	ofp_inetsw[];
-extern struct inpcbinfo ofp_udbinfo;
 
 extern int ofp_udp_log_in_vain;
 extern int ofp_udp_blackhole;
@@ -439,9 +439,9 @@ ofp_udp6_input(odp_packet_t *pkt, int *offp, int *nxt)
 #endif /* IPFIREWALL_FORWARD */
 #endif
 
-	inp = ofp_in6_pcblookup(&ofp_udbinfo, &ip6->ip6_src,
-		    uh->uh_sport, &ip6->ip6_dst, uh->uh_dport,
-		    INPLOOKUP_WILDCARD | INPLOOKUP_RLOCKPCB, ifp);
+	inp = ofp_in6_pcblookup(&V_udbinfo, &ip6->ip6_src,
+				uh->uh_sport, &ip6->ip6_dst, uh->uh_dport,
+				INPLOOKUP_WILDCARD | INPLOOKUP_RLOCKPCB, ifp);
 
 	if (inp == NULL) {
 		if (ofp_udp_log_in_vain) {
@@ -499,7 +499,7 @@ ofp_udp6_input(odp_packet_t *pkt, int *offp, int *nxt)
 
 #if 0
 badheadlocked:
-	INP_INFO_RUNLOCK(&ofp_udbinfo);
+	INP_INFO_RUNLOCK(&V_udbinfo);
 #endif
 badunlocked:
 	return OFP_PKT_DROP;
@@ -562,11 +562,11 @@ ofp_udp6_ctlinput(int cmd, struct ofp_sockaddr *sa, void *d)
 		bzero(&uh, sizeof(uh));
 		memcpy(&uh, (uint8_t *)odp_packet_l3_ptr(m, NULL) + off,
 			sizeof(*uhp));
-		(void)ofp_in6_pcbnotify(&ofp_udbinfo, sa, uh.uh_dport,
+		(void)ofp_in6_pcbnotify(&V_udbinfo, sa, uh.uh_dport,
 			(struct ofp_sockaddr *)ip6cp->ip6c_src, uh.uh_sport,
 			 cmd, cmdarg, notify);
 	} else
-		(void)ofp_in6_pcbnotify(&ofp_udbinfo, sa, 0,
+		(void)ofp_in6_pcbnotify(&V_udbinfo, sa, 0,
 			(const struct ofp_sockaddr *)sa6_src, 0,
 			cmd, cmdarg, notify);
 }
@@ -878,10 +878,10 @@ udp6_abort(struct socket *so)
 
 	INP_WLOCK(inp);
 	if (!OFP_IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr)) {
-		INP_HASH_WLOCK(&ofp_udbinfo);
+		INP_HASH_WLOCK(&V_udbinfo);
 		ofp_in6_pcbdisconnect(inp);
 		inp->in6p_laddr = ofp_in6addr_any;
-		INP_HASH_WUNLOCK(&ofp_udbinfo);
+		INP_HASH_WUNLOCK(&V_udbinfo);
 		ofp_soisdisconnected(so);
 	}
 	INP_WUNLOCK(inp);
@@ -906,11 +906,11 @@ udp6_attach(struct socket *so, int proto, struct thread *td)
 			return (error);
 	}*/
 
-	INP_INFO_WLOCK(&ofp_udbinfo);
+	INP_INFO_WLOCK(&V_udbinfo);
 
-	error = ofp_in_pcballoc(so, &ofp_udbinfo);
+	error = ofp_in_pcballoc(so, &V_udbinfo);
 	if (error) {
-		INP_INFO_WUNLOCK(&ofp_udbinfo);
+		INP_INFO_WUNLOCK(&V_udbinfo);
 		return (error);
 	}
 
@@ -941,7 +941,7 @@ udp6_attach(struct socket *so, int proto, struct thread *td)
 	inp->inp_ppcb = &inp->ppcb_space.udp_ppcb;
 
 	INP_WUNLOCK(inp);
-	INP_INFO_WUNLOCK(&ofp_udbinfo);
+	INP_INFO_WUNLOCK(&V_udbinfo);
 
 	return (0);
 }
@@ -957,7 +957,7 @@ udp6_bind(struct socket *so, struct ofp_sockaddr *nam, struct thread *td)
 	KASSERT(inp != NULL, ("udp6_bind: inp == NULL"));
 
 	INP_WLOCK(inp);
-	INP_HASH_WLOCK(&ofp_udbinfo);
+	INP_HASH_WLOCK(&V_udbinfo);
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
 	if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0) {
@@ -982,7 +982,7 @@ udp6_bind(struct socket *so, struct ofp_sockaddr *nam, struct thread *td)
 
 	error = ofp_in6_pcbbind(inp, nam, td->td_ucred);
 out:
-	INP_HASH_WUNLOCK(&ofp_udbinfo);
+	INP_HASH_WUNLOCK(&V_udbinfo);
 	INP_WUNLOCK(inp);
 	return (error);
 }
@@ -1005,10 +1005,10 @@ udp6_close(struct socket *so)
 
 	INP_WLOCK(inp);
 	if (!OFP_IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr)) {
-		INP_HASH_WLOCK(&ofp_udbinfo);
+		INP_HASH_WLOCK(&V_udbinfo);
 		ofp_in6_pcbdisconnect(inp);
 		inp->in6p_laddr = ofp_in6addr_any;
-		INP_HASH_WUNLOCK(&ofp_udbinfo);
+		INP_HASH_WUNLOCK(&V_udbinfo);
 		ofp_soisdisconnected(so);
 	}
 	INP_WUNLOCK(inp);
@@ -1049,10 +1049,10 @@ udp6_connect(struct socket *so, struct ofp_sockaddr *nam, struct thread *td)
 		if (error != 0)
 			goto out;
 #endif /* 0 */
-		INP_HASH_WLOCK(&ofp_udbinfo);
+		INP_HASH_WLOCK(&V_udbinfo);
 		error = ofp_in_pcbconnect(inp, (struct ofp_sockaddr *)&sin,
 		    td->td_ucred);
-		INP_HASH_WUNLOCK(&ofp_udbinfo);
+		INP_HASH_WUNLOCK(&V_udbinfo);
 		if (error == 0)
 			ofp_soisconnected(so);
 		goto out;
@@ -1069,9 +1069,9 @@ udp6_connect(struct socket *so, struct ofp_sockaddr *nam, struct thread *td)
 	if (error != 0)
 		goto out;
 #endif
-	INP_HASH_WLOCK(&ofp_udbinfo);
+	INP_HASH_WLOCK(&V_udbinfo);
 	error = ofp_in6_pcbconnect(inp, nam, td->td_ucred);
-	INP_HASH_WUNLOCK(&ofp_udbinfo);
+	INP_HASH_WUNLOCK(&V_udbinfo);
 	if (error == 0)
 		ofp_soisconnected(so);
 out:
@@ -1088,13 +1088,13 @@ udp6_detach(struct socket *so)
 	inp = sotoinpcb(so);
 	KASSERT(inp != NULL, ("udp6_detach: inp == NULL"));
 
-	INP_INFO_WLOCK(&ofp_udbinfo);
+	INP_INFO_WLOCK(&V_udbinfo);
 	INP_WLOCK(inp);
 	up = intoudpcb(inp);
 	KASSERT(up != NULL, ("%s: up == NULL", __func__));
 	ofp_in_pcbdetach(inp);
 	ofp_in_pcbfree(inp);
-	INP_INFO_WUNLOCK(&ofp_udbinfo);
+	INP_INFO_WUNLOCK(&V_udbinfo);
 }
 
 
@@ -1122,10 +1122,10 @@ udp6_disconnect(struct socket *so)
 		return OFP_ENOTCONN;
 	}
 
-	INP_HASH_WLOCK(&ofp_udbinfo);
+	INP_HASH_WLOCK(&V_udbinfo);
 	ofp_in6_pcbdisconnect(inp);
 	inp->in6p_laddr = ofp_in6addr_any;
-	INP_HASH_WUNLOCK(&ofp_udbinfo);
+	INP_HASH_WUNLOCK(&V_udbinfo);
 	OFP_SOCK_LOCK(so);
 	so->so_state &= ~SS_ISCONNECTED;		/* XXX */
 	OFP_SOCK_UNLOCK(so);
@@ -1189,9 +1189,9 @@ udp6_send(struct socket *so, int flags, odp_packet_t m,
 		}
 	}
 
-	INP_HASH_WLOCK(&ofp_udbinfo);
+	INP_HASH_WLOCK(&V_udbinfo);
 	error = udp6_output(inp, m, addr, control, td);
-	INP_HASH_WUNLOCK(&ofp_udbinfo);
+	INP_HASH_WUNLOCK(&V_udbinfo);
 
 	INP_WUNLOCK(inp);
 	return (error);

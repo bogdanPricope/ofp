@@ -40,10 +40,12 @@ ofp_route.c \
 ofp_subr_hash.c \
 ofp_syscalls.c \
 ofp_timer.c \
+ofp_udp_shm.c \
 ofp_udp_usrreq.c \
 ofp_uipc_sockbuf.c \
 ofp_uipc_socket.c \
 ofp_uipc_domain.c \
+ofp_tcp_shm.c \
 ofp_tcp_usrreq.c \
 ofp_tcp_subr.c \
 ofp_tcp_timer.c \

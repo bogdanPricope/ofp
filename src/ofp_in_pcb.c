@@ -49,6 +49,7 @@
 #include "ofpi_socketvar.h"
 #include "ofpi_tcp_var.h"
 #include "ofpi_tcp_shm.h"
+#include "ofpi_udp_shm.h"
 #include "ofpi_systm.h"
 #include "ofpi_route.h"
 #include "ofpi_ip6_var.h"
@@ -63,10 +64,7 @@
 
 #define	HASH_NOWAIT	0x00000001
 #define	HASH_WAITOK	0x00000002
-extern void *ofp_hashinit(int count, void *type, uint64_t *hashmask);
 extern void  ofp_hashdestroy(void *vhashtbl, void *type, uint64_t hashmask);
-
-extern struct inpcbinfo ofp_udbinfo;
 
 static void in_pcbremlists(struct inpcb *inp);
 static struct inpcb *
@@ -98,8 +96,14 @@ refcount_release(odp_atomic_u32_t *count)
 }
 
 #ifdef OFP_RSS
-void ofp_tcp_rss_in_pcbinfo_init( int hash_nelements, int porthash_nelements,
-    uma_init inpcbzone_init, uma_fini inpcbzone_fini, uint32_t inpcbzone_flags)
+void ofp_rss_in_pcbinfo_init(const char *name,
+			     struct inpcbinfo *pcbinfotbl,
+			     struct inpcbhead *pcblisttbl,
+			     struct inpcbhead *hashtbl, uint32_t hashtbl_size,
+			     struct inpcbporthead *porthashtbl,
+			     uint32_t porthashtbl_size,
+			     uma_init inpcbzone_init, uma_fini inpcbzone_fini,
+			     uint32_t inpcbzone_flags, uint32_t inpcbzone_size)
 {
 	int32_t cpu_id;
 
@@ -109,33 +113,35 @@ void ofp_tcp_rss_in_pcbinfo_init( int hash_nelements, int porthash_nelements,
 	(void)inpcbzone_flags;
 
 	for (cpu_id = 0; cpu_id < odp_cpu_count(); cpu_id++) {
-		struct inpcbinfo *pcbinfo = &shm_tcp->ofp_tcbinfo[cpu_id];
-		struct inpcbhead *listhead = &shm_tcp->ofp_tcb[cpu_id];
-		char name_cpu[16];
+		struct inpcbinfo *pcbinfo = &pcbinfotbl[cpu_id];
+		struct inpcbhead *listhead = &pcblisttbl[cpu_id];
+		char name_cpu[256];
 
-		sprintf (name_cpu, "tcp_%u", cpu_id);
+		sprintf(name_cpu, "%s_%u", name, cpu_id);
 		INP_INFO_LOCK_INIT(pcbinfo, name_cpu);
 
-		sprintf (name_cpu, "pcbinfohash_%u", cpu_id);
+		sprintf(name_cpu, "%s_pcbinfohash_%u", name, cpu_id);
 		INP_HASH_LOCK_INIT(pcbinfo, name_cpu);
 		pcbinfo->ipi_listhead = listhead;
 		OFP_LIST_INIT(pcbinfo->ipi_listhead);
 		pcbinfo->ipi_count = 0;
 
-		pcbinfo->ipi_hashbase = shm_tcp->ofp_hashtbl;
-		ofp_tcp_hashinit(hash_nelements, &pcbinfo->ipi_hashmask,
-				pcbinfo->ipi_hashbase);
+		pcbinfo->ipi_hashbase = hashtbl + cpu_id * hashtbl_size;
+		ofp_hashinit(hashtbl_size, &pcbinfo->ipi_hashmask,
+			     pcbinfo->ipi_hashbase);
 
-		pcbinfo->ipi_porthashbase = shm_tcp->ofp_porthashtbl;
-		ofp_tcp_hashinit(porthash_nelements,
-			&pcbinfo->ipi_hashmask,
-			pcbinfo->ipi_porthashbase);
+		pcbinfo->ipi_porthashbase = porthashtbl +
+			cpu_id * porthashtbl_size;
+		ofp_hashinit(porthashtbl_size,
+			     &pcbinfo->ipi_hashmask,
+			     pcbinfo->ipi_porthashbase);
 
-		sprintf (name_cpu, "tcp_inpcb_%u", cpu_id);
-		pcbinfo->ipi_zone = uma_zcreate(name_cpu,
-			global_param->pcb_tcp_max, sizeof(struct inpcb),
-			NULL, NULL, inpcbzone_init, inpcbzone_fini,
-			UMA_ALIGN_PTR, inpcbzone_flags);
+		sprintf(name_cpu, "%s_inpcb_%u", name, cpu_id);
+		pcbinfo->ipi_zone = uma_zcreate(name_cpu, cbzone_size,
+						sizeof(struct inpcb),
+						NULL, NULL,
+						inpcbzone_init, inpcbzone_fini,
+						UMA_ALIGN_PTR, inpcbzone_flags);
 
 		if (pcbinfo->ipi_zone == -1)
 			OFP_ERR("ipi_zone for pcbinfo NOT allocated!");
@@ -152,12 +158,15 @@ void ofp_tcp_rss_in_pcbinfo_init( int hash_nelements, int porthash_nelements,
  * arguments in time.
  */
 void
-ofp_in_pcbinfo_init(struct inpcbinfo *pcbinfo, const char *name,
-    struct inpcbhead *listhead, int hash_nelements, int porthash_nelements,
-    const char *inpcbzone_name, uma_init inpcbzone_init, uma_fini inpcbzone_fini,
-    uint32_t inpcbzone_flags)
+ofp_in_pcbinfo_init(const char *name,
+		    struct inpcbinfo *pcbinfo, struct inpcbhead *listhead,
+		    struct inpcbhead *hashtbl, uint32_t hashtbl_size,
+		    struct inpcbporthead *porthashtbl,
+		    uint32_t porthashtbl_size,
+		    uma_init inpcbzone_init, uma_fini inpcbzone_fini,
+		    uint32_t inpcbzone_flags, uint32_t inpcbzone_size)
 {
-	int pcb_size = global_param->socket.num_max;
+	char inpcbzone_name[256];
 
 	/* make compiler happy */
 	(void)inpcbzone_init;
@@ -165,31 +174,25 @@ ofp_in_pcbinfo_init(struct inpcbinfo *pcbinfo, const char *name,
 	(void)inpcbzone_flags;
 
 	INP_INFO_LOCK_INIT(pcbinfo, name);
-	INP_HASH_LOCK_INIT(pcbinfo, "pcbinfohash");	/* XXXRW: argument? */
+	INP_HASH_LOCK_INIT(pcbinfo, "notused");
 	pcbinfo->ipi_listhead = listhead;
 	OFP_LIST_INIT(pcbinfo->ipi_listhead);
 	pcbinfo->ipi_count = 0;
 
-	if (strcmp(name, "tcp") == 0) {
-		pcbinfo->ipi_hashbase = shm_tcp->ofp_hashtbl;
-		ofp_tcp_hashinit(hash_nelements, &pcbinfo->ipi_hashmask,
-			pcbinfo->ipi_hashbase);
+	pcbinfo->ipi_hashbase = hashtbl;
+	ofp_hashinit(hashtbl_size, &pcbinfo->ipi_hashmask,
+		     pcbinfo->ipi_hashbase);
 
-		pcbinfo->ipi_porthashbase = shm_tcp->ofp_porthashtbl;
-		ofp_tcp_hashinit(porthash_nelements, &pcbinfo->ipi_hashmask,
-                        pcbinfo->ipi_porthashbase);
-		pcb_size = global_param->pcb_tcp_max;
-	} else {
-		pcbinfo->ipi_hashbase = ofp_hashinit(hash_nelements, 0,
-		    &pcbinfo->ipi_hashmask);
-		pcbinfo->ipi_porthashbase = ofp_hashinit(porthash_nelements, 0,
-		    &pcbinfo->ipi_porthashmask);
-	}
+	pcbinfo->ipi_porthashbase = porthashtbl;
+	ofp_hashinit(porthashtbl_size, &pcbinfo->ipi_hashmask,
+		     pcbinfo->ipi_porthashbase);
 
-	pcbinfo->ipi_zone = uma_zcreate(
-		inpcbzone_name, pcb_size, sizeof(struct inpcb),
-		NULL, NULL, inpcbzone_init, inpcbzone_fini, UMA_ALIGN_PTR,
-		inpcbzone_flags);
+	sprintf(inpcbzone_name, "%s_inpcb", name);
+	pcbinfo->ipi_zone = uma_zcreate(inpcbzone_name, inpcbzone_size,
+					sizeof(struct inpcb),
+					NULL, NULL,
+					inpcbzone_init, inpcbzone_fini,
+					UMA_ALIGN_PTR, inpcbzone_flags);
 	uma_zone_set_max(pcbinfo->ipi_zone, maxsockets);
 }
 
@@ -450,7 +453,7 @@ ofp_in_pcb_lport(struct inpcb *inp, struct ofp_in_addr *laddrp, uint16_t *lportp
 	 * ipport_tick() allows it.
 	 */
 
-	if (ofp_ipport_randomized && pcbinfo == &ofp_udbinfo)
+	if (ofp_ipport_randomized && pcbinfo == &V_udbinfo)
 		dorandom = 1;
 	else
 		dorandom = 0;

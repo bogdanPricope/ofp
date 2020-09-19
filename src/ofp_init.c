@@ -32,7 +32,8 @@
 #include "ofpi_pkt_processing.h"
 #include "ofpi_ifnet.h"
 #include "ofpi_ip.h"
-#include "ofpi_tcp_var.h"
+#include "ofpi_tcp_shm.h"
+#include "ofpi_udp_shm.h"
 #include "ofpi_socketvar.h"
 #include "ofpi_socket.h"
 #include "ofpi_reass.h"
@@ -256,7 +257,6 @@ static void read_conf_file(ofp_global_param_t *params, const char *filename)
 	GET_CONF_INT(bool, arp.check_interface);
 	GET_CONF_INT(int, evt_rx_burst_size);
 	GET_CONF_INT(int, pkt_tx_burst_size);
-	GET_CONF_INT(int, pcb_tcp_max);
 	GET_CONF_INT(int, pkt_pool.nb_pkts);
 	GET_CONF_INT(int, pkt_pool.buffer_size);
 	GET_CONF_INT(int, num_vlan);
@@ -278,6 +278,16 @@ static void read_conf_file(ofp_global_param_t *params, const char *filename)
 	GET_CONF_INT(int, socket.num_max);
 	GET_CONF_INT(int, socket.sd_offset);
 
+	GET_CONF_INT(int, tcp.pcb_tcp_max);
+	GET_CONF_INT(int, tcp.pcb_hashtbl_size);
+	GET_CONF_INT(int, tcp.pcbport_hashtbl_size);
+	GET_CONF_INT(int, tcp.syncache_hashtbl_size);
+	GET_CONF_INT(int, tcp.sackhole_max);
+
+	GET_CONF_INT(int, udp.pcb_udp_max);
+	GET_CONF_INT(int, udp.pcb_hashtbl_size);
+	GET_CONF_INT(int, udp.pcbport_hashtbl_size);
+
 	GET_CONF_INT(bool, if_loopback);
 done:
 	config_destroy(&conf);
@@ -289,6 +299,9 @@ done:
 
 void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *filename)
 {
+	uint32_t htcp_dflt = 0;
+	uint32_t hudp_dflt = 0;
+
 	memset(params, 0, sizeof(*params));
 	params->pktin_mode = ODP_PKTIN_MODE_SCHED;
 	params->pktout_mode = ODP_PKTIN_MODE_DIRECT;
@@ -302,7 +315,6 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
 	params->arp.entry_timeout = OFP_ARP_ENTRY_TIMEOUT;
 	params->arp.saved_pkt_timeout = OFP_ARP_SAVED_PKT_TIMEOUT;
 	params->evt_rx_burst_size = OFP_EVT_RX_BURST_SIZE;
-	params->pcb_tcp_max = OFP_NUM_PCB_TCP_MAX;
 	params->pkt_pool.nb_pkts = SHM_PKT_POOL_NB_PKTS;
 	params->pkt_pool.buffer_size = SHM_PKT_POOL_BUFFER_SIZE;
 	params->pkt_tx_burst_size = OFP_PKT_TX_BURST_SIZE;
@@ -321,9 +333,59 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
 	params->socket.num_max = OFP_NUM_SOCKETS_MAX;
 	params->socket.sd_offset = OFP_SOCK_NUM_OFFSET;
 
+	params->tcp.pcb_tcp_max = OFP_NUM_PCB_TCP_MAX;
+	params->tcp.sackhole_max = 0; /* to be computed */
+	params->tcp.pcb_hashtbl_size = 0; /* to be computed */
+	params->tcp.pcbport_hashtbl_size = 0; /* to be computed */
+	params->tcp.syncache_hashtbl_size = 0; /* to be computed */
+
+	params->udp.pcb_udp_max = OFP_NUM_PCB_UDP_MAX;
+	params->udp.pcb_hashtbl_size = 0; /* to be computed */
+	params->udp.pcbport_hashtbl_size = 0; /* to be computed */
+
 	params->if_loopback = 0;
 
 	read_conf_file(params, filename);
+
+	htcp_dflt = ofp_hashsize_dflt(params->tcp.pcb_tcp_max);
+	if (!params->tcp.pcb_hashtbl_size)
+		params->tcp.pcb_hashtbl_size = (int)
+			ofp_hashsize_pow2(htcp_dflt);
+	else
+		params->tcp.pcb_hashtbl_size = (int)
+			ofp_hashsize_pow2(params->tcp.pcb_hashtbl_size);
+
+	if (!params->tcp.pcbport_hashtbl_size)
+		params->tcp.pcbport_hashtbl_size = (int)
+			ofp_hashsize_pow2(htcp_dflt);
+	else
+		params->tcp.pcbport_hashtbl_size = (int)
+			ofp_hashsize_pow2(params->tcp.pcbport_hashtbl_size);
+
+	if (!params->tcp.syncache_hashtbl_size)
+		params->tcp.syncache_hashtbl_size = (int)
+			ofp_hashsize_pow2(htcp_dflt);
+	else
+		params->tcp.syncache_hashtbl_size = (int)
+			ofp_hashsize_pow2(params->tcp.syncache_hashtbl_size);
+
+	hudp_dflt = ofp_hashsize_dflt(params->udp.pcb_udp_max);
+	if (!params->udp.pcb_hashtbl_size)
+		params->udp.pcb_hashtbl_size = (int)
+			ofp_hashsize_pow2(hudp_dflt);
+	else
+		params->udp.pcb_hashtbl_size = (int)
+			ofp_hashsize_pow2(params->udp.pcb_hashtbl_size);
+
+	if (!params->udp.pcbport_hashtbl_size)
+		params->udp.pcbport_hashtbl_size = (int)
+			ofp_hashsize_pow2(hudp_dflt);
+	else
+		params->udp.pcbport_hashtbl_size = (int)
+			ofp_hashsize_pow2(params->udp.pcbport_hashtbl_size);
+
+	if (!params->tcp.sackhole_max)
+		params->tcp.sackhole_max = 4 * params->tcp.pcb_tcp_max;
 }
 
 void ofp_init_global_param(ofp_global_param_t *params)
@@ -341,7 +403,7 @@ static void ofp_init_prepare(void)
 	 * global_param can be accessed and ofp_shared_memory_prealloc()
 	 * can be called.
 	 */
-        ofp_uma_init_prepare();
+	ofp_uma_init_prepare();
 	ofp_avl_init_prepare();
 	ofp_reassembly_init_prepare();
 	ofp_pcap_init_prepare();
@@ -355,6 +417,7 @@ static void ofp_init_prepare(void)
 	ofp_vxlan_init_prepare();
 	ofp_socket_init_prepare();
 	ofp_tcp_var_init_prepare();
+	ofp_udp_var_init_prepare();
 	ofp_ip_init_prepare();
 	ofp_ipsec_init_prepare(&global_param->ipsec);
 }
@@ -430,6 +493,7 @@ static int ofp_init_pre_global(ofp_global_param_t *params)
 
 	HANDLE_ERROR(ofp_socket_init_global(ofp_packet_pool));
 	HANDLE_ERROR(ofp_tcp_var_init_global());
+	HANDLE_ERROR(ofp_udp_var_init_global());
 	HANDLE_ERROR(ofp_inet_init());
 	HANDLE_ERROR(ofp_ip_init_global());
 	HANDLE_ERROR(ofp_ipsec_init_global(&params->ipsec));
@@ -532,6 +596,7 @@ int ofp_init_local(void)
 	HANDLE_ERROR(ofp_vxlan_lookup_shared_memory());
 	HANDLE_ERROR(ofp_arp_init_local());
 	HANDLE_ERROR(ofp_tcp_var_lookup_shared_memory());
+	HANDLE_ERROR(ofp_udp_var_lookup_shared_memory());
 	HANDLE_ERROR(ofp_send_pkt_out_init_local());
 	HANDLE_ERROR(ofp_ip_init_local());
 	HANDLE_ERROR(ofp_ipsec_init_local());
@@ -658,6 +723,9 @@ int ofp_term_post_global(const char *pool_name)
 
 	/* Cleanup of TCP content */
 	CHECK_ERROR(ofp_tcp_var_term_global(), rc);
+
+	/* Cleanup of UDP content */
+	CHECK_ERROR(ofp_udp_var_term_global(), rc);
 
 	/* Cleanup vxlan */
 	CHECK_ERROR(ofp_vxlan_term_global(), rc);

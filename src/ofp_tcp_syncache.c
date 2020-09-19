@@ -119,11 +119,9 @@ static struct syncache
 /* Arbitrary values */
 #define TCP_SYNCACHE_BUCKETLIMIT	30
 
-static VNET_DEFINE(struct tcp_syncache, tcp_syncache);
-#define	V_tcp_syncache			VNET(tcp_syncache)
-
 OFP_SYSCTL_NODE(_net_inet_tcp, OFP_OID_AUTO, syncache, OFP_CTLFLAG_RW, 0, "TCP SYN cache");
 
+#if 0
 SYSCTL_VNET_UINT(_net_inet_tcp_syncache, OFP_OID_AUTO, bucketlimit, OFP_CTLFLAG_RDTUN,
     &VNET_NAME(tcp_syncache.bucket_limit), 0,
     "Per-bucket hash limit for syncache");
@@ -143,6 +141,7 @@ SYSCTL_VNET_UINT(_net_inet_tcp_syncache, OFP_OID_AUTO, hashsize, OFP_CTLFLAG_RDT
 SYSCTL_VNET_UINT(_net_inet_tcp_syncache, OFP_OID_AUTO, rexmtlimit, OFP_CTLFLAG_RW,
     &VNET_NAME(tcp_syncache.rexmt_limit), 0,
     "Limit on SYN/ACK retransmissions");
+#endif /* 0 */
 
 VNET_DEFINE(int, ofp_tcp_sc_rst_sock_fail) = 1;
 SYSCTL_VNET_INT(_net_inet_tcp_syncache, OFP_OID_AUTO, rst_on_sock_fail,
@@ -198,7 +197,7 @@ ofp_syncache_init(void)
 	int i;
 
 	V_tcp_syncache.cache_count = 0;
-	V_tcp_syncache.hashsize = TCP_SYNCACHE_HASHSIZE;
+	V_tcp_syncache.hashsize = V_tcp_syncachehashtbl_size;
 	V_tcp_syncache.bucket_limit = TCP_SYNCACHE_BUCKETLIMIT;
 	V_tcp_syncache.rexmt_limit = SYNCACHE_MAXREXMTS;
 	V_tcp_syncache.hash_secret = 11235 /*arc4random()*/;
@@ -209,7 +208,7 @@ ofp_syncache_init(void)
 	    V_tcp_syncache.hashsize * V_tcp_syncache.bucket_limit;
 
 	/* Allocate the hash table. */
-	V_tcp_syncache.hashbase = shm_tcp->syncache;
+	V_tcp_syncache.hashbase = V_tcp_syncachehashtbl;
 
 	/* Initialize the hash buckets. */
 	for (i = 0; i < (int)V_tcp_syncache.hashsize; i++) {

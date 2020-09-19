@@ -168,8 +168,6 @@ static int	tcp_soreceive_stream = 0;
 OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, soreceive_stream, OFP_CTLFLAG_RDTUN,
     &tcp_soreceive_stream, 0, "Using soreceive_stream for TCP sockets");
 
-#define OFP_SACK_HOLE_ZONE_NITEMS 65536  /* derived from ofp_tcp_sack_globalmaxholes */
-
 VNET_DEFINE(struct hhook_head *, ofp_tcp_hhh[HHOOK_TCP_LAST+1]);
 
 static struct inpcb *tcp_mtudisc_notify(struct inpcb *, int);
@@ -259,8 +257,6 @@ ofp_tcp_tcbinfo_hashstats(unsigned int *min, unsigned int *avg, unsigned int *ma
 void
 ofp_tcp_init(void)
 {
-	int hashsize;
-
 #if 0
 	if (hhook_head_register(HHOOK_TYPE_TCP, HHOOK_TCP_EST_IN,
 	    &V_tcp_hhh[HHOOK_TCP_EST_IN], HHOOK_NOWAIT|HHOOK_HEADISINVNET) != 0)
@@ -269,28 +265,30 @@ ofp_tcp_init(void)
 	    &V_tcp_hhh[HHOOK_TCP_EST_OUT], HHOOK_NOWAIT|HHOOK_HEADISINVNET) != 0)
 		OFP_WARN("unable to register helper hook");
 #endif
-	hashsize = TCBHASHSIZE;
-#if 0 /* We trust size is power of 2. */
-	TUNABLE_INT_FETCH("net.inet.tcp.tcbhashsize", &hashsize);
-	if (!powerof2(hashsize)) {
-		OFP_WARN("TCB hash size not a power of 2");
-		hashsize = 512; /* safe default */
-	}
-#endif
 
 #ifdef OFP_RSS
-	ofp_tcp_rss_in_pcbinfo_init(hashsize, hashsize, tcp_inpcb_init, NULL, 0);
+	ofp_rss_in_pcbinfo_init("tcp",
+				V_tcbinfotbl, V_tcbtbl,
+				V_tcp_hashtbl, V_tcp_hashtbl_size,
+				V_tcp_porthashtbl, V_tcp_porthashtbl_size,
+				tcp_inpcb_init, NULL, 0,
+				(uint32_t)global_param->tcp.pcb_tcp_max);
 #else
-	ofp_in_pcbinfo_init(&V_tcbinfo, "tcp", &V_tcb, hashsize, hashsize,
-	    "tcp_inpcb", tcp_inpcb_init, NULL, 0);
+	ofp_in_pcbinfo_init("tcp",
+			    &V_tcbinfo, &V_tcb,
+			    V_tcp_hashtbl, V_tcp_hashtbl_size,
+			    V_tcp_porthashtbl, V_tcp_porthashtbl_size,
+			    tcp_inpcb_init, NULL, 0,
+			    (uint32_t)global_param->tcp.pcb_tcp_max);
 #endif
 
 	/*
 	 * These have to be type stable for the benefit of the timers.
 	 */
-	V_tcpcb_zone = uma_zcreate(
-		"tcpcb", global_param->pcb_tcp_max, sizeof(struct tcpcb_mem),
-		NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
+	V_tcpcb_zone = uma_zcreate("tcpcb", global_param->tcp.pcb_tcp_max,
+				   sizeof(struct tcpcb_mem),
+				   NULL, NULL, NULL, NULL,
+				   UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 	uma_zone_set_max(V_tcpcb_zone, maxsockets);
 
 	ofp_tcp_tw_init();
@@ -300,9 +298,11 @@ ofp_tcp_init(void)
 
 	//TUNABLE_INT_FETCH("net.inet.tcp.sack.enable", &V_tcp_do_sack);
 
-	V_sack_hole_zone = uma_zcreate(
-		"sackhole", OFP_SACK_HOLE_ZONE_NITEMS, sizeof(struct sackhole),
-		NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
+	V_sack_hole_zone = uma_zcreate("sackhole",
+				       global_param->tcp.sackhole_max,
+				       sizeof(struct sackhole),
+				       NULL, NULL, NULL, NULL,
+				       UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 
 	/* XXX virtualize those bellow? */
 	ofp_tcp_delacktime = TCPTV_DELACK;
@@ -319,7 +319,7 @@ ofp_tcp_init(void)
 	tcp_reassdl = TCPTV_REASSDL;
 #endif
 	ofp_tcp_finwait2_timeout = TCPTV_FINWAIT2_TIMEOUT;
-	tcp_tcbhashsize = hashsize;
+	tcp_tcbhashsize = V_tcp_hashtbl_size;
 
 #ifdef INET6
 #define TCP_MINPROTOHDR (sizeof(struct ofp_ip6_hdr) + sizeof(struct ofp_tcphdr))
@@ -407,7 +407,7 @@ ofp_tcp_netstat(int fd)
 	struct inpcb *inp, *inp_temp;
 	struct inpcbhead *ipi_listhead;
 
-	ipi_listhead = shm_tcp->ofp_tcbinfo.ipi_listhead;
+	ipi_listhead = V_tcbinfo.ipi_listhead;
 
 	OFP_LIST_FOREACH_SAFE(inp, ipi_listhead, inp_list, inp_temp) {
 #ifdef INET6

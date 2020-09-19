@@ -43,67 +43,47 @@
 #include "ofpi_util.h"
 #include "ofpi_tcp_shm.h"
 
+#define OFP_HASH_CUT 128
 /*
  * Initialize tcb hash tables.
  */
 void
-ofp_tcp_hashinit(long hashsize, uint64_t *hashmask,
-	void *tcp_hashtbl)
+ofp_hashinit(uint32_t hashsize, uint64_t *hashmask, void *_hashtbl)
 {
-	OFP_LIST_HEAD(generic, generic) *hashtbl = tcp_hashtbl;
-	int i;
+	OFP_LIST_HEAD(generic, generic) * hashtbl = _hashtbl;
+	uint32_t i;
 
-	if (hashtbl != NULL) {
-		for (i = 0; i < hashsize; i++)
-			OFP_LIST_INIT(&hashtbl[i]);
-		*hashmask = hashsize - 1;
+	if (hashtbl == NULL) {
+		*hashmask = 0;
+		return;
 	}
-	return;
+
+	for (i = 0; i < hashsize; i++)
+		OFP_LIST_INIT(&hashtbl[i]);
+
+	*hashmask = hashsize - 1;
 }
 
 /*
- * General routine to allocate a hash table with control of memory flags.
+ * Aproximate a hash size bazed on number of elements.
  */
-void *
-ofp_hashinit_flags(int elements, void *type, uint64_t *hashmask,
-	       int flags)
+uint32_t ofp_hashsize_dflt(uint32_t elemcnt)
 {
-	long hashsize;
-	OFP_LIST_HEAD(generic, generic) *hashtbl;
-	int i;
+	return elemcnt / OFP_HASH_CUT + 1;
+}
 
-	(void)type;
+/*
+ * General routine to make hashsize a power of 2.
+ */
+uint32_t ofp_hashsize_pow2(uint32_t hashsize)
+{
+	uint32_t size;
 
-	KASSERT(elements > 0, ("%s: bad elements", __func__));
-	/* Exactly one of HASH_WAITOK and HASH_NOWAIT must be set. */
-	KASSERT((flags & HASH_WAITOK) ^ (flags & HASH_NOWAIT),
-	    ("Bad flags (0x%x) passed to ofp_hashinit_flags", flags));
-
-	for (hashsize = 1; hashsize <= elements; hashsize <<= 1)
+	for (size = 1; size <= hashsize; size <<= 1)
 		continue;
-	hashsize >>= 1;
+	size >>= 1;
 
-	if (flags & HASH_NOWAIT)
-		hashtbl = malloc((uint64_t)hashsize * sizeof(*hashtbl));
-	else
-		hashtbl = malloc((uint64_t)hashsize * sizeof(*hashtbl));
-
-	if (hashtbl != NULL) {
-		for (i = 0; i < hashsize; i++)
-			OFP_LIST_INIT(&hashtbl[i]);
-		*hashmask = hashsize - 1;
-	}
-	return (hashtbl);
-}
-
-/*
- * Allocate and initialize a hash table with default flag: may sleep.
- */
-void *
-ofp_hashinit(int elements, void *type, uint64_t *hashmask)
-{
-
-	return (ofp_hashinit_flags(elements, type, hashmask, HASH_WAITOK));
+	return size;
 }
 
 void
@@ -116,9 +96,9 @@ ofp_hashdestroy(void *vhashtbl, void *type, uint64_t hashmask)
 	hashtbl = vhashtbl;
 	for (hp = hashtbl; hp <= &hashtbl[hashmask]; hp++)
 		KASSERT(OFP_LIST_EMPTY(hp), ("%s: hash not empty", __func__));
-	free(hashtbl);
 }
 
+#if 0	/* do not use malloc or prime hashsize */
 static const int primes[] = { 1, 13, 31, 61, 127, 251, 509, 761, 1021, 1531,
 			2039, 2557, 3067, 3583, 4093, 4603, 5119, 5623, 6143,
 			6653, 7159, 7673, 8191, 12281, 16381, 24571, 32749 };
@@ -150,3 +130,4 @@ ofp_phashinit(int elements, void *type, uint64_t *nentries)
 	*nentries = hashsize;
 	return (hashtbl);
 }
+#endif /*0*/

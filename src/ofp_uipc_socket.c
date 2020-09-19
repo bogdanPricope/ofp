@@ -226,11 +226,21 @@ void ofp_accept_unlock(void)
 	odp_rwlock_write_unlock(&shm->ofp_accept_mtx);
 }
 
+static uint64_t ofp_socket_get_shm_socket_list_size(void)
+{
+	return global_param->socket.num_max * sizeof(struct socket);
+}
+
+static uint64_t ofp_socket_get_shm_sleeper_list_size(void)
+{
+	return global_param->socket.num_max * sizeof(struct sleeper);
+}
+
 static uint64_t ofp_socket_get_shm_size(void)
 {
 	return sizeof(*shm) +
-		global_param->socket.num_max * sizeof(struct socket) +
-		global_param->socket.num_max * sizeof(struct sleeper);
+		ofp_socket_get_shm_socket_list_size() +
+		ofp_socket_get_shm_sleeper_list_size();
 }
 
 static int ofp_socket_alloc_shared_memory(void)
@@ -289,7 +299,7 @@ int ofp_socket_init_global(odp_pool_t pool)
 
 	shm->socket_list_off = sizeof(*shm);
 	shm->sleeper_list_off = shm->socket_list_off +
-		global_param->socket.num_max * sizeof(struct socket);
+		ofp_socket_get_shm_socket_list_size();
 
 	shm->pool = ODP_POOL_INVALID;
 	shm_socket_list = (struct socket *)((uint8_t *)shm +
@@ -303,14 +313,14 @@ int ofp_socket_init_global(odp_pool_t pool)
 			NULL : &(shm_socket_list[i + 1]);
 		so->so_number = i + global_param->socket.sd_offset;
 	}
-	shm->free_sockets = &(shm_socket_list[0]);
+	shm->free_sockets = shm_socket_list;
 
 	for (i = 0; i < global_param->socket.num_max; i++) {
 		sl = &shm_sleeper_list[i];
 		sl->next = (i == global_param->socket.num_max - 1) ?
 			NULL : &(shm_sleeper_list[i + 1]);
 	}
-	shm->free_sleepers = &(shm_sleeper_list[0]);
+	shm->free_sleepers = shm_sleeper_list;
 
 	shm->somaxconn = SOMAXCONN;
 	shm->pool = pool;
@@ -513,7 +523,14 @@ ofp_sonewconn(struct socket *head, int connstatus)
 	so->so_snd.sb_flags |= head->so_snd.sb_flags & SB_AUTOSIZE;
 	so->so_state |= connstatus;
 
+/* trap 'general protection fault' detected when using assignment
+in multiprocess environment */
+#if 1
+	memcpy(&so->so_sigevent, &head->so_sigevent, sizeof(head->so_sigevent));
+#else
 	so->so_sigevent = head->so_sigevent;
+#endif
+
 	so->so_rcv.sb_socket = so;
 	so->so_snd.sb_socket = NULL;
 

@@ -186,12 +186,6 @@ typedef struct ofp_global_param_t {
 	 */
 	uint32_t pkt_tx_burst_size;
 
-	/**
-	 * Maximum number of TCP PCBs.
-	 * Default value is OFP_NUM_PCB_TCP_MAX
-	 */
-	int pcb_tcp_max;
-
 	struct pkt_pool_s {
 		/** Packet pool size; Default value is SHM_PKT_POOL_NB_PKTS */
 		int nb_pkts;
@@ -249,6 +243,64 @@ typedef struct ofp_global_param_t {
 		 */
 		uint32_t sd_offset;
 	} socket;
+
+	/*
+	 * TCP parameters
+	 */
+	struct tcp_s {
+		/**
+		 * Maximum number of TCP PCBs.
+		 * Default value is OFP_NUM_PCB_TCP_MAX
+		 */
+		int pcb_tcp_max;
+
+		/**
+		 * Size of pcb hash.
+		 * Must be a power of 2.
+		 */
+		int pcb_hashtbl_size;
+
+		/**
+		 * Size of pcbport hash.
+		 * Must be a power of 2.
+		 */
+		int pcbport_hashtbl_size;
+
+		/**
+		 * Size of syncache hash.
+		 * Must be a power of 2.
+		 */
+		int syncache_hashtbl_size;
+
+		/**
+		 * Maximum number of SACK holes.
+		 * Default value is 4 * pcb_tcp_max
+		 */
+		int sackhole_max;
+	} tcp;
+
+	/*
+	 * UDP parameters
+	 */
+	struct udp_s {
+		/**
+		 * Maximum number of UDP PCBs.
+		 * Default value is OFP_NUM_PCB_UDP_MAX
+		 */
+		int pcb_udp_max;
+
+		/**
+		 * Size of pcb hash.
+		 * Must be a power of 2.
+		 */
+		int pcb_hashtbl_size;
+
+		/**
+		 * Size of pcbport hash
+		 * Must be a power of 2.
+		 */
+		int pcbport_hashtbl_size;
+	} udp;
 
 	/**
 	 * Create default loopback interface lo0, 127.0.0.1/8.

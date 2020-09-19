@@ -645,10 +645,22 @@ VNET_DECLARE(int, ofp_ipport_tcpallocs);
 #define	V_ipport_tcpallocs	VNET(ofp_ipport_tcpallocs)
 
 void	ofp_in_pcbinfo_destroy(struct inpcbinfo *);
-void	ofp_in_pcbinfo_init(struct inpcbinfo *, const char *, struct inpcbhead *,
-	    int, int, const char *, uma_init, uma_fini, uint32_t);
+void ofp_in_pcbinfo_init(const char *name,
+			 struct inpcbinfo *pcbinfo, struct inpcbhead *listhead,
+			 struct inpcbhead *hashtbl, uint32_t hashtbl_size,
+			 struct inpcbporthead *porthashtbl,
+			 uint32_t porthashtbl_size,
+			 uma_init inpcbzone_init, uma_fini inpcbzone_fini,
+			 uint32_t inpcbzone_flags, uint32_t inpcbzone_size);
 #ifdef OFP_RSS
-void	ofp_tcp_rss_in_pcbinfo_init(int, int, uma_init, uma_fini, uint32_t);
+void ofp_rss_in_pcbinfo_init(const char *name,
+			     struct inpcbinfo *pcbinfotbl,
+			     struct inpcbhead *pcblisttbl,
+			     struct inpcbhead *hashtbl, uint32_t hashtbl_size,
+			     struct inpcbporthead *porthashtbl,
+			     uint32_t porthashtbl_size,
+			     uma_init inpcbzone_init, uma_fini inpcbzone_fini,
+			     uint32_t inpcbzone_flags, uint32_t inpcbzone_size);
 #endif
 
 void	ofp_in_pcbinfo_hashstats(struct inpcbinfo *pcbinfo, unsigned int *min,
