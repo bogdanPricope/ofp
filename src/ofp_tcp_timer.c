@@ -55,63 +55,88 @@
 #include <netinet/tcp_debug.h>
 #endif
 
-int	ofp_tcp_keepinit;
-OFP_SYSCTL_PROC(_net_inet_tcp, TCPCTL_KEEPINIT, keepinit, OFP_CTLTYPE_INT|OFP_CTLFLAG_RW,
-    &ofp_tcp_keepinit, 0, sysctl_msec_to_ticks, "I", "time to establish connection");
-
-int	ofp_tcp_keepidle;
-OFP_SYSCTL_PROC(_net_inet_tcp, TCPCTL_KEEPIDLE, keepidle, OFP_CTLTYPE_INT|OFP_CTLFLAG_RW,
-    &ofp_tcp_keepidle, 0, sysctl_msec_to_ticks, "I", "time before keepalive probes begin");
-
-int	ofp_tcp_keepintvl;
-OFP_SYSCTL_PROC(_net_inet_tcp, TCPCTL_KEEPINTVL, keepintvl, OFP_CTLTYPE_INT|OFP_CTLFLAG_RW,
-    &ofp_tcp_keepintvl, 0, sysctl_msec_to_ticks, "I", "time between keepalive probes");
-
-int	ofp_tcp_delacktime;
-OFP_SYSCTL_PROC(_net_inet_tcp, TCPCTL_DELACKTIME, delacktime, OFP_CTLTYPE_INT|OFP_CTLFLAG_RW,
-    &ofp_tcp_delacktime, 0, sysctl_msec_to_ticks, "I",
-    "Time before a delayed ACK is sent");
-
-int	ofp_tcp_msl;
-OFP_SYSCTL_PROC(_net_inet_tcp, OFP_OID_AUTO, msl, OFP_CTLTYPE_INT|OFP_CTLFLAG_RW,
-    &ofp_tcp_msl, 0, sysctl_msec_to_ticks, "I", "Maximum segment lifetime");
-
-int	ofp_tcp_rexmit_min;
-OFP_SYSCTL_PROC(_net_inet_tcp, OFP_OID_AUTO, rexmit_min, OFP_CTLTYPE_INT|OFP_CTLFLAG_RW,
-    &ofp_tcp_rexmit_min, 0, sysctl_msec_to_ticks, "I",
-    "Minimum Retransmission Timeout");
-
-int	ofp_tcp_rexmit_slop;
-OFP_SYSCTL_PROC(_net_inet_tcp, OFP_OID_AUTO, rexmit_slop, OFP_CTLTYPE_INT|OFP_CTLFLAG_RW,
-    &ofp_tcp_rexmit_slop, 0, sysctl_msec_to_ticks, "I",
-    "Retransmission Timer Slop");
-
-static int	always_keepalive = 1;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, always_keepalive, OFP_CTLFLAG_RW,
-    &always_keepalive , 0, "Assume SO_KEEPALIVE on all TCP connections");
-
-int    ofp_tcp_fast_finwait2_recycle = 0;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, fast_finwait2_recycle, OFP_CTLFLAG_RW,
-    &ofp_tcp_fast_finwait2_recycle, 0,
-    "Recycle closed FIN_WAIT_2 connections faster");
-
-int    ofp_tcp_finwait2_timeout;
-OFP_SYSCTL_PROC(_net_inet_tcp, OFP_OID_AUTO, finwait2_timeout, OFP_CTLTYPE_INT|OFP_CTLFLAG_RW,
-    &ofp_tcp_finwait2_timeout, 0, sysctl_msec_to_ticks, "I", "FIN-WAIT2 timeout");
-
-int	ofp_tcp_keepcnt = TCPTV_KEEPCNT;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, keepcnt, OFP_CTLFLAG_RW, &ofp_tcp_keepcnt, 0,
-    "Number of keepalive probes to send");
-
-	/* max idle probes */
-int	ofp_tcp_maxpersistidle;
-
+OFP_SYSCTL_PROC_DEF(net_inet_tcp, keepinit);
+OFP_SYSCTL_PROC_DEF(net_inet_tcp, keepidle);
+OFP_SYSCTL_PROC_DEF(net_inet_tcp, keepintvl);
+OFP_SYSCTL_PROC_DEF(net_inet_tcp, delacktime);
+OFP_SYSCTL_PROC_DEF(net_inet_tcp, msl);
+OFP_SYSCTL_PROC_DEF(net_inet_tcp, rexmit_min);
+OFP_SYSCTL_PROC_DEF(net_inet_tcp, rexmit_slop);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, always_keepalive);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, fast_finwait2_recycle);
+OFP_SYSCTL_PROC_DEF(net_inet_tcp, finwait2_timeout);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, keepcnt);
 
 #if (defined OFP_RSS) || (defined OFP_TCP_MULTICORE_TIMERS)
 #define	INP_CPU(inp) odp_cpu_id()
 #else
 #define	INP_CPU(inp) -1
 #endif
+
+int	ofp_tcp_syn_backoff[TCP_MAXRXTSHIFT + 1] = {
+	1, 1, 1, 1, 1, 2, 4, 8, 16, 32, 64, 64, 64};
+
+int	ofp_tcp_backoff[TCP_MAXRXTSHIFT + 1] = {
+	1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 512, 512, 512};
+
+static int tcp_totbackoff = 2559;	/* sum of ofp_tcp_backoff[] */
+
+int ofp_tcp_timer_init_local(void)
+{
+	OFP_SYSCTL_PROC_SET(net_inet_tcp, OFP_OID_AUTO, keepinit,
+			    OFP_CTLFLAG_RW, &V_tcp_keepinit, 0,
+			    sysctl_msec_to_ticks, "I",
+			    "time to establish connection");
+
+	OFP_SYSCTL_PROC_SET(net_inet_tcp, OFP_OID_AUTO, keepidle,
+			    OFP_CTLFLAG_RW, &V_tcp_keepidle, 0,
+			    sysctl_msec_to_ticks, "I",
+			    "time before keepalive probes begin");
+
+	OFP_SYSCTL_PROC_SET(net_inet_tcp, OFP_OID_AUTO, keepintvl,
+			    OFP_CTLFLAG_RW, &V_tcp_keepintvl, 0,
+			    sysctl_msec_to_ticks, "I",
+			    "time between keepalive probes");
+
+	OFP_SYSCTL_PROC_SET(net_inet_tcp, OFP_OID_AUTO, delacktime,
+			    OFP_CTLFLAG_RW, &V_tcp_delacktime, 0,
+			    sysctl_msec_to_ticks, "I",
+			    "time before a delayed ACK is sent");
+
+	OFP_SYSCTL_PROC_SET(net_inet_tcp, OFP_OID_AUTO, msl,
+			    OFP_CTLFLAG_RW, &V_tcp_msl, 0,
+			    sysctl_msec_to_ticks, "I",
+			    "Maximum segment lifetime");
+
+	OFP_SYSCTL_PROC_SET(net_inet_tcp, OFP_OID_AUTO, rexmit_min,
+			    OFP_CTLFLAG_RW, &V_tcp_rexmit_min, 0,
+			    sysctl_msec_to_ticks, "I",
+			    "Minimum Retransmission Timeout");
+
+	OFP_SYSCTL_PROC_SET(net_inet_tcp, OFP_OID_AUTO, rexmit_slop,
+			    OFP_CTLFLAG_RW, &V_tcp_rexmit_slop, 0,
+			    sysctl_msec_to_ticks, "I",
+			    "Retransmission Timer Slop");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, always_keepalive,
+			   OFP_CTLFLAG_RW, &V_tcp_always_keepalive, 0,
+			   "Assume SO_KEEPALIVE on all TCP connections");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, fast_finwait2_recycle,
+			   OFP_CTLFLAG_RW, &V_tcp_fast_finwait2_recycle, 0,
+			   "Recycle closed FIN_WAIT_2 connections faster");
+
+	OFP_SYSCTL_PROC_SET(net_inet_tcp, OFP_OID_AUTO, finwait2_timeout,
+			    OFP_CTLFLAG_RW, &V_tcp_finwait2_timeout, 0,
+			    sysctl_msec_to_ticks, "I",
+			    "FIN-WAIT2 timeout");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, keepcnt,
+			   OFP_CTLFLAG_RW, &V_tcp_keepcnt, 0,
+			   "Number of keepalive probes to send");
+
+	return 0;
+}
 
 /*
  * Tcp protocol timeout routine called every 500 ms.
@@ -136,16 +161,6 @@ ofp_tcp_slowtimo(void *notused)
 #endif
 }
 
-int	ofp_tcp_syn_backoff[TCP_MAXRXTSHIFT + 1] =
-    { 1, 1, 1, 1, 1, 2, 4, 8, 16, 32, 64, 64, 64 };
-
-int	ofp_tcp_backoff[TCP_MAXRXTSHIFT + 1] =
-    { 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 512, 512, 512 };
-
-static int tcp_totbackoff = 2559;	/* sum of ofp_tcp_backoff[] */
-
-static int tcp_timer_race;
-
 /*
  * TCP timer processing.
  */
@@ -168,7 +183,7 @@ ofp_tcp_timer_delack(void *xtp)
 	 * KASSERT(inp != NULL, ("ofp_tcp_timer_delack: inp == NULL"));
 	 */
 	if (inp == NULL) {
-		tcp_timer_race++;
+		V_tcp_timer_race++;
 		return;
 	}
 	INP_WLOCK(inp);
@@ -208,7 +223,7 @@ ofp_tcp_timer_2msl(void *xtp)
 	 * KASSERT(inp != NULL, ("ofp_tcp_timer_2msl: inp == NULL"));
 	 */
 	if (inp == NULL) {
-		tcp_timer_race++;
+		V_tcp_timer_race++;
 		INP_INFO_WUNLOCK(&V_tcbinfo);
 		return;
 	}
@@ -231,7 +246,7 @@ ofp_tcp_timer_2msl(void *xtp)
 	 * there's no point in hanging onto FIN_WAIT_2 socket. Just close it.
 	 * Ignore fact that there were recent incoming segments.
 	 */
-	if (ofp_tcp_fast_finwait2_recycle && tp->t_state == TCPS_FIN_WAIT_2 &&
+	if (V_tcp_fast_finwait2_recycle && tp->t_state == TCPS_FIN_WAIT_2 &&
 	    tp->t_inpcb && tp->t_inpcb->inp_socket &&
 	    (tp->t_inpcb->inp_socket->so_rcv.sb_state & SBS_CANTRCVMORE)) {
 		TCPSTAT_INC(tcps_finwait2_drops);
@@ -276,7 +291,7 @@ ofp_tcp_timer_keep(void *xtp)
 	 * KASSERT(inp != NULL, ("ofp_tcp_timer_keep: inp == NULL"));
 	 */
 	if (inp == NULL) {
-		tcp_timer_race++;
+		V_tcp_timer_race++;
 		INP_INFO_WUNLOCK(&V_tcbinfo);
 		return;
 	}
@@ -295,7 +310,8 @@ ofp_tcp_timer_keep(void *xtp)
 	TCPSTAT_INC(tcps_keeptimeo);
 	if (tp->t_state < TCPS_ESTABLISHED)
 		goto dropit;
-	if ((always_keepalive || (inp->inp_socket->so_options & OFP_SO_KEEPALIVE)) &&
+	if ((V_tcp_always_keepalive ||
+	     (inp->inp_socket->so_options & OFP_SO_KEEPALIVE)) &&
 	    tp->t_state <= TCPS_CLOSING) {
 		if ((int)(ofp_timer_ticks(0) - tp->t_rcvtime) >=
 		    TP_KEEPIDLE(tp) + TP_MAXIDLE(tp))
@@ -370,7 +386,7 @@ ofp_tcp_timer_persist(void *xtp)
 	 * KASSERT(inp != NULL, ("ofp_tcp_timer_persist: inp == NULL"));
 	 */
 	if (inp == NULL) {
-		tcp_timer_race++;
+		V_tcp_timer_race++;
 		INP_INFO_WUNLOCK(&V_tcbinfo);
 		return;
 	}
@@ -395,8 +411,10 @@ ofp_tcp_timer_persist(void *xtp)
 	 * backoff that we would use if retransmitting.
 	 */
 	if (tp->t_rxtshift == TCP_MAXRXTSHIFT &&
-	    ((int)(ofp_timer_ticks(0) - tp->t_rcvtime) >= ofp_tcp_maxpersistidle ||
-	     ofp_timer_ticks(0) - tp->t_rcvtime >= TCP_REXMTVAL(tp) * tcp_totbackoff)) {
+	    ((int)(ofp_timer_ticks(0) - tp->t_rcvtime) >=
+	     V_tcp_maxpersistidle ||
+	     ofp_timer_ticks(0) - tp->t_rcvtime >=
+	     TCP_REXMTVAL(tp) * tcp_totbackoff)) {
 		TCPSTAT_INC(tcps_persistdrop);
 		tp = ofp_tcp_drop(tp, OFP_ETIMEDOUT);
 		goto out;
@@ -438,7 +456,7 @@ ofp_tcp_timer_rexmt(void * xtp)
 	 * KASSERT(inp != NULL, ("ofp_tcp_timer_rexmt: inp == NULL"));
 	 */
 	if (inp == NULL) {
-		tcp_timer_race++;
+		V_tcp_timer_race++;
 		INP_INFO_RUNLOCK(&V_tcbinfo);
 		return;
 	}
@@ -575,7 +593,7 @@ tcp_timer_reassdl(void *xtp)
 	 * KASSERT(inp != NULL, ("tcp_timer_reassdl: inp == NULL"));
 	 */
 	if (inp == NULL) {
-		tcp_timer_race++;
+		V_tcp_timer_race++;
 		return;
 	}
 	INP_WLOCK(inp);

@@ -112,31 +112,37 @@
 #include "ofpi_protosw.h"
 #include "ofpi_tcp_shm.h"
 
-#define	SYSCTL_VNET_INT OFP_SYSCTL_INT
+OFP_SYSCTL_NODE_DEF(net_inet_tcp, sack);
+OFP_SYSCTL_INT_DEF(net_inet_tcp_sack, enable);
+OFP_SYSCTL_INT_DEF(net_inet_tcp_sack, maxholes);
+OFP_SYSCTL_INT_DEF(net_inet_tcp_sack, globalmaxholes);
+OFP_SYSCTL_INT_DEF(net_inet_tcp_sack, globalholes);
 
-OFP_SYSCTL_NODE(_net_inet_tcp, OFP_OID_AUTO, sack, OFP_CTLFLAG_RW, 0, "TCP SACK");
-VNET_DEFINE(int, ofp_tcp_do_sack) = 1;
-#define	V_tcp_do_sack			VNET(ofp_tcp_do_sack)
-SYSCTL_VNET_INT(_net_inet_tcp_sack, OFP_OID_AUTO, enable, OFP_CTLFLAG_RW,
-    &VNET_NAME(ofp_tcp_do_sack), 0, "Enable/Disable TCP SACK support");
+int ofp_tcp_sack_init_local(void)
+{
+	OFP_SYSCTL_NODE_SET(net_inet_tcp, OFP_OID_AUTO, sack,
+			    OFP_CTLFLAG_RW, NULL, "TCP SACK");
 
-VNET_DEFINE(int, ofp_tcp_sack_maxholes) = 128;
-#define	V_tcp_sack_maxholes		VNET(ofp_tcp_sack_maxholes)
-SYSCTL_VNET_INT(_net_inet_tcp_sack, OFP_OID_AUTO, maxholes, OFP_CTLFLAG_RW,
-    &VNET_NAME(ofp_tcp_sack_maxholes), 0,
-    "Maximum number of TCP SACK holes allowed per connection");
+	OFP_SYSCTL_INT_SET(net_inet_tcp_sack, OFP_OID_AUTO, enable,
+			   OFP_CTLFLAG_RW, &V_tcp_do_sack, 0,
+			   "Enable/Disable TCP SACK support");
 
-VNET_DEFINE(int, ofp_tcp_sack_globalmaxholes) = 65536;
-#define	V_tcp_sack_globalmaxholes	VNET(ofp_tcp_sack_globalmaxholes)
-SYSCTL_VNET_INT(_net_inet_tcp_sack, OFP_OID_AUTO, globalmaxholes, OFP_CTLFLAG_RW,
-    &VNET_NAME(ofp_tcp_sack_globalmaxholes), 0,
-    "Global maximum number of TCP SACK holes");
+	OFP_SYSCTL_INT_SET(net_inet_tcp_sack, OFP_OID_AUTO, maxholes,
+			   OFP_CTLFLAG_RW, &V_tcp_sack_maxholes, 0,
+			   "Maximum number of TCP SACK holes allowed "
+			   "per connection");
 
-VNET_DEFINE(int, ofp_tcp_sack_globalholes) = 0;
-#define	V_tcp_sack_globalholes		VNET(ofp_tcp_sack_globalholes)
-SYSCTL_VNET_INT(_net_inet_tcp_sack, OFP_OID_AUTO, globalholes, OFP_CTLFLAG_RD,
-    &VNET_NAME(ofp_tcp_sack_globalholes), 0,
-    "Global number of TCP SACK holes currently allocated");
+	OFP_SYSCTL_INT_SET(net_inet_tcp_sack, OFP_OID_AUTO, globalmaxholes,
+			   OFP_CTLFLAG_RW, &V_tcp_sack_globalmaxholes, 0,
+			   "Global maximum number of TCP SACK holes");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp_sack, OFP_OID_AUTO, globalholes,
+			   OFP_CTLFLAG_RD, &V_tcp_sack_globalholes, 0,
+			   "Global number of TCP SACK holes currently "
+			   "allocated");
+
+	return 0;
+}
 
 /*
  * This function is called upon receipt of new valid data (while not in
@@ -281,7 +287,7 @@ tcp_sackhole_free(struct tcpcb *tp, struct sackhole *hole)
 	odp_atomic_dec_u32((odp_atomic_u32_t *)&V_tcp_sack_globalholes);
 
 	KASSERT(tp->snd_numholes >= 0, ("tp->snd_numholes >= 0"));
-	KASSERT(V_tcp_sack_globalholes >= 0, ("ofp_tcp_sack_globalholes >= 0"));
+	KASSERT(V_tcp_sack_globalholes >= 0, ("V_tcp_sack_globalholes >= 0"));
 }
 
 /*

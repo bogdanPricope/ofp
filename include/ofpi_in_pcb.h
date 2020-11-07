@@ -614,36 +614,6 @@ void	inp_4tuple_get(struct inpcb *inp, uint32_t *laddr, uint16_t *lp,
 #define	IPI_HASHFIELDS_2TUPLE	1
 #define	IPI_HASHFIELDS_4TUPLE	2
 
-#define	VNET_DEFINE(t, n) t n
-
-VNET_DECLARE(int, ofp_ipport_reservedhigh);
-VNET_DECLARE(int, ofp_ipport_reservedlow);
-VNET_DECLARE(int, ofp_ipport_lowfirstauto);
-VNET_DECLARE(int, ofp_ipport_lowlastauto);
-VNET_DECLARE(int, ofp_ipport_firstauto);
-VNET_DECLARE(int, ofp_ipport_lastauto);
-VNET_DECLARE(int, ofp_ipport_hifirstauto);
-VNET_DECLARE(int, ofp_ipport_hilastauto);
-VNET_DECLARE(int, ofp_ipport_randomized);
-VNET_DECLARE(int, ofp_ipport_randomcps);
-VNET_DECLARE(int, ofp_ipport_randomtime);
-VNET_DECLARE(int, ofp_ipport_stoprandom);
-VNET_DECLARE(int, ofp_ipport_tcpallocs);
-
-#define	V_ipport_reservedhigh	VNET(ofp_ipport_reservedhigh)
-#define	V_ipport_reservedlow	VNET(ofp_ipport_reservedlow)
-#define	V_ipport_lowfirstauto	VNET(ofp_ipport_lowfirstauto)
-#define	V_ipport_lowlastauto	VNET(ofp_ipport_lowlastauto)
-#define	V_ipport_firstauto	VNET(ofp_ipport_firstauto)
-#define	V_ipport_lastauto	VNET(ofp_ipport_lastauto)
-#define	V_ipport_hifirstauto	VNET(ofp_ipport_hifirstauto)
-#define	V_ipport_hilastauto	VNET(ofp_ipport_hilastauto)
-#define	V_ipport_randomized	VNET(ofp_ipport_randomized)
-#define	V_ipport_randomcps	VNET(ofp_ipport_randomcps)
-#define	V_ipport_randomtime	VNET(ofp_ipport_randomtime)
-#define	V_ipport_stoprandom	VNET(ofp_ipport_stoprandom)
-#define	V_ipport_tcpallocs	VNET(ofp_ipport_tcpallocs)
-
 void	ofp_in_pcbinfo_destroy(struct inpcbinfo *);
 void ofp_in_pcbinfo_init(const char *name,
 			 struct inpcbinfo *pcbinfo, struct inpcbhead *listhead,
@@ -725,5 +695,7 @@ int	ofp_in_getsockaddr(struct socket *so, struct ofp_sockaddr **nam);
 struct ofp_sockaddr *
 	ofp_in_sockaddr(ofp_in_port_t port, struct ofp_in_addr *addr);
 void	ofp_in_pcbsosetlabel(struct socket *so);
+
+int ofp_ipport_init_local(void);
 
 #endif /* !_NETINET_IN_PCB_H_ */

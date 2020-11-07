@@ -31,9 +31,10 @@
 #include "ofpi_avl.h"
 #include "ofpi_pkt_processing.h"
 #include "ofpi_ifnet.h"
-#include "ofpi_ip.h"
+#include "ofpi_ip_shm.h"
 #include "ofpi_tcp_shm.h"
 #include "ofpi_udp_shm.h"
+#include "ofpi_igmp_shm.h"
 #include "ofpi_socketvar.h"
 #include "ofpi_socket.h"
 #include "ofpi_reass.h"
@@ -404,6 +405,7 @@ static void ofp_init_prepare(void)
 	 * can be called.
 	 */
 	ofp_uma_init_prepare();
+	ofp_sysctl_init_prepare();
 	ofp_avl_init_prepare();
 	ofp_reassembly_init_prepare();
 	ofp_pcap_init_prepare();
@@ -418,6 +420,7 @@ static void ofp_init_prepare(void)
 	ofp_socket_init_prepare();
 	ofp_tcp_var_init_prepare();
 	ofp_udp_var_init_prepare();
+	ofp_igmp_var_init_prepare();
 	ofp_ip_init_prepare();
 	ofp_ipsec_init_prepare(&global_param->ipsec);
 }
@@ -445,10 +448,10 @@ static int ofp_init_pre_global(ofp_global_param_t *params)
 	/* Finish preallocation phase before the corresponding allocations */
 	HANDLE_ERROR(ofp_shared_memory_prealloc_finish());
 
+	HANDLE_ERROR(ofp_sysctl_init_global());
+
         /* Initialize the UM allocator before doing other inits */
 	HANDLE_ERROR(ofp_uma_init_global());
-
-	ofp_register_sysctls();
 
 	HANDLE_ERROR(ofp_avl_init_global());
 
@@ -492,10 +495,11 @@ static int ofp_init_pre_global(ofp_global_param_t *params)
 	}
 
 	HANDLE_ERROR(ofp_socket_init_global(ofp_packet_pool));
+	HANDLE_ERROR(ofp_ip_init_global());
 	HANDLE_ERROR(ofp_tcp_var_init_global());
 	HANDLE_ERROR(ofp_udp_var_init_global());
+	HANDLE_ERROR(ofp_igmp_var_init_global());
 	HANDLE_ERROR(ofp_inet_init());
-	HANDLE_ERROR(ofp_ip_init_global());
 	HANDLE_ERROR(ofp_ipsec_init_global(&params->ipsec));
 
 	return 0;
@@ -581,6 +585,7 @@ int ofp_init_local(void)
 	/* Lookup shared memories */
 	HANDLE_ERROR(ofp_uma_lookup_shared_memory());
 	HANDLE_ERROR(ofp_global_config_lookup_shared_memory());
+	HANDLE_ERROR(ofp_sysctl_init_local());
 	HANDLE_ERROR(ofp_portconf_lookup_shared_memory());
 	HANDLE_ERROR(ofp_vlan_lookup_shared_memory());
 	HANDLE_ERROR(ofp_route_lookup_shared_memory());
@@ -594,11 +599,13 @@ int ofp_init_local(void)
 	HANDLE_ERROR(ofp_hook_lookup_shared_memory());
 	HANDLE_ERROR(ofp_arp_lookup_shared_memory());
 	HANDLE_ERROR(ofp_vxlan_lookup_shared_memory());
+	HANDLE_ERROR(ofp_in_proto_init_local());
 	HANDLE_ERROR(ofp_arp_init_local());
-	HANDLE_ERROR(ofp_tcp_var_lookup_shared_memory());
-	HANDLE_ERROR(ofp_udp_var_lookup_shared_memory());
-	HANDLE_ERROR(ofp_send_pkt_out_init_local());
 	HANDLE_ERROR(ofp_ip_init_local());
+	HANDLE_ERROR(ofp_tcp_var_init_local());
+	HANDLE_ERROR(ofp_udp_var_init_local());
+	HANDLE_ERROR(ofp_igmp_var_init_local());
+	HANDLE_ERROR(ofp_send_pkt_out_init_local());
 	HANDLE_ERROR(ofp_ipsec_init_local());
 
 	return 0;
@@ -714,18 +721,20 @@ int ofp_term_post_global(const char *pool_name)
 	odp_pool_t pool;
 	int rc = 0;
 
-	ofp_igmp_uninit(NULL);
-
-	CHECK_ERROR(ofp_ip_term_global(), rc);
-
 	/* Cleanup sockets */
 	CHECK_ERROR(ofp_socket_term_global(), rc);
+
+	/* Cleanup of IGMP content */
+	CHECK_ERROR(ofp_igmp_var_term_global(), rc);
 
 	/* Cleanup of TCP content */
 	CHECK_ERROR(ofp_tcp_var_term_global(), rc);
 
 	/* Cleanup of UDP content */
 	CHECK_ERROR(ofp_udp_var_term_global(), rc);
+
+	/* Cleanup of IP content */
+	CHECK_ERROR(ofp_ip_term_global(), rc);
 
 	/* Cleanup vxlan */
 	CHECK_ERROR(ofp_vxlan_term_global(), rc);
@@ -795,8 +804,9 @@ int ofp_term_post_global(const char *pool_name)
 		pool = ODP_POOL_INVALID;
 	}
 
+	CHECK_ERROR(ofp_sysctl_term_global(), rc);
+
 	CHECK_ERROR(ofp_global_config_free_shared_memory(), rc);
-	CHECK_ERROR(ofp_unregister_sysctls(), rc);
 
 	CHECK_ERROR(ofp_uma_term_global(), rc);
 

@@ -60,7 +60,8 @@
 #endif
 #include "ofpi_tcp_shm.h"
 
-static int	maxtcptw;
+OFP_SYSCTL_PROC_DEF(net_inet_tcp, maxtcptw);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, nolocaltimewait);
 
 /*
  * The timed wait queue contains references to each of the TCP sessions
@@ -100,36 +101,42 @@ sysctl_maxtcptw(OFP_SYSCTL_HANDLER_ARGS)
 	(void)arg1;
 	(void)arg2;
 
-	if (maxtcptw == 0)
+	if (V_tcp_maxtcptw == 0)
 		new = tcptw_auto_size();
 	else
-		new = maxtcptw;
+		new = V_tcp_maxtcptw;
 	error = sysctl_handle_int(oidp, &new, 0, req);
 	if (error == 0 && req->newptr)
 		if (new >= 32) {
-			maxtcptw = new;
-			uma_zone_set_max(V_tcptw_zone, maxtcptw);
+			V_tcp_maxtcptw = new;
+			uma_zone_set_max(V_tcptw_zone, V_tcp_maxtcptw);
 		}
 	return (error);
 }
-
-OFP_SYSCTL_PROC(_net_inet_tcp, OFP_OID_AUTO, maxtcptw, OFP_CTLTYPE_INT|OFP_CTLFLAG_RW,
-    &maxtcptw, 0, sysctl_maxtcptw, "IU",
-    "Maximum number of compressed TCP TIME_WAIT entries");
-
-VNET_DEFINE(int, ofp_nolocaltimewait) = 0;
-#define	V_nolocaltimewait	VNET(ofp_nolocaltimewait)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, nolocaltimewait, OFP_CTLFLAG_RW,
-	   &ofp_nolocaltimewait, 0,
-	   "Do not create compressed TCP TIME_WAIT entries for local connections");
 
 void
 ofp_tcp_tw_zone_change(void)
 {
 	/* HJo
-	if (maxtcptw == 0)
+	if (V_tcp_maxtcptw == 0)
 		uma_zone_set_max(V_tcptw_zone, tcptw_auto_size());
 	*/
+}
+
+int ofp_tcp_timewait_init_local(void)
+{
+	OFP_SYSCTL_PROC_SET(net_inet_tcp, OFP_OID_AUTO, maxtcptw,
+			    OFP_CTLFLAG_RW, &V_tcp_maxtcptw, 0,
+			    sysctl_maxtcptw, "IU",
+			    "Maximum number of compressed TCP TIME_WAIT "
+			    "entries");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, nolocaltimewait,
+			   OFP_CTLFLAG_RW, &V_nolocaltimewait, 0,
+			   "Do not create compressed TCP TIME_WAIT entries "
+			   "for local connections");
+
+	return 0;
 }
 
 void
@@ -138,12 +145,10 @@ ofp_tcp_tw_init(void)
 	V_tcptw_zone = uma_zcreate(
 		"tcptw", tcptw_auto_size(), sizeof(struct tcptw),
 		NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
-	/* TUNABLE_INT_FETCH("net.inet.tcp.maxtcptw", &maxtcptw); */
-	if (maxtcptw == 0) {
+	if (V_tcp_maxtcptw == 0)
 		uma_zone_set_max(V_tcptw_zone, tcptw_auto_size());
-	} else {
-		uma_zone_set_max(V_tcptw_zone, maxtcptw);
-	}
+	else
+		uma_zone_set_max(V_tcptw_zone, V_tcp_maxtcptw);
 
 #ifdef OFP_RSS
 	int32_t cpu_id = 0;
@@ -508,7 +513,7 @@ ofp_tcp_twrespond(struct tcptw *tw, int flags)
 	{
 		// HJo odp_packet_csum_flags(m) = CSUM_TCP;
 		ip->ip_len = odp_cpu_to_be_16(odp_packet_len(m));
-		if (V_path_mtu_discovery)
+		if (V_tcp_path_mtu_discovery)
 			ip->ip_off |= OFP_IP_DF;
 
 		ip->ip_off = odp_cpu_to_be_16(ip->ip_off);
@@ -535,7 +540,7 @@ tcp_tw_2msl_reset(struct tcptw *tw, int rearm)
 	INP_WLOCK_ASSERT(tw->tw_inpcb);
 	if (rearm)
 		OFP_TAILQ_REMOVE(&V_twq_2msl, tw, tw_2msl);
-	tw->tw_time = ticks + 2 * ofp_tcp_msl;
+	tw->tw_time = ticks + 2 * V_tcp_msl;
 	OFP_TAILQ_INSERT_TAIL(&V_twq_2msl, tw, tw_2msl);
 }
 

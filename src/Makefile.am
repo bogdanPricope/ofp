@@ -35,6 +35,8 @@ ofp_in_pcb.c \
 ofp_in_proto.c \
 ofp_in_cksum.c \
 ofp_ip_init.c \
+ofp_ip_shm.c \
+ofp_ip.c \
 ofp_portconf.c \
 ofp_route.c \
 ofp_subr_hash.c \
@@ -65,6 +67,7 @@ ofp_reass.c \
 ofp_sys_socket.c \
 ofp_in.c \
 ofp_sysctl.c \
+ofp_igmp_shm.c \
 ofp_igmp.c \
 ofp_in_mcast.c \
 ofp_vxlan.c \

@@ -601,6 +601,11 @@ struct cli_command commands[] = {
 		f_exit
 	},
 	{
+		"quit",
+		"Quit the connection",
+		f_exit
+	},
+	{
 		"show",
 		"Display information",
 		f_help_show
@@ -1005,6 +1010,11 @@ struct cli_command commands[] = {
 		"stat help",
 		NULL,
 		f_help_stat
+	},
+	{
+		"sysctl",
+		"Dump sysctl tree",
+		f_sysctl_dump
 	},
 	{
 		"sysctl dump",

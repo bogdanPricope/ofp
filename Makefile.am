@@ -69,6 +69,7 @@ noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_init.h \
 		  $(top_srcdir)/include/ofpi_in.h \
 		  $(top_srcdir)/include/ofpi_in_pcb.h \
+		  $(top_srcdir)/include/ofpi_in_mcast.h \
 		  $(top_srcdir)/include/ofpi_in_var.h \
 		  $(top_srcdir)/include/ofpi_ioctl.h \
 		  $(top_srcdir)/include/ofpi_ip6.h \
@@ -112,8 +113,10 @@ noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_vxlan.h \
 		  $(top_srcdir)/include/ofpi_hook.h \
 		  $(top_srcdir)/include/ofpi_util.h \
+		  $(top_srcdir)/include/ofpi_ip_shm.h \
 		  $(top_srcdir)/include/ofpi_tcp_shm.h \
 		  $(top_srcdir)/include/ofpi_udp_shm.h \
+		  $(top_srcdir)/include/ofpi_igmp_shm.h \
 		  $(top_srcdir)/include/ofpi_epoll.h \
 		  $(top_srcdir)/include/ofpi_brlock.h \
 		  $(top_srcdir)/include/ofpi_ipsec.h \

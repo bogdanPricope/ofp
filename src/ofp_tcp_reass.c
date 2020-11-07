@@ -72,36 +72,13 @@
 #include "ofpi_protosw.h"
 #include "ofpi_tcp_shm.h"
 
-#define SYSCTL_VNET_INT(_a...) OFP_SYSCTL_INT(_a)
-#define SYSCTL_VNET_PROC(_a...) OFP_SYSCTL_PROC(_a)
-
 static int tcp_reass_sysctl_maxseg(OFP_SYSCTL_HANDLER_ARGS);
 static int tcp_reass_sysctl_qsize(OFP_SYSCTL_HANDLER_ARGS);
 
-OFP_SYSCTL_NODE(_net_inet_tcp, OFP_OID_AUTO, reass, OFP_CTLFLAG_RW, 0,
-    "TCP Segment Reassembly Queue");
-
-static VNET_DEFINE(int, tcp_reass_maxseg) = 0;
-#define	V_tcp_reass_maxseg		VNET(tcp_reass_maxseg)
-SYSCTL_VNET_PROC(_net_inet_tcp_reass, OFP_OID_AUTO, maxsegments,
-    OFP_CTLTYPE_INT | OFP_CTLFLAG_RDTUN,
-    &VNET_NAME(tcp_reass_maxseg), 0, &tcp_reass_sysctl_maxseg, "I",
-    "Global maximum number of TCP Segments in Reassembly Queue");
-
-static VNET_DEFINE(int, tcp_reass_qsize) = 0;
-#define	V_tcp_reass_qsize		VNET(tcp_reass_qsize)
-SYSCTL_VNET_PROC(_net_inet_tcp_reass, OFP_OID_AUTO, cursegments,
-    OFP_CTLTYPE_INT | OFP_CTLFLAG_RD,
-    &VNET_NAME(tcp_reass_qsize), 0, &tcp_reass_sysctl_qsize, "I",
-    "Global number of TCP Segments currently in Reassembly Queue");
-
-static VNET_DEFINE(int, tcp_reass_overflows) = 0;
-#define	V_tcp_reass_overflows		VNET(tcp_reass_overflows)
-SYSCTL_VNET_INT(_net_inet_tcp_reass, OFP_OID_AUTO, overflows,
-    OFP_CTLTYPE_INT | OFP_CTLFLAG_RD,
-    &VNET_NAME(tcp_reass_overflows), 0,
-    "Global number of TCP Segment Reassembly Queue Overflows");
-
+OFP_SYSCTL_NODE_DEF(net_inet_tcp, reass);
+OFP_SYSCTL_PROC_DEF(net_inet_tcp_reass, maxsegments);
+OFP_SYSCTL_PROC_DEF(net_inet_tcp_reass, cursegments);
+OFP_SYSCTL_INT_DEF(net_inet_tcp_reass, overflows);
 
 /* Derived from libuinet sys/kern/subr_param.c and
  * sys/kern/kern_mbuf.c */
@@ -120,6 +97,32 @@ tcp_reass_zone_change(void *tag)
 	*/
 }
 #endif
+
+int ofp_tcp_reass_init_local(void)
+{
+	OFP_SYSCTL_NODE_SET(net_inet_tcp, OFP_OID_AUTO, reass,
+			    OFP_CTLFLAG_RW, 0,
+			    "TCP Segment Reassembly Queue");
+
+	OFP_SYSCTL_PROC_SET(net_inet_tcp_reass, OFP_OID_AUTO, maxsegments,
+			    OFP_CTLFLAG_RDTUN, &V_tcp_reass_maxseg, 0,
+			    &tcp_reass_sysctl_maxseg, "I",
+			    "Global maximum number of TCP Segments in "
+			    "Reassembly Queue");
+
+	OFP_SYSCTL_PROC_SET(net_inet_tcp_reass, OFP_OID_AUTO, cursegments,
+			    OFP_CTLFLAG_RD, &V_tcp_reass_qsize, 0,
+			    &tcp_reass_sysctl_qsize, "I",
+			    "Global number of TCP Segments currently in "
+			    "Reassembly Queue");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp_reass, OFP_OID_AUTO, overflows,
+			   OFP_CTLFLAG_RD, &V_tcp_reass_overflows, 0,
+			   "Global number of TCP Segment Reassembly "
+			   "Queue Overflows");
+
+	return 0;
+}
 
 void
 ofp_tcp_reass_init(void)

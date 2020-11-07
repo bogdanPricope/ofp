@@ -75,15 +75,16 @@
 #include <netinet/tcp_debug.h>
 #endif
 
-#define	SYSCTL_VNET_INT OFP_SYSCTL_INT
-
-unsigned int ofp_max_protohdr = 0;
-int ofp_max_linkhdr = 64;
-
-VNET_DEFINE(int, ofp_tcp_mssdflt) = OFP_TCP_MSS;
-#ifdef INET6
-VNET_DEFINE(int, ofp_tcp_v6mssdflt) = OFP_TCP6_MSS;
-#endif
+#ifdef _INET6
+OFP_SYSCTL_PROC_DEF(net_inet_tcp, v6mssdflt);
+#endif /*_INET6*/
+OFP_SYSCTL_INT_DEF(net_inet_tcp, rfc1323);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, log_debug);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, tcbhashsize);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, do_tcpdrain);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, icmp_may_rst);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, isn_reseed_interval);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, soreceive_stream);
 
 #if 0
 static int
@@ -119,54 +120,7 @@ sysctl_net_inet_tcp_mss_v6_check(OFP_SYSCTL_HANDLER_ARGS)
 	}
 	return (error);
 }
-
-SYSCTL_VNET_PROC(_net_inet_tcp, TCPCTL_V6MSSDFLT, v6mssdflt,
-    OFP_CTLTYPE_INT|OFP_CTLFLAG_RW, &VNET_NAME(tcp_v6mssdflt), 0,
-    &sysctl_net_inet_tcp_mss_v6_check, "I",
-   "Default TCP Maximum Segment Size for IPv6");
 #endif /* INET6 */
-
-/*
- * Minimum MSS we accept and use. This prevents DoS attacks where
- * we are forced to a ridiculous low MSS like 20 and send hundreds
- * of packets instead of one. The effect scales with the available
- * bandwidth and quickly saturates the CPU and network interface
- * with packet generation and sending. Set to zero to disable MINMSS
- * checking. This setting prevents us from sending too small packets.
- */
-VNET_DEFINE(int, ofp_tcp_minmss) = OFP_TCP_MINMSS;
-VNET_DEFINE(int, ofp_tcp_do_rfc1323) = 1;
-SYSCTL_VNET_INT(_net_inet_tcp, TCPCTL_DO_RFC1323, rfc1323, OFP_CTLFLAG_RW,
-    &VNET_NAME(ofp_tcp_do_rfc1323), 0,
-    "Enable rfc1323 (high performance TCP) extensions");
-
-static int	tcp_log_debug = 0;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, log_debug, OFP_CTLFLAG_RW,
-    &tcp_log_debug, 0, "Log errors caused by incoming TCP segments");
-
-static int	tcp_tcbhashsize = 0;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, tcbhashsize, OFP_CTLFLAG_RDTUN,
-    &tcp_tcbhashsize, 0, "Size of TCP control-block hashtable");
-
-static int	do_tcpdrain = 1;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, do_tcpdrain, OFP_CTLFLAG_RW, &do_tcpdrain, 0,
-    "Enable tcp_drain routine for extra help when low on mbufs");
-
-static VNET_DEFINE(int, icmp_may_rst) = 1;
-#define	V_icmp_may_rst			VNET(icmp_may_rst)
-SYSCTL_VNET_INT(_net_inet_tcp, OFP_OID_AUTO, icmp_may_rst, OFP_CTLFLAG_RW,
-    &VNET_NAME(icmp_may_rst), 0,
-    "Certain ICMP unreachable messages may abort connections in SYN_SENT");
-
-static VNET_DEFINE(int, tcp_isn_reseed_interval) = 0;
-#define	V_tcp_isn_reseed_interval	VNET(tcp_isn_reseed_interval)
-SYSCTL_VNET_INT(_net_inet_tcp, OFP_OID_AUTO, isn_reseed_interval, OFP_CTLFLAG_RW,
-    &VNET_NAME(tcp_isn_reseed_interval), 0,
-    "Seconds between reseeding of ISN secret");
-
-static int	tcp_soreceive_stream = 0;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, soreceive_stream, OFP_CTLFLAG_RDTUN,
-    &tcp_soreceive_stream, 0, "Using soreceive_stream for TCP sockets");
 
 VNET_DEFINE(struct hhook_head *, ofp_tcp_hhh[HHOOK_TCP_LAST+1]);
 
@@ -236,6 +190,47 @@ static odp_spinlock_t isn_mtx;
 	} while (0)
 #endif
 
+int ofp_tcp_subr_init_local(void)
+{
+#ifdef _INET6
+	OFP_SYSCTL_PROC_SET(net_inet_tcp, OFP_OID_AUTO, v6mssdflt,
+			    OFP_CTLFLAG_RW, &V_tcp_v6mssdflt, 0,
+			    &sysctl_net_inet_tcp_mss_v6_check, "I",
+			    "Default TCP Maximum Segment Size for IPv6");
+#endif /*_INET6*/
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, rfc1323,
+			   OFP_CTLFLAG_RW, &V_tcp_do_rfc1323, 0,
+			   "Enable rfc1323 (high performance TCP) extensions");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, log_debug,
+			   OFP_CTLFLAG_RW, &V_tcp_log_debug, 0,
+			   "Log errors caused by incoming TCP segments");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, tcbhashsize,
+			   OFP_CTLFLAG_RDTUN, &V_tcp_tcbhashsize, 0,
+			   "Size of TCP control-block hashtable");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, do_tcpdrain,
+			   OFP_CTLFLAG_RW, &V_tcp_do_tcpdrain, 0,
+			   "Enable tcp_drain routine for extra help when "
+			   "low on mbufs");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, icmp_may_rst,
+			   OFP_CTLFLAG_RW, &V_tcp_icmp_may_rst, 0,
+			   "Certain ICMP unreachable messages may abort "
+			   "connections in SYN_SENT");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, isn_reseed_interval,
+			   OFP_CTLFLAG_RW, &V_tcp_isn_reseed_interval, 0,
+			   "Seconds between reseeding of ISN secret");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, soreceive_stream,
+			   OFP_CTLFLAG_RDTUN, &V_tcp_soreceive_stream, 0,
+			   "Using soreceive_stream for TCP sockets");
+
+	return 0;
+}
 
 static int
 tcp_inpcb_init(void *mem, int size, int flags)
@@ -305,30 +300,31 @@ ofp_tcp_init(void)
 				       UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 
 	/* XXX virtualize those bellow? */
-	ofp_tcp_delacktime = TCPTV_DELACK;
-	ofp_tcp_keepinit = TCPTV_KEEP_INIT;
-	ofp_tcp_keepidle = TCPTV_KEEP_IDLE;
-	ofp_tcp_keepintvl = TCPTV_KEEPINTVL;
-	ofp_tcp_maxpersistidle = TCPTV_KEEP_IDLE;
-	ofp_tcp_msl = TCPTV_MSL;
-	ofp_tcp_rexmit_min = TCPTV_MIN;
-	if (ofp_tcp_rexmit_min < 1)
-		ofp_tcp_rexmit_min = 1;
-	ofp_tcp_rexmit_slop = TCPTV_CPU_VAR;
+	V_tcp_delacktime = TCPTV_DELACK;
+	V_tcp_keepinit = TCPTV_KEEP_INIT;
+	V_tcp_keepidle = TCPTV_KEEP_IDLE;
+	V_tcp_keepintvl = TCPTV_KEEPINTVL;
+	V_tcp_maxpersistidle = TCPTV_KEEP_IDLE;
+	V_tcp_msl = TCPTV_MSL;
+	V_tcp_rexmit_min = TCPTV_MIN;
+	if (V_tcp_rexmit_min < 1)
+		V_tcp_rexmit_min = 1;
+	V_tcp_rexmit_slop = TCPTV_CPU_VAR;
 #ifdef PASSIVE_INET
 	tcp_reassdl = TCPTV_REASSDL;
 #endif
-	ofp_tcp_finwait2_timeout = TCPTV_FINWAIT2_TIMEOUT;
-	tcp_tcbhashsize = V_tcp_hashtbl_size;
+	V_tcp_finwait2_timeout = TCPTV_FINWAIT2_TIMEOUT;
+	V_tcp_tcbhashsize = V_tcp_hashtbl_size;
 
 #ifdef INET6
 #define TCP_MINPROTOHDR (sizeof(struct ofp_ip6_hdr) + sizeof(struct ofp_tcphdr))
 #else /* INET6 */
 #define TCP_MINPROTOHDR (sizeof(struct tcpiphdr))
 #endif /* INET6 */
-	if (ofp_max_protohdr < TCP_MINPROTOHDR)
-		ofp_max_protohdr = TCP_MINPROTOHDR;
-	if (ofp_max_linkhdr + TCP_MINPROTOHDR > global_param->pkt_pool.buffer_size)
+	if (V_tcp_maxprotohdr < TCP_MINPROTOHDR)
+		V_tcp_maxprotohdr = TCP_MINPROTOHDR;
+	if (V_l2_max_linkhdr + TCP_MINPROTOHDR >
+	    global_param->pkt_pool.buffer_size)
 		panic("ofp_tcp_init");
 #undef TCP_MINPROTOHDR
 
@@ -638,7 +634,7 @@ ofp_tcp_respond(struct tcpcb *tp, void *ipgen, struct ofp_tcphdr *th, odp_packet
 		tlen += sizeof (struct tcpiphdr);
 		ip->ip_len = tlen;
 		ip->ip_ttl = V_ip_defttl;
-		if (V_path_mtu_discovery)
+		if (V_tcp_path_mtu_discovery)
 			ip->ip_off |= OFP_IP_DF;
 	}
 
@@ -781,7 +777,7 @@ ofp_tcp_newtcpcb(struct inpcb *inp)
 	 */
 	tp->t_srtt = TCPTV_SRTTBASE;
 	tp->t_rttvar = ((TCPTV_RTOBASE - TCPTV_SRTTBASE) << TCP_RTTVAR_SHIFT) / 4;
-	tp->t_rttmin = ofp_tcp_rexmit_min;
+	tp->t_rttmin = V_tcp_rexmit_min;
 	tp->t_rxtcur = TCPTV_RTOBASE;
 	tp->snd_cwnd = OFP_TCP_MAXWIN << OFP_TCP_MAX_WINSHIFT;
 	tp->snd_ssthresh = OFP_TCP_MAXWIN << OFP_TCP_MAX_WINSHIFT;
@@ -1035,7 +1031,7 @@ ofp_tcp_close(struct tcpcb *tp)
 void
 ofp_tcp_drain(void)
 {
-	if (!do_tcpdrain)
+	if (!V_tcp_do_tcpdrain)
 		return;
 }
 
@@ -1239,9 +1235,9 @@ tcp_pcblist(OFP_SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-OFP_SYSCTL_PROC(_net_inet_tcp, TCPCTL_PCBLIST, pcblist,
-    OFP_CTLTYPE_OPAQUE | OFP_CTLFLAG_RD, NULL, 0,
-    tcp_pcblist, "S,xtcpcb", "List of active TCP connections");
+OFP_SYSCTL_PROC(_net_inet_tcp, OFP_OID_AUTO, pcblist,
+		OFP_CTLTYPE_OPAQUE | OFP_CTLFLAG_RD, NULL, 0,
+		tcp_pcblist, "S,xtcpcb", "List of active TCP connections");
 
 static int
 tcp_getcred(OFP_SYSCTL_HANDLER_ARGS)
@@ -1391,9 +1387,10 @@ ofp_tcp_ctlinput(int cmd, struct ofp_sockaddr *sa, void *vip)
 
 	if (cmd == OFP_PRC_MSGSIZE)
 		notify = tcp_mtudisc_notify;
-	else if (V_icmp_may_rst && (cmd == OFP_PRC_UNREACH_ADMIN_PROHIB ||
-		cmd == OFP_PRC_UNREACH_PORT ||
-		cmd == OFP_PRC_TIMXCEED_INTRANS) && ip)
+	else if (V_tcp_icmp_may_rst &&
+		 (cmd == OFP_PRC_UNREACH_ADMIN_PROHIB ||
+		  cmd == OFP_PRC_UNREACH_PORT ||
+		  cmd == OFP_PRC_TIMXCEED_INTRANS) && ip)
 		notify = ofp_tcp_drop_syn_sent;
 	/*
 	 * Redirects don't need to be handled up here.
@@ -1703,7 +1700,7 @@ ofp_tcp_new_isn(struct tcpcb *tp)
 /*
  * When a specific ICMP unreachable message is received and the
  * connection state is SYN-SENT, drop the connection.  This behavior
- * is controlled by the icmp_may_rst sysctl.
+ * is controlled by the V_tcp_icmp_may_rst sysctl.
  */
 struct inpcb *
 ofp_tcp_drop_syn_sent(struct inpcb *inp, int err)
@@ -2252,9 +2249,9 @@ sysctl_drop(OFP_SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-OFP_SYSCTL_PROC(_net_inet_tcp, TCPCTL_DROP, drop,
-    OFP_CTLTYPE_STRUCT|OFP_CTLFLAG_WR|OFP_CTLFLAG_SKIP, NULL,
-    0, sysctl_drop, "", "Drop TCP connection");
+OFP_SYSCTL_PROC(_net_inet_tcp, OFP_OID_AUTO, drop,
+		OFP_CTLTYPE_STRUCT | OFP_CTLFLAG_WR | OFP_CTLFLAG_SKIP, NULL,
+		0, sysctl_drop, "", "Drop TCP connection");
 #endif /* HJo */
 
 /*
@@ -2274,7 +2271,7 @@ ofp_tcp_log_vain(struct in_conninfo *inc, struct ofp_tcphdr *th, void *ip4hdr,
 {
 
 	/* Is logging enabled? */
-	if (ofp_tcp_log_in_vain == 0)
+	if (V_tcp_log_in_vain == 0)
 		return (NULL);
 
 	return (tcp_log_addr(inc, th, ip4hdr, ip6hdr));
@@ -2286,7 +2283,7 @@ ofp_tcp_log_addrs(struct in_conninfo *inc, struct ofp_tcphdr *th, void *ip4hdr,
 {
 
 	/* Is logging enabled? */
-	if (tcp_log_debug == 0)
+	if (V_tcp_log_debug == 0)
 		return (NULL);
 
 	return (tcp_log_addr(inc, th, ip4hdr, ip6hdr));

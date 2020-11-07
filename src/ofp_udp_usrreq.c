@@ -85,34 +85,41 @@ extern odp_pool_t ofp_packet_pool;
 #define	M_BCAST		0x00000200 /* send/received as link-level broadcast */
 #define	M_MCAST		0x00000400 /* send/received as link-level multicast */
 
-int		ofp_udp_cksum = 1;
-int		ofp_udp_log_in_vain = 0;
-int		ofp_udp_blackhole = 0;
-uint64_t	ofp_udp_sendspace = 9216;		/* really max datagram size */
-uint64_t	ofp_udp_recvspace = 40 * (1024 + sizeof(struct ofp_sockaddr_in6));
-int		ofp_max_linkhdr;
-VNET_DEFINE(int, ofp_ip_defttl) = 255;
-
 static void	udp_detach(struct socket *so);
 static int	udp_output(struct inpcb *, odp_packet_t , struct ofp_sockaddr *,
 		    odp_packet_t , struct thread *);
 
+OFP_SYSCTL_INT_DEF(net_inet_udp, checksum);
+OFP_SYSCTL_INT_DEF(net_inet_udp, log_in_vain);
+OFP_SYSCTL_INT_DEF(net_inet_udp, blackhole);
+OFP_SYSCTL_UQUAD_DEF(net_inet_udp, maxdgram);
+OFP_SYSCTL_UQUAD_DEF(net_inet_udp, recvspace);
 
-OFP_SYSCTL_INT(_net_inet_udp, UDPCTL_CHECKSUM, checksum, OFP_CTLFLAG_RW,
-	   &ofp_udp_cksum, 0, "compute udp checksum");
+int ofp_udp_init_local_sysctl(void)
+{
+	OFP_SYSCTL_INT_SET(net_inet_udp, OFP_OID_AUTO, checksum,
+			   OFP_CTLFLAG_RW, &V_udp_cksum_enable, 0,
+			   "compute udp checksum");
 
-OFP_SYSCTL_INT(_net_inet_udp, OFP_OID_AUTO, log_in_vain, OFP_CTLFLAG_RW,
-	   &ofp_udp_log_in_vain, 0, "Log all incoming UDP packets");
+	OFP_SYSCTL_INT_SET(net_inet_udp, OFP_OID_AUTO, log_in_vain,
+			   OFP_CTLFLAG_RW, &V_udp_log_in_vain, 0,
+			   "Log all incoming UDP packets");
 
-OFP_SYSCTL_INT(_net_inet_udp, OFP_OID_AUTO, blackhole, OFP_CTLFLAG_RW,
-	   &ofp_udp_blackhole, 0,
-	   "Do not send port unreachables for refused connects");
+	OFP_SYSCTL_INT_SET(net_inet_udp, OFP_OID_AUTO, blackhole,
+			   OFP_CTLFLAG_RW, &V_udp_blackhole, 0,
+			   "Do not send port unreachables for "
+			   "refused connects");
 
-OFP_SYSCTL_ULONG(_net_inet_udp, UDPCTL_MAXDGRAM, maxdgram, OFP_CTLFLAG_RW,
-	     &ofp_udp_sendspace, 0, "Maximum outgoing UDP datagram size");
+	OFP_SYSCTL_UQUAD_SET(net_inet_udp, OFP_OID_AUTO, maxdgram,
+			     OFP_CTLFLAG_RW, &V_udp_sendspace, 0,
+			     "Maximum outgoing UDP datagram size");
 
-OFP_SYSCTL_ULONG(_net_inet_udp, UDPCTL_RECVSPACE, recvspace, OFP_CTLFLAG_RW,
-	     &ofp_udp_recvspace, 0, "Maximum space for incoming UDP datagrams");
+	OFP_SYSCTL_UQUAD_SET(net_inet_udp, OFP_OID_AUTO, recvspace,
+			     OFP_CTLFLAG_RW, &V_udp_recvspace, 0,
+			     "Maximum space for incoming UDP datagrams");
+
+	return 0;
+}
 
 static int
 udp_inpcb_init(void *mem, int size, int flags)
@@ -384,7 +391,7 @@ ofp_udp_input(odp_packet_t *m, int off)
 	 * Save a copy of the IP header in case we want restore it for
 	 * sending an ICMP error message in response.
 	 */
-	if (!ofp_udp_blackhole)
+	if (!V_udp_blackhole)
 		save_ip = *ip;
 	else
 		memset(&save_ip, 0, sizeof(save_ip));
@@ -534,7 +541,7 @@ ofp_udp_input(odp_packet_t *m, int off)
 			       INPLOOKUP_RLOCKPCB, ifp);
 
 	if (inp == NULL) {
-		if (ofp_udp_log_in_vain) {
+		if (V_udp_log_in_vain) {
 			/* LOG */
 			OFP_INFO("Connection attempt to UDP %s:%d from %s:%d",
 				  ofp_print_ip_addr(ip->ip_dst.s_addr),
@@ -549,7 +556,7 @@ ofp_udp_input(odp_packet_t *m, int off)
 			goto badunlocked;
 		}
 		*/
-		if (ofp_udp_blackhole)
+		if (V_udp_blackhole)
 			goto badunlocked;
 #if 0
 		if (badport_bandlim(BANDLIM_ICMP_UNREACH) < 0)
@@ -1149,7 +1156,7 @@ udp_output(struct inpcb *inp, odp_packet_t m, struct ofp_sockaddr *addr,
 	 * UDP checksum will be inserted (either by SW or HW) after routing.
 	 */
 #ifdef OFP_IPv4_UDP_CSUM_COMPUTE
-	if (ofp_udp_cksum)
+	if (V_udp_cksum_enable)
 		ofp_packet_user_area(m)->chksum_flags |=
 			OFP_UDP_CHKSUM_INSERT;
 	else
@@ -1227,7 +1234,7 @@ udp_attach(struct socket *so, int proto, struct thread *td)
 	KASSERT(inp == NULL, ("udp_attach: inp != NULL"));
 
 	/* HJo: Constant space reserved.
-	error = ofp_soreserve(so, ofp_udp_sendspace, ofp_udp_recvspace);
+	error = ofp_soreserve(so, V_udp_sendspace, V_udp_recvspace);
 	if (error)
 		return (error);
 	*/
@@ -1242,7 +1249,7 @@ udp_attach(struct socket *so, int proto, struct thread *td)
 
 	inp = sotoinpcb(so);
 	inp->inp_vflag |= INP_IPV4;
-	inp->inp_ip_ttl = ofp_ip_defttl;
+	inp->inp_ip_ttl = V_ip_defttl;
 
 	/* HJo: Replaced by static allocation.
 	error = udp_newudpcb(inp);

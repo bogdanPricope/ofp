@@ -64,8 +64,6 @@ static inline void ofp_chksum_insert(odp_packet_t pkt,
 
 extern odp_pool_t ofp_packet_pool;
 
-__thread struct ofp_global_ip_state *ofp_ip_shm;
-
 int default_event_dispatcher(void *arg)
 {
 	odp_event_t ev;

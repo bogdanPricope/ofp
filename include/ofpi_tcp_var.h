@@ -43,9 +43,6 @@
  * Kernel variables for tcp.
  */
 
-VNET_DECLARE(int, ofp_tcp_do_rfc1323);
-#define	V_tcp_do_rfc1323	VNET(ofp_tcp_do_rfc1323)
-
 /* TCP segment queue entry */
 struct tseg_qent {
 	OFP_LIST_ENTRY(tseg_qent) tqe_q;
@@ -550,77 +547,7 @@ struct	xtcpcb {
 };
 #endif
 
-/*
- * Names for TCP sysctl objects
- */
-#define	TCPCTL_DO_RFC1323	1	/* use RFC-1323 extensions */
-#define	TCPCTL_MSSDFLT		3	/* MSS default */
-#define TCPCTL_STATS		4	/* statistics (read-only) */
-#define	TCPCTL_RTTDFLT		5	/* default RTT estimate */
-#define	TCPCTL_KEEPIDLE		6	/* keepalive idle timer */
-#define	TCPCTL_KEEPINTVL	7	/* interval to send keepalives */
-#define	TCPCTL_SENDSPACE	8	/* send buffer space */
-#define	TCPCTL_RECVSPACE	9	/* receive buffer space */
-#define	TCPCTL_KEEPINIT		10	/* timeout for establishing syn */
-#define	TCPCTL_PCBLIST		11	/* list of all outstanding PCBs */
-#define	TCPCTL_DELACKTIME	12	/* time before sending delayed ACK */
-#define	TCPCTL_V6MSSDFLT	13	/* MSS default for IPv6 */
-#define	TCPCTL_SACK		14	/* Selective Acknowledgement,rfc 2018 */
-#define	TCPCTL_DROP		15	/* drop tcp connection */
-#define	TCPCTL_MAXID		16
-#define TCPCTL_FINWAIT2_TIMEOUT	17
-
-#define TCPCTL_NAMES { \
-	{ 0, 0 }, \
-	{ "rfc1323", OFP_CTLTYPE_INT }, \
-	{ "mssdflt", OFP_CTLTYPE_INT }, \
-	{ "stats", OFP_CTLTYPE_STRUCT }, \
-	{ "rttdflt", OFP_CTLTYPE_INT }, \
-	{ "keepidle", OFP_CTLTYPE_INT }, \
-	{ "keepintvl", OFP_CTLTYPE_INT }, \
-	{ "sendspace", OFP_CTLTYPE_INT }, \
-	{ "recvspace", OFP_CTLTYPE_INT }, \
-	{ "keepinit", OFP_CTLTYPE_INT }, \
-	{ "pcblist", OFP_CTLTYPE_STRUCT }, \
-	{ "delacktime", OFP_CTLTYPE_INT }, \
-	{ "v6mssdflt", OFP_CTLTYPE_INT }, \
-	{ "maxid", OFP_CTLTYPE_INT }, \
-}
-
-SYSCTL_DECL(_net_inet_tcp);
-SYSCTL_DECL(_net_inet_tcp_sack);
-
-VNET_DECLARE(struct ofp_tcpstat, ofp_tcpstat);		/* tcp statistics */
-extern	int ofp_tcp_log_in_vain;
-VNET_DECLARE(int, ofp_tcp_mssdflt);	/* XXX */
-VNET_DECLARE(int, ofp_tcp_minmss);
-VNET_DECLARE(int, ofp_tcp_delack_enabled);
-VNET_DECLARE(int, ofp_tcp_do_rfc3390);
-VNET_DECLARE(int, ofp_path_mtu_discovery);
-VNET_DECLARE(int, ofp_ss_fltsz);
-VNET_DECLARE(int, ofp_ss_fltsz_local);
-VNET_DECLARE(int, ofp_tcp_do_rfc3465);
-VNET_DECLARE(int, ofp_tcp_abc_l_var);
-#define	V_tcpstat		VNET(ofp_tcpstat)
-#define	V_tcp_mssdflt		VNET(ofp_tcp_mssdflt)
-#define	V_tcp_minmss		VNET(ofp_tcp_minmss)
-#define	V_tcp_delack_enabled	VNET(ofp_tcp_delack_enabled)
-#define	V_tcp_do_rfc3390	VNET(ofp_tcp_do_rfc3390)
-#define	V_path_mtu_discovery	VNET(ofp_path_mtu_discovery)
-#define	V_ss_fltsz		VNET(ofp_ss_fltsz)
-#define	V_ss_fltsz_local	VNET(ofp_ss_fltsz_local)
-#define	V_tcp_do_rfc3465	VNET(ofp_tcp_do_rfc3465)
-#define	V_tcp_abc_l_var		VNET(ofp_tcp_abc_l_var)
-
-VNET_DECLARE(int, ofp_tcp_do_sack);			/* SACK enabled/disabled */
-VNET_DECLARE(int, ofp_tcp_sc_rst_sock_fail);	/* RST on sock alloc failure */
-#define	V_tcp_do_sack		VNET(ofp_tcp_do_sack)
-#define	V_tcp_sc_rst_sock_fail	VNET(ofp_tcp_sc_rst_sock_fail)
-
-VNET_DECLARE(int, ofp_tcp_do_ecn);			/* TCP ECN enabled/disabled */
-VNET_DECLARE(int, ofp_tcp_ecn_maxretries);
-#define	V_tcp_do_ecn		VNET(ofp_tcp_do_ecn)
-#define	V_tcp_ecn_maxretries	VNET(ofp_tcp_ecn_maxretries)
+SYSCTL_DECL(net_inet_tcp);
 
 VNET_DECLARE(struct hhook_head *, ofp_tcp_hhh[HHOOK_TCP_LAST + 1]);
 #define	V_tcp_hhh		VNET(ofp_tcp_hhh)
@@ -697,8 +624,6 @@ void	 tcp_hc_updatemtu(struct in_conninfo *, uint64_t);
 //void	 tcp_hc_update(struct in_conninfo *, struct hc_metrics_lite *);
 
 extern	struct pr_usrreqs ofp_tcp_usrreqs;
-extern	uint64_t ofp_tcp_sendspace;
-extern	uint64_t ofp_tcp_recvspace;
 tcp_seq ofp_tcp_new_isn(struct tcpcb *);
 
 void	 ofp_tcp_sack_doack(struct tcpcb *, struct tcpopt *, tcp_seq);
@@ -712,5 +637,15 @@ int	 tcp_newreno(struct tcpcb *, struct ofp_tcphdr *);
 u_long	 tcp_seq_subtract(uint64_t, uint64_t );
 
 void	ofp_cc_cong_signal(struct tcpcb *tp, struct ofp_tcphdr *th, uint32_t type);
+
+int ofp_tcp_input_init_local(void);
+int ofp_tcp_output_init_local(void);
+int ofp_tcp_usrreq_init_local(void);
+int ofp_tcp_sack_init_local(void);
+int ofp_tcp_syncache_init_local(void);
+int ofp_tcp_reass_init_local(void);
+int ofp_tcp_timewait_init_local(void);
+int ofp_tcp_subr_init_local(void);
+int ofp_tcp_timer_init_local(void);
 
 #endif /* _NETINET_TCP_VAR_H_ */

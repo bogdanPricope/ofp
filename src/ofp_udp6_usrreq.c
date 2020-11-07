@@ -124,9 +124,6 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/netinet6/udp6_usrreq.c 238247 2012-07-08 1
 
 extern struct protosw	ofp_inetsw[];
 
-extern int ofp_udp_log_in_vain;
-extern int ofp_udp_blackhole;
-
 #if 0
 static void		udp6_detach(struct socket *so);
 #endif
@@ -444,7 +441,7 @@ ofp_udp6_input(odp_packet_t *pkt, int *offp, int *nxt)
 				INPLOOKUP_WILDCARD | INPLOOKUP_RLOCKPCB, ifp);
 
 	if (inp == NULL) {
-		if (ofp_udp_log_in_vain) {
+		if (V_udp_log_in_vain) {
 			OFP_INFO(
 			    "Connection attempt to UDP [%s]:%d from [%s]:%d",
 			    ofp_print_ip6_addr((uint8_t *)&ip6->ip6_dst),
@@ -462,7 +459,7 @@ ofp_udp6_input(odp_packet_t *pkt, int *offp, int *nxt)
 		}
 #endif
 
-		if (ofp_udp_blackhole)
+		if (V_udp_blackhole)
 			goto badunlocked;
 
 #if 0

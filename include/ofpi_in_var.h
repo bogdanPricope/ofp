@@ -182,10 +182,6 @@ ims_get_mode(const struct ofp_in_multi *inm, const struct ofp_ip_msource *ims,
 	return (OFP_MCAST_UNDEFINED);
 }
 
-SYSCTL_DECL(_net_inet);
-SYSCTL_DECL(_net_inet_ip);
-SYSCTL_DECL(_net_inet_raw);
-
 /*
  * Lock macros for IPv4 layer multicast address lists.  IPv4 lock goes
  * before link layer multicast locks in the lock order.  In most cases,
@@ -284,6 +280,5 @@ int	in_control(struct ofp_socket *, uint64_t, char *, struct ofp_ifnet *,
 		   void *);
 void	in_rtqdrain(void);
 void	ip_input(odp_packet_t );
-
 
 #endif /* _NETINET_IN_VAR_H_ */

@@ -5,6 +5,7 @@
  */
 
 #include "ofpi_udp_shm.h"
+#include "ofpi_udp_var.h"
 
 #define SHM_NAME_UDP_VAR "OfpUdpVarShMem"
 
@@ -61,7 +62,7 @@ static int ofp_udp_var_free_shared_memory(void)
 	return rc;
 }
 
-int ofp_udp_var_lookup_shared_memory(void)
+static int ofp_udp_var_lookup_shared_memory(void)
 {
 	shm_udp = ofp_shared_memory_lookup(SHM_NAME_UDP_VAR);
 	if (shm_udp == NULL) {
@@ -100,6 +101,13 @@ int ofp_udp_var_init_global(void)
 	shm_udp_porthashtbl = (struct inpcbporthead *)
 		((uint8_t *)shm_udp + shm_udp->porthashtbl_off);
 
+	V_udp_cksum_enable = 1;
+	V_udp_log_in_vain = 0;
+	V_udp_blackhole = 0;
+
+	V_udp_sendspace = 9216;		/* really max datagram size */
+	V_udp_recvspace = 40 * (1024 + sizeof(struct ofp_sockaddr_in6));
+
 	return 0;
 }
 
@@ -110,5 +118,16 @@ int ofp_udp_var_term_global(void)
 	CHECK_ERROR(ofp_udp_var_free_shared_memory(), rc);
 
 	return rc;
+}
+
+int ofp_udp_var_init_local(void)
+{
+	if (ofp_udp_var_lookup_shared_memory())
+		return -1;
+
+	if (ofp_udp_init_local_sysctl())
+		return -1;
+
+	return 0;
 }
 

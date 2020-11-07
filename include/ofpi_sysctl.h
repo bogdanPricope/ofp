@@ -38,47 +38,225 @@
 #include "ofpi_queue.h"
 #include "api/ofp_sysctl.h"
 
-enum sysinit_sub_id {
-	SI_SUB_DUMMY		= 0x0000000,	/* not executed; for linker*/
-	SI_SUB_KMEM		= 0x1800000,	/* kernel memory*/
+/*
+ * USE THIS instead of a hardwired number from the categories below
+ * to get dynamically assigned sysctl entries. This is the way nearly
+ * all new sysctl variables should be implemented.
+ * e.g. OFP_SYSCTL_INT_SET(parent, OFP_OID_AUTO, name, OFP_CTLFLAG_RW,
+ * &variable, 0, "");
+ */
+#define OFP_OID_AUTO	(-1)
+
+#define OFP_SYSCTL_HANDLER_ARGS struct ofp_sysctl_oid *oidp, void *arg1, \
+	intptr_t arg2, struct ofp_sysctl_req *req
+
+/*
+ * This describes the access space for a sysctl request.  This is needed
+ * so that we can use the interface from the kernel or from user-space.
+ */
+struct ofp_sysctl_req {
+	struct thread	*td;		/* used for access checking */
+	int		lock;		/* wiring state */
+	void		*oldptr;
+	size_t		oldlen;
+	size_t		oldidx;
+	int		(*oldfunc)(struct ofp_sysctl_req *_r, const void *_p,
+				   size_t _l);
+	const void	*newptr;
+	size_t		newlen;
+	size_t		newidx;
+	int		(*newfunc)(struct ofp_sysctl_req *_r, void *_p,
+				   size_t _l);
+	size_t		validlen;
+	int		flags;
 };
 
-enum sysinit_elem_order {
-	SI_ORDER_FIRST		= 0x0000000,	/* first*/
-	SI_ORDER_SECOND		= 0x0000001,	/* second*/
-	SI_ORDER_THIRD		= 0x0000002,	/* third*/
-	SI_ORDER_FOURTH		= 0x0000003,	/* fourth*/
-	SI_ORDER_MIDDLE		= 0x1000000,	/* somewhere in the middle */
-	SI_ORDER_ANY		= 0xfffffff	/* last*/
+#define SYSCTL_IN(r, p, l) (r->newfunc)(r, p, l)
+#define SYSCTL_OUT(r, p, l) (r->oldfunc)(r, p, l)
+
+
+/*
+ * This describes one "oid" in the MIB tree.  Potentially more nodes can
+ * be hidden behind it, expanded by the handler.
+ */
+struct ofp_sysctl_oid {
+	struct ofp_sysctl_oid *oid_parent;
+
+	OFP_SLIST_HEAD(, ofp_sysctl_oid) oid_head;
+	OFP_SLIST_ENTRY(ofp_sysctl_oid) oid_link;
+	int		oid_number;
+	unsigned int	oid_kind;
+	void		*oid_arg1;
+	intptr_t	oid_arg2;
+	const char	*oid_name;
+	int		(*oid_handler)(OFP_SYSCTL_HANDLER_ARGS);
+	const char	*oid_fmt;
+	int		oid_refcnt;
+	unsigned int	oid_running;
+	const char	*oid_descr;
 };
 
-typedef void (*sysinit_nfunc_t)(void *);
-typedef void (*sysinit_cfunc_t)(const void *);
-
-struct sysinit {
-	enum sysinit_sub_id	subsystem;	/* subsystem identifier*/
-	enum sysinit_elem_order	order;		/* init order within subsystem*/
-	sysinit_cfunc_t func;			/* function		*/
-	const void	*udata;			/* multiplexer/argument */
-};
-
-/* definitions for ofp_sysctl_req 'lock' member */
-#define	REQ_UNWIRED	1
-#define	REQ_WIRED	2
-
-/* definitions for ofp_sysctl_req 'flags' member */
-#if defined(__amd64__) || defined(__ia64__) || defined(__powerpc64__)
-#define	SCTL_MASK32	1	/* 32 bit emulation */
+#ifndef NO_SYSCTL_DESCR
+#define __DESCR(d) d
+#else
+#define __DESCR(d) ""
 #endif
 
-/* Dynamic oid handling */
-int	ofp_kernel_sysctl(struct thread *td, const int *name, unsigned int namelen, void *old,
-			    size_t *oldlenp, const void *new, size_t newlen,
-			    size_t *retval, int flags);
-int	ofp_sysctl_find_oid(const int *name, unsigned int namelen, struct ofp_sysctl_oid **noid,
-			      int *nindx, struct ofp_sysctl_req *req);
-void	ofp_register_sysctls(void);
-int	ofp_unregister_sysctls(void);
-void	ofp_sysctl_write_tree(int fd);
+#define SYSCTL_DECL(name)					\
+	extern __thread struct ofp_sysctl_oid sysctl_##name
+
+extern __thread int ofp_oid_auto;
+
+SYSCTL_DECL(root);
+SYSCTL_DECL(net);
+
+/* Root's children case */
+#define OFP_SYSCTL_OID_ROOT_CHLD_DEF(name) \
+	__thread struct ofp_sysctl_oid sysctl_##name = {0}
+
+#define OFP_SYSCTL_OID_ROOT_CHLD_SET(nbr, name, access, a1, a2, handler, fmt, descr) {	\
+	sysctl_##name = (struct ofp_sysctl_oid){			    \
+		&sysctl_root, OFP_SLIST_HEAD_INITIALIZER(oid_head), {NULL}, \
+		nbr == OFP_OID_AUTO ? ofp_oid_auto++ : nbr,		    \
+		access, a1, a2, #name, handler, fmt, 0, 0, __DESCR(descr)   \
+	};								    \
+	ofp_sysctl_add_child(&sysctl_##name, &sysctl_root);		    \
+}
+
+#define OFP_SYSCTL_NODE_ROOT_CHLD_DEF(name)	\
+	OFP_SYSCTL_OID_ROOT_CHLD_DEF(name)
+
+#define OFP_SYSCTL_NODE_ROOT_CHLD_SET(nbr, name, access, handler, descr)    \
+	OFP_SYSCTL_OID_ROOT_CHLD_SET(nbr, name, OFP_CTLTYPE_NODE | (access),\
+		0, 0, handler, "N", descr)
+
+#define OFP_SYSCTL_PROC_ROOT_CHLD_DEF(name)	\
+	OFP_SYSCTL_OID_ROOT_CHLD_DEF(name)
+
+#define OFP_SYSCTL_PROC_ROOT_CHLD_SET(nbr, name, access, ptr, arg, handler, fmt, descr)	\
+	OFP_SYSCTL_OID_ROOT_CHLD_SET(nbr, name, OFP_CTLTYPE_PROC | (access),\
+		ptr, arg, handler, fmt, descr)
+
+/* Regular case*/
+#define OFP_SYSCTL_OID_DEF(parent, name) \
+	__thread struct ofp_sysctl_oid sysctl_##parent##_##name = {0}
+
+#define OFP_SYSCTL_OID_SET(parent, nbr, name, kind, a1, a2, handler, fmt, descr) { \
+	sysctl_##parent##_##name = (struct ofp_sysctl_oid){		       \
+		&sysctl_##parent, OFP_SLIST_HEAD_INITIALIZER(oid_head), {NULL},\
+		nbr == OFP_OID_AUTO ? ofp_oid_auto++ : nbr,		       \
+		kind, a1, a2, #name, handler, fmt, 0, 0, __DESCR(descr)	       \
+	};								       \
+	ofp_sysctl_add_child(&sysctl_##parent##_##name, &sysctl_##parent);     \
+}
+
+#define OFP_SYSCTL_NODE_DEF(parent, name)	\
+	OFP_SYSCTL_OID_DEF(parent, name)
+
+#define OFP_SYSCTL_NODE_SET(parent, nbr, name, access, handler, descr)	       \
+	OFP_SYSCTL_OID_SET(parent, nbr, name, OFP_CTLTYPE_NODE | (access),     \
+		NULL, 0, handler, "N", descr)
+
+#define OFP_SYSCTL_INT_DEF(parent, name)	\
+	OFP_SYSCTL_OID_DEF(parent, name)
+
+#define OFP_SYSCTL_INT_SET(parent, nbr, name, access, ptr, val, descr)	       \
+	OFP_SYSCTL_OID_SET(parent, nbr, name,				       \
+		OFP_CTLTYPE_INT | OFP_CTLFLAG_MPSAFE | (access),	       \
+		ptr, val, sysctl_handle_int, "I", descr)
+
+#define OFP_SYSCTL_UINT_DEF(parent, name)	\
+	OFP_SYSCTL_OID_DEF(parent, name)
+
+#define OFP_SYSCTL_UINT_SET(parent, nbr, name, access, ptr, val, descr)	       \
+	OFP_SYSCTL_OID_SET(parent, nbr, name,				       \
+		OFP_CTLTYPE_UINT | OFP_CTLFLAG_MPSAFE | (access),	       \
+		ptr, val, sysctl_handle_int, "IU", descr)
+
+#define OFP_SYSCTL_LONG_DEF(parent, name)	\
+	OFP_SYSCTL_OID_DEF(parent, name)
+
+#define OFP_SYSCTL_LONG_SET(parent, nbr, name, access, ptr, val, descr)	       \
+	OFP_SYSCTL_OID_SET(parent, nbr, name,				       \
+		OFP_CTLTYPE_LONG | OFP_CTLFLAG_MPSAFE | (access),	       \
+		ptr, val, sysctl_handle_long, "L", descr)
+
+#define OFP_SYSCTL_ULONG_DEF(parent, name)	\
+	OFP_SYSCTL_OID_DEF(parent, name)
+
+#define OFP_SYSCTL_ULONG_SET(parent, nbr, name, access, ptr, val, descr)       \
+	OFP_SYSCTL_OID_SET(parent, nbr, name,				       \
+		OFP_CTLTYPE_ULONG | OFP_CTLFLAG_MPSAFE | (access),	       \
+		ptr, val, sysctl_handle_long, "LU", descr)
+
+#define OFP_SYSCTL_QUAD_DEF(parent, name)	\
+	OFP_SYSCTL_OID_DEF(parent, name)
+
+#define OFP_SYSCTL_QUAD_SET(parent, nbr, name, access, ptr, val, descr)	       \
+	OFP_SYSCTL_OID_SET(parent, nbr, name,				       \
+		OFP_CTLTYPE_S64 | OFP_CTLFLAG_MPSAFE | (access),	       \
+		ptr, val, sysctl_handle_64, "Q", descr)
+
+#define OFP_SYSCTL_UQUAD_DEF(parent, name)	\
+	OFP_SYSCTL_OID_DEF(parent, name)
+
+#define OFP_SYSCTL_UQUAD_SET(parent, nbr, name, access, ptr, val, descr)       \
+	OFP_SYSCTL_OID_SET(parent, nbr, name,				       \
+		OFP_CTLTYPE_U64 | OFP_CTLFLAG_MPSAFE | (access),	       \
+		ptr, val, sysctl_handle_64, "QU", descr)
+
+#define OFP_SYSCTL_STRING_DEF(parent, name)	\
+	OFP_SYSCTL_OID_DEF(parent, name)
+
+/* Oid for a string.  len can be 0 to indicate '\0' termination. */
+#define OFP_SYSCTL_STRING_SET(parent, nbr, name, access, arg, len, descr)      \
+	OFP_SYSCTL_OID_SET(parent, nbr, name,				       \
+		OFP_CTLTYPE_STRING | (access),				       \
+		arg, len, sysctl_handle_string, "A", descr)
+
+#define OFP_SYSCTL_OPAQUE_DEF(parent, name)	\
+	OFP_SYSCTL_OID_DEF(parent, name)
+
+/* Oid for an opaque object.  Specified by a pointer and a length. */
+#define OFP_SYSCTL_OPAQUE_SET(parent, nbr, name, access, ptr, len, fmt, descr) \
+	OFP_SYSCTL_OID_SET(parent, nbr, name,				       \
+		OFP_CTLTYPE_OPAQUE | (access),				       \
+		ptr, len, sysctl_handle_opaque, fmt, descr)
+
+#define OFP_SYSCTL_STRUCT_DEF(parent, name)	\
+	OFP_SYSCTL_OID_DEF(parent, name)
+
+/* Oid for a struct.  Specified by a pointer and a type. */
+#define OFP_SYSCTL_STRUCT_SET(parent, nbr, name, access, ptr, type, descr)     \
+	OFP_SYSCTL_OID_SET(parent, nbr, name,				       \
+		OFP_CTLTYPE_OPAQUE | (access),				       \
+		ptr, sizeof(struct type), sysctl_handle_opaque,		       \
+		"S," #type, descr)
+
+#define OFP_SYSCTL_PROC_DEF(parent, name)	\
+	OFP_SYSCTL_OID_DEF(parent, name)
+
+/* Oid for a procedure.  Specified by a pointer and an arg. */
+#define OFP_SYSCTL_PROC_SET(parent, nbr, name, access, ptr, arg, handler, fmt, descr) \
+	OFP_SYSCTL_OID_SET(parent, nbr, name, OFP_CTLTYPE_PROC | (access), \
+		ptr, arg, handler, fmt, descr)
+
+/* OID handlers */
+int sysctl_handle_int(OFP_SYSCTL_HANDLER_ARGS);
+int sysctl_msec_to_ticks(OFP_SYSCTL_HANDLER_ARGS);
+int sysctl_handle_long(OFP_SYSCTL_HANDLER_ARGS);
+int sysctl_handle_64(OFP_SYSCTL_HANDLER_ARGS);
+int sysctl_handle_string(OFP_SYSCTL_HANDLER_ARGS);
+int sysctl_handle_opaque(OFP_SYSCTL_HANDLER_ARGS);
+
+void ofp_sysctl_add_child(struct ofp_sysctl_oid *oidp,
+			  struct ofp_sysctl_oid *parent);
+
+void ofp_sysctl_write_tree(int fd);
+
+void ofp_sysctl_init_prepare(void);
+int ofp_sysctl_init_global(void);
+int ofp_sysctl_term_global(void);
+int ofp_sysctl_init_local(void);
 
 #endif	/* !_SYS_SYSCTL_H_ */

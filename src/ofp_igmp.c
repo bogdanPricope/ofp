@@ -60,6 +60,7 @@
 #include "ofpi_in.h"
 #include "ofpi_igmp.h"
 #include "ofpi_igmp_var.h"
+#include "ofpi_igmp_shm.h"
 #include "ofpi_socketvar.h"
 #include "ofpi_timer.h"
 #include "ofpi_in_pcb.h"
@@ -157,7 +158,6 @@ static const struct netisr_handler igmp_nh = {
 #define HDR2PKT(_hdr) (_hdr ? _hdr->pkt : ODP_PACKET_INVALID)
 
 struct socket *ofp_ip_mrouter = NULL;	/* multicast routing daemon */
-VNET_DEFINE(struct ofp_ipstat, ofp_ipstat);
 
 #if 0
 static void ofp_packet_set_flags(odp_packet_t pkt, int flags)
@@ -238,15 +238,9 @@ static void netisr_dispatch(int x, odp_packet_t pkt)
  * as anything which modifies ifma needs to be covered by that lock.
  * So check for ifma_protospec being NULL before proceeding.
  */
-odp_rwlock_t ofp_igmp_mtx;
 
-odp_packet_t ofp_m_raopt = ODP_PACKET_INVALID; /* Router Alert option */
 //HJo MALLOC_DEFINE(M_IGMP, "igmp", "igmp state");
 
-#define	VNET_DEFINE(t, n)	t n
-#define	VNET(n)			(n)
-
-#define	VNET_ASSERT(exp, msg)
 #define	CURVNET_SET(arg)
 #define	CURVNET_SET_QUIET(arg)
 #define	CURVNET_RESTORE()
@@ -259,118 +253,30 @@ odp_packet_t ofp_m_raopt = ODP_PACKET_INVALID; /* Router Alert option */
 #define	VNET_LIST_RUNLOCK_NOSLEEP()
 #define	VNET_ITERATOR_DECL(arg)
 #define	VNET_FOREACH(arg)
-#define	V_if_index	VNET(if_index)
-
-#define	SYSCTL_VNET_INT(parent, nbr, name, access, ptr, val, descr)	\
-	OFP_SYSCTL_INT(parent, nbr, name, access, ptr, val, descr)
-#define	SYSCTL_VNET_PROC(parent, nbr, name, access, ptr, arg, handler,	\
-	    fmt, descr)							\
-	OFP_SYSCTL_PROC(parent, nbr, name, access, ptr, arg, handler, fmt,	\
-	    descr)
-#define	SYSCTL_VNET_OPAQUE(parent, nbr, name, access, ptr, len, fmt,    \
-	    descr)							\
-	OFP_SYSCTL_OPAQUE(parent, nbr, name, access, ptr, len, fmt, descr)
-#define	SYSCTL_VNET_STRING(parent, nbr, name, access, arg, len, descr)	\
-	OFP_SYSCTL_STRING(parent, nbr, name, access, arg, len, descr)
-#define	SYSCTL_VNET_STRUCT(parent, nbr, name, access, ptr, type, descr)	\
-	OFP_SYSCTL_STRUCT(parent, nbr, name, access, ptr, type, descr)
-#define	SYSCTL_VNET_UINT(parent, nbr, name, access, ptr, val, descr)	\
-	OFP_SYSCTL_UINT(parent, nbr, name, access, ptr, val, descr)
-#define	VNET_SYSCTL_ARG(req, arg1)
-
-/*
- * VIMAGE-wide globals.
- *
- * The IGMPv3 timers themselves need to run per-image, however,
- * protosw timers run globally (see tcp).
- * An ifnet can only be in one vimage at a time, and the loopback
- * ifnet, loif, is itself virtualized.
- * It would otherwise be possible to seriously hose IGMP state,
- * and create inconsistencies in upstream multicast routing, if you have
- * multiple VIMAGEs running on the same link joining different multicast
- * groups, UNLESS the "primary IP address" is different. This is because
- * IGMP for IPv4 does not force link-local addresses to be used for each
- * node, unlike MLD for IPv6.
- * Obviously the IGMPv3 per-interface state has per-vimage granularity
- * also as a result.
- *
- * FUTURE: Stop using IFP_TO_IA/OFP_INADDR_ANY, and use source address selection
- * policy to control the address used by IGMP on the link.
- */
-static VNET_DEFINE(int, interface_timers_running);	/* IGMPv3 general
-							 * query response */
-static VNET_DEFINE(int, state_change_timers_running);	/* IGMPv3 state-change
-							 * retransmit */
-static VNET_DEFINE(int, current_state_timers_running);	/* IGMPv1/v2 host
-							 * report; IGMPv3 g/sg
-							 * query response */
-
-#define	V_interface_timers_running	VNET(interface_timers_running)
-#define	V_state_change_timers_running	VNET(state_change_timers_running)
-#define	V_current_state_timers_running	VNET(current_state_timers_running)
-
-static VNET_DEFINE(OFP_LIST_HEAD(, ofp_igmp_ifinfo), igi_head);
-static VNET_DEFINE(struct igmpstat, igmpstat) = {
-	.igps_version = IGPS_VERSION_3,
-	.igps_len = sizeof(struct igmpstat),
-};
-static VNET_DEFINE(struct ofp_timeval, igmp_gsrdelay) = {10, 0};
-
-#define	V_igi_head			VNET(igi_head)
-#define	V_igmpstat			VNET(igmpstat)
-#define	V_igmp_gsrdelay			VNET(igmp_gsrdelay)
-
-static VNET_DEFINE(int, igmp_recvifkludge) = 1;
-static VNET_DEFINE(int, igmp_sendra) = 1;
-static VNET_DEFINE(int, igmp_sendlocal) = 1;
-static VNET_DEFINE(int, igmp_v1enable) = 1;
-static VNET_DEFINE(int, igmp_v2enable) = 1;
-static VNET_DEFINE(int, igmp_legacysupp);
-static VNET_DEFINE(int, igmp_default_version) = IGMP_VERSION_3;
-
-#define	V_igmp_recvifkludge		VNET(igmp_recvifkludge)
-#define	V_igmp_sendra			VNET(igmp_sendra)
-#define	V_igmp_sendlocal		VNET(igmp_sendlocal)
-#define	V_igmp_v1enable			VNET(igmp_v1enable)
-#define	V_igmp_v2enable			VNET(igmp_v2enable)
-#define	V_igmp_legacysupp		VNET(igmp_legacysupp)
-#define	V_igmp_default_version		VNET(igmp_default_version)
-
-VNET_DEFINE(int, if_index);
-
-odp_timer_t ofp_igmp_fasttimo_timer = ODP_TIMER_INVALID;
 
 /*
  * Virtualized sysctls.
  */
-SYSCTL_VNET_STRUCT(_net_inet_igmp, IGMPCTL_STATS, stats, OFP_CTLFLAG_RW,
-    &VNET_NAME(igmpstat), igmpstat, "");
-SYSCTL_VNET_INT(_net_inet_igmp, OFP_OID_AUTO, recvifkludge, OFP_CTLFLAG_RW,
-    &VNET_NAME(igmp_recvifkludge), 0,
-    "Rewrite IGMPv1/v2 reports from 0.0.0.0 to contain subnet address");
-SYSCTL_VNET_INT(_net_inet_igmp, OFP_OID_AUTO, sendra, OFP_CTLFLAG_RW,
-    &VNET_NAME(igmp_sendra), 0,
-    "Send IP Router Alert option in IGMPv2/v3 messages");
-SYSCTL_VNET_INT(_net_inet_igmp, OFP_OID_AUTO, sendlocal, OFP_CTLFLAG_RW,
-    &VNET_NAME(igmp_sendlocal), 0,
-    "Send IGMP membership reports for 224.0.0.0/24 groups");
-SYSCTL_VNET_INT(_net_inet_igmp, OFP_OID_AUTO, v1enable, OFP_CTLFLAG_RW,
-    &VNET_NAME(igmp_v1enable), 0,
-    "Enable backwards compatibility with IGMPv1");
-SYSCTL_VNET_INT(_net_inet_igmp, OFP_OID_AUTO, v2enable, OFP_CTLFLAG_RW,
-    &VNET_NAME(igmp_v2enable), 0,
-    "Enable backwards compatibility with IGMPv2");
-SYSCTL_VNET_INT(_net_inet_igmp, OFP_OID_AUTO, legacysupp, OFP_CTLFLAG_RW,
-    &VNET_NAME(igmp_legacysupp), 0,
-    "Allow v1/v2 reports to suppress v3 group responses");
-SYSCTL_VNET_PROC(_net_inet_igmp, OFP_OID_AUTO, default_version,
-    OFP_CTLTYPE_INT | OFP_CTLFLAG_RW | OFP_CTLFLAG_MPSAFE,
-    &VNET_NAME(igmp_default_version), 0, sysctl_igmp_default_version, "I",
-    "Default version of IGMP to run on each interface");
-SYSCTL_VNET_PROC(_net_inet_igmp, OFP_OID_AUTO, gsrdelay,
-    OFP_CTLTYPE_INT | OFP_CTLFLAG_RW | OFP_CTLFLAG_MPSAFE,
-    &VNET_NAME(igmp_gsrdelay.tv_sec), 0, sysctl_igmp_gsr, "I",
-    "Rate limit for IGMPv3 Group-and-Source queries in seconds");
+
+/*
+ * Names for IGMP sysctl objects
+ */
+
+#define IGMPCTL_NAMES { \
+	{ 0, 0 }, \
+	{ "stats", CTLTYPE_STRUCT } \
+}
+
+SYSCTL_DECL(net_inet_igmp);
+OFP_SYSCTL_STRUCT_DEF(net_inet_igmp, stats);
+OFP_SYSCTL_INT_DEF(net_inet_igmp, recvifkludge);
+OFP_SYSCTL_INT_DEF(net_inet_igmp, sendra);
+OFP_SYSCTL_INT_DEF(net_inet_igmp, sendlocal);
+OFP_SYSCTL_INT_DEF(net_inet_igmp, v1enable);
+OFP_SYSCTL_INT_DEF(net_inet_igmp, v2enable);
+OFP_SYSCTL_INT_DEF(net_inet_igmp, legacysupp);
+OFP_SYSCTL_PROC_DEF(net_inet_igmp, default_version);
+OFP_SYSCTL_PROC_DEF(net_inet_igmp, gsrdelay);
 
 /*
  * Non-virtualized sysctls.
@@ -379,6 +285,53 @@ SYSCTL_VNET_PROC(_net_inet_igmp, OFP_OID_AUTO, gsrdelay,
 OFP_SYSCTL_NODE(_net_inet_igmp, OFP_OID_AUTO, ifinfo, OFP_CTLFLAG_RD | OFP_CTLFLAG_MPSAFE,
     sysctl_igmp_ifinfo, "Per-interface IGMPv3 state");
 #endif
+
+int ofp_igmp_sysctl_init_local(void)
+{
+	OFP_SYSCTL_STRUCT_SET(net_inet_igmp, OFP_OID_AUTO, stats,
+			      OFP_CTLFLAG_RW, &V_igmpstat, igmpstat, "");
+
+	OFP_SYSCTL_INT_SET(net_inet_igmp, OFP_OID_AUTO, recvifkludge,
+			   OFP_CTLFLAG_RW, &V_igmp_recvifkludge, 0,
+			   "Rewrite IGMPv1/v2 reports from 0.0.0.0 to "
+			   "contain subnet address");
+
+	OFP_SYSCTL_INT_SET(net_inet_igmp, OFP_OID_AUTO, sendra,
+			   OFP_CTLFLAG_RW, &V_igmp_sendra, 0,
+			   "Send IP Router Alert option in IGMPv2/v3 messages");
+
+	OFP_SYSCTL_INT_SET(net_inet_igmp, OFP_OID_AUTO, sendlocal,
+			   OFP_CTLFLAG_RW, &V_igmp_sendlocal, 0,
+			   "Send IGMP membership reports for 224.0.0.0/24 "
+			   "groups");
+
+	OFP_SYSCTL_INT_SET(net_inet_igmp, OFP_OID_AUTO, v1enable,
+			   OFP_CTLFLAG_RW, &V_igmp_v1enable, 0,
+			   "Enable backwards compatibility with IGMPv1");
+
+	OFP_SYSCTL_INT_SET(net_inet_igmp, OFP_OID_AUTO, v2enable,
+			   OFP_CTLFLAG_RW, &V_igmp_v2enable, 0,
+			   "Enable backwards compatibility with IGMPv2");
+
+	OFP_SYSCTL_INT_SET(net_inet_igmp, OFP_OID_AUTO, legacysupp,
+			   OFP_CTLFLAG_RW, &V_igmp_legacysupp, 0,
+			   "Allow v1/v2 reports to suppress v3 "
+			   "group responses");
+
+	OFP_SYSCTL_PROC_SET(net_inet_igmp, OFP_OID_AUTO, default_version,
+			    OFP_CTLFLAG_RW | OFP_CTLFLAG_MPSAFE,
+			    &V_igmp_default_version, 0,
+			    sysctl_igmp_default_version, "I",
+			    "Default version of IGMP to run on each interface");
+
+	OFP_SYSCTL_PROC_SET(net_inet_igmp, OFP_OID_AUTO, gsrdelay,
+			    OFP_CTLFLAG_RW | OFP_CTLFLAG_MPSAFE,
+			    &V_igmp_gsrdelay, 0, sysctl_igmp_gsr, "I",
+			    "Rate limit for IGMPv3 Group-and-Source "
+			    "queries in seconds");
+
+	return 0;
+}
 
 static __inline void
 igmp_save_context(odp_packet_t m, struct ofp_ifnet *ifp)
@@ -1691,8 +1644,8 @@ ofp_igmp_fasttimo(void *arg)
 	loop = 0;
 	uri_fasthz = 0;
 
-	ofp_igmp_fasttimo_timer = ofp_timer_start(200000UL, ofp_igmp_fasttimo,
-					NULL, 0);
+	V_igmp_fasttimo_timer = ofp_timer_start(200000UL, ofp_igmp_fasttimo,
+						NULL, 0);
 
 	/*
 	 * Quick check to see if any work needs to be done, in order to
@@ -3427,7 +3380,7 @@ igmp_intr(odp_packet_t m)
 		return;
 	}
 
-	ipopts = V_igmp_sendra ? ofp_m_raopt : ODP_PACKET_INVALID;
+	ipopts = V_igmp_sendra ? V_igmp_raopt : ODP_PACKET_INVALID;
 
 	imo.imo_multicast_ttl  = 1;
 	imo.imo_multicast_vif  = -1;
@@ -3580,10 +3533,10 @@ ofp_igmp_init(void)
 
 	IGMP_LOCK_INIT();
 
-	ofp_m_raopt = igmp_ra_alloc();
+	V_igmp_raopt = igmp_ra_alloc();
 
-	ofp_igmp_fasttimo_timer = ofp_timer_start(200000UL, ofp_igmp_fasttimo,
-					NULL, 0);
+	V_igmp_fasttimo_timer = ofp_timer_start(200000UL, ofp_igmp_fasttimo,
+						NULL, 0);
 
 	// HJo netisr_register(&igmp_nh);
 }
@@ -3599,14 +3552,14 @@ ofp_igmp_uninit(void *unused)
 
 	/* HJo netisr_unregister(&igmp_nh);*/
 
-	if (ofp_igmp_fasttimo_timer != ODP_TIMER_INVALID) {
-		ofp_timer_cancel(ofp_igmp_fasttimo_timer);
-		ofp_igmp_fasttimo_timer = ODP_TIMER_INVALID;
+	if (V_igmp_fasttimo_timer != ODP_TIMER_INVALID) {
+		ofp_timer_cancel(V_igmp_fasttimo_timer);
+		V_igmp_fasttimo_timer = ODP_TIMER_INVALID;
 	}
 
-	if (ofp_m_raopt != ODP_PACKET_INVALID) {
-		odp_packet_free(ofp_m_raopt);
-		ofp_m_raopt = ODP_PACKET_INVALID;
+	if (V_igmp_raopt != ODP_PACKET_INVALID) {
+		odp_packet_free(V_igmp_raopt);
+		V_igmp_raopt = ODP_PACKET_INVALID;
 	}
 
 	IGMP_LOCK_DESTROY();

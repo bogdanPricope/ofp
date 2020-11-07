@@ -56,6 +56,7 @@
 #include "ofpi_tcp_seq.h"
 #include "ofpi_tcp_timer.h"
 #include "ofpi_tcp_var.h"
+#include "ofpi_tcp_shm.h"
 //#include "ofp_tcpip.h"
 
 
@@ -63,48 +64,13 @@
 #include <netinet/tcp_debug.h>
 #endif
 
-//#include <machine/in_cksum.h>
-
-extern int ofp_max_linkhdr;
-
-VNET_DEFINE(int, ofp_path_mtu_discovery) = 1;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, path_mtu_discovery, OFP_CTLFLAG_RW,
-	   &ofp_path_mtu_discovery, 1,
-	   "Enable Path MTU Discovery");
-
-VNET_DEFINE(int, ofp_ss_fltsz) = 1;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, slowstart_flightsize, OFP_CTLFLAG_RW,
-	   &ofp_ss_fltsz, 1,
-	   "Slow start flight size");
-
-VNET_DEFINE(int, ofp_ss_fltsz_local) = 4;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, local_slowstart_flightsize,
-	   OFP_CTLFLAG_RW, &ofp_ss_fltsz_local, 1,
-	   "Slow start flight size for local networks");
-
-VNET_DEFINE(int, ofp_tcp_do_tso) = 1;
-#define	V_tcp_do_tso		VNET(ofp_tcp_do_tso)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, tso, OFP_CTLFLAG_RW,
-	   &ofp_tcp_do_tso, 0,
-	   "Enable TCP Segmentation Offload");
-
-VNET_DEFINE(int, ofp_tcp_do_autosndbuf) = 1;
-#define	V_tcp_do_autosndbuf	VNET(ofp_tcp_do_autosndbuf)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, sendbuf_auto, OFP_CTLFLAG_RW,
-	   &ofp_tcp_do_autosndbuf, 0,
-	   "Enable automatic send buffer sizing");
-
-VNET_DEFINE(int, ofp_tcp_autosndbuf_inc) = 8*1024;
-#define	V_tcp_autosndbuf_inc	VNET(ofp_tcp_autosndbuf_inc)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, sendbuf_inc, OFP_CTLFLAG_RW,
-	   &ofp_tcp_autosndbuf_inc, 0,
-	   "Incrementor step size of automatic send buffer");
-
-VNET_DEFINE(int, ofp_tcp_autosndbuf_max) = 2*1024*1024;
-#define	V_tcp_autosndbuf_max	VNET(ofp_tcp_autosndbuf_max)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, sendbuf_max, OFP_CTLFLAG_RW,
-	   &ofp_tcp_autosndbuf_max, 0,
-	   "Max size of automatic send buffer");
+OFP_SYSCTL_INT_DEF(net_inet_tcp, path_mtu_discovery);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, slowstart_flightsize);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, local_slowstart_flightsize);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, tso);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, sendbuf_auto);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, sendbuf_inc);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, sendbuf_max);
 
 /*
 static inline void	hhook_run_tcp_est_out(struct tcpcb *tp,
@@ -112,6 +78,40 @@ static inline void	hhook_run_tcp_est_out(struct tcpcb *tp,
 			    long len, int tso);
 */
 static inline void	cc_after_idle(struct tcpcb *tp);
+
+int ofp_tcp_output_init_local(void)
+{
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, path_mtu_discovery,
+			   OFP_CTLFLAG_RW, &V_tcp_path_mtu_discovery, 1,
+			   "Enable Path MTU Discovery");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, slowstart_flightsize,
+			   OFP_CTLFLAG_RW, &V_tcp_ss_fltsz, 1,
+			   "Slow start flight size");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO,
+			   local_slowstart_flightsize,
+			   OFP_CTLFLAG_RW, &V_tcp_ss_fltsz_local, 1,
+			   "Slow start flight size for local networks");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, tso,
+			   OFP_CTLFLAG_RW, &V_tcp_do_tso, 0,
+			   "Enable TCP Segmentation Offload");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, sendbuf_auto,
+			   OFP_CTLFLAG_RW, &V_tcp_do_autosndbuf, 0,
+			   "Enable automatic send buffer sizing");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, sendbuf_inc,
+			   OFP_CTLFLAG_RW,	&V_tcp_autosndbuf_inc, 0,
+			   "Incrementor step size of automatic send buffer");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, sendbuf_max,
+			   OFP_CTLFLAG_RW, &V_tcp_autosndbuf_max, 0,
+			   "Max size of automatic send buffer");
+
+	return 0;
+}
 
 /*
  * Wrapper for the TCP established ouput helper hook.
@@ -676,7 +676,7 @@ send:
 	 * NOTE: we assume that the IP/TCP header plus TCP options
 	 * always fit in a single mbuf, leaving room for a maximum
 	 * link header, i.e.
-	 *	ofp_max_linkhdr + sizeof (struct tcpiphdr) + optlen <= MCLBYTES
+	 *	V_l2_max_linkhdr + sizeof (struct tcpiphdr) + optlen <= MCLBYTES
 	 */
 	optlen = 0;
 #ifdef INET6
@@ -808,9 +808,9 @@ send:
 /*#ifdef DIAGNOSTIC*/
 #if 0
 #ifdef INET6
-	if (ofp_max_linkhdr + hdrlen > MCLBYTES)
+	if (V_l2_max_linkhdr + hdrlen > MCLBYTES)
 #else
-	if (ofp_max_linkhdr + hdrlen > MHLEN)
+	if (V_l2_max_linkhdr + hdrlen > MHLEN)
 #endif
 		panic("tcphdr too big");
 #endif
@@ -849,7 +849,7 @@ send:
 		}
 
 #if 0
-		if (MHLEN < hdrlen + ofp_max_linkhdr) {
+		if (MHLEN < hdrlen + V_l2_max_linkhdr) {
 			MCLGET(m, M_DONTWAIT);
 			if ((odp_packet_flags(m) & M_EXT) == 0) {
 				SOCKBUF_UNLOCK(&so->so_snd);
@@ -901,7 +901,7 @@ send:
 		}
 
 #if 0
-		if (isipv6 && (MHLEN < hdrlen + ofp_max_linkhdr) &&
+		if (isipv6 && (MHLEN < hdrlen + V_l2_max_linkhdr) &&
 		    MHLEN >= hdrlen) {
 			MH_ALIGN(m, hdrlen);
 		} else
@@ -1268,7 +1268,7 @@ timer:
 	 *
 	 * NB: Don't set DF on small MTU/MSS to have a safe fallback.
 	 */
-	if (V_path_mtu_discovery && (int)tp->t_maxopd > V_tcp_minmss)
+	if (V_tcp_path_mtu_discovery && (int)tp->t_maxopd > V_tcp_minmss)
 		ip->ip_off |= OFP_IP_DF;
 
 	ip->ip_off = odp_cpu_to_be_16(ip->ip_off);

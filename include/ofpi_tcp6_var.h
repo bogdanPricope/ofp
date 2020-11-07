@@ -64,13 +64,11 @@
 
 #include <odp_api.h>
 
-
+#if 0
 #ifdef SYSCTL_DECL
-SYSCTL_DECL(_net_inet6_tcp6);
-
-VNET_DECLARE(int, ofp_tcp_v6mssdflt);	/* XXX */
-#define	V_tcp_v6mssdflt			VNET(ofp_tcp_v6mssdflt)
+SYSCTL_DECL(net_inet6_tcp6);
 #endif
+#endif /*0*/
 
 struct	ofp_ip6_hdr;
 

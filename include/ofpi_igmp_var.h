@@ -189,12 +189,15 @@ CTASSERT(sizeof(struct igmpstat) == 168);
  * The IGMP lock is only taken with IGMP. Currently it is system-wide.
  * VIMAGE: The lock could be pushed to per-VIMAGE granularity in future.
  */
-#define	IGMP_LOCK_INIT()	odp_rwlock_init(&ofp_igmp_mtx)
-#define	IGMP_LOCK_DESTROY()	do {} while (0) /*mtx_destroy(&ofp_igmp_mtx)*/
-#define	IGMP_LOCK()		odp_rwlock_write_lock(&ofp_igmp_mtx)
-#define	IGMP_LOCK_ASSERT()	do {} while (0) /*mtx_assert(&ofp_igmp_mtx, MA_OWNED)*/
-#define	IGMP_UNLOCK()		odp_rwlock_write_unlock(&ofp_igmp_mtx)
-#define	IGMP_UNLOCK_ASSERT()	do {} while (0) /*mtx_assert(&ofp_igmp_mtx, MA_NOTOWNED)*/
+#define	IGMP_LOCK_INIT()	odp_rwlock_init(&V_igmp_mtx)
+#define	IGMP_LOCK_DESTROY()	\
+	do {} while (0) /*mtx_destroy(&V_igmp_mtx)*/
+#define	IGMP_LOCK()		odp_rwlock_write_lock(&V_igmp_mtx)
+#define	IGMP_LOCK_ASSERT()	\
+	do {} while (0) /*mtx_assert(&V_igmp_mtx, MA_OWNED)*/
+#define	IGMP_UNLOCK()		odp_rwlock_write_unlock(&V_igmp_mtx)
+#define	IGMP_UNLOCK_ASSERT()	\
+	do {} while (0) /*mtx_assert(&V_igmp_mtx, MA_NOTOWNED)*/
 
 struct ofp_igmp_ifinfo;
 struct ofp_in_multi;
@@ -209,18 +212,5 @@ void	ofp_igmp_slowtimo(void);
 void	ofp_igmp_init(void);
 void	ofp_igmp_uninit(void *unused);
 
-SYSCTL_DECL(_net_inet_igmp);
-
-/*
- * Names for IGMP sysctl objects
- */
-#define IGMPCTL_STATS		1	/* statistics (read-only) */
-#define IGMPCTL_MAXID		2
-
-#define IGMPCTL_NAMES { \
-	{ 0, 0 }, \
-	{ "stats", CTLTYPE_STRUCT } \
-}
-
-
+int ofp_igmp_sysctl_init_local(void);
 #endif

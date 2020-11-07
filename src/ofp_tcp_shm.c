@@ -6,6 +6,7 @@
 
 #include "ofpi_init.h"
 #include "ofpi_tcp_shm.h"
+#include "ofpi_tcp_timer.h"
 
 #define SHM_NAME_TCP_VAR "OfpTcpVarShMem"
 
@@ -80,7 +81,7 @@ static int ofp_tcp_var_free_shared_memory(void)
 	return rc;
 }
 
-int ofp_tcp_var_lookup_shared_memory(void)
+static int ofp_tcp_var_lookup_shared_memory(void)
 {
 	shm_tcp = ofp_shared_memory_lookup(SHM_NAME_TCP_VAR);
 	if (shm_tcp == NULL) {
@@ -129,6 +130,84 @@ int ofp_tcp_var_init_global(void)
 	shm_tcp_syncachehashtbl = (struct syncache_head *)
 		((uint8_t *)shm_tcp + shm_tcp->syncachehashtbl_off);
 
+	/* TCP input*/
+	V_tcp_log_in_vain = 0;
+	V_tcp_blackhole = 0;
+	V_tcp_delack_enabled = 1;
+	V_tcp_drop_synfin = 0;
+	V_tcp_do_rfc3042 = 0;
+	V_tcp_do_rfc3390 = 1;
+	V_tcp_do_rfc3465 = 1;
+	V_tcp_abc_l_var = 2;
+	V_tcp_do_ecn = 0;
+	V_tcp_ecn_maxretries = 1;
+
+	V_tcp_insecure_rst = 0;
+	V_tcp_do_autorcvbuf = 1;
+	V_tcp_autorcvbuf_inc = 16 * 1024;
+	V_tcp_autorcvbuf_max = 2 * 1024 * 1024;
+	V_tcp_passive_trace = 0;
+
+	/*TCP output*/
+	V_tcp_path_mtu_discovery = 1;
+	V_tcp_ss_fltsz = 1;
+	V_tcp_ss_fltsz_local = 4;
+	V_tcp_do_tso = 1;
+	V_tcp_do_autosndbuf = 1;
+	V_tcp_autosndbuf_inc = 8 * 1024;
+	V_tcp_autosndbuf_max = 2 * 1024 * 1024;
+
+	/*TCP userreq*/
+	V_tcp_sendspace = 1024 * 32;
+	V_tcp_recvspace = 1024 * 64;
+
+	/*TCP SACK*/
+	V_tcp_do_sack = 1;
+	V_tcp_sack_maxholes = 128;
+	V_tcp_sack_globalmaxholes = 65536;
+	V_tcp_sack_globalholes = 0;
+
+	/*TCP syncookies*/
+	V_tcp_syncookies = 1;
+	V_tcp_syncookiesonly = 0;
+	V_tcp_sc_rst_sock_fail = 1;
+
+	/* TCP REASSEMBLY*/
+	V_tcp_reass_maxseg = 0;
+	V_tcp_reass_qsize = 0;
+	V_tcp_reass_overflows = 0;
+
+	/* TCP timewait */
+	V_tcp_maxtcptw = 0;
+	V_nolocaltimewait = 0;
+
+	/* TCP subr */
+	V_tcp_maxprotohdr = 0;
+	V_tcp_mssdflt = OFP_TCP_MSS;
+#ifdef INET6
+	V_tcp_v6mssdflt = OFP_TCP6_MSS;
+#endif /*INET6*/
+	V_tcp_minmss = OFP_TCP_MINMSS;
+	V_tcp_do_rfc1323 = 1;
+	V_tcp_log_debug = 0;
+	V_tcp_tcbhashsize = 0;
+	V_tcp_do_tcpdrain = 1;
+	V_tcp_icmp_may_rst = 1;
+	V_tcp_isn_reseed_interval = 0;
+	V_tcp_soreceive_stream = 0;
+	V_tcp_keepinit = 0;		/* initialized with ofp_tcp_init */
+	V_tcp_keepidle = 0;		/* initialized with ofp_tcp_init */
+	V_tcp_keepintvl = 0;	/* initialized with ofp_tcp_init */
+	V_tcp_delacktime = 0;	/* initialized with ofp_tcp_init */
+	V_tcp_msl = 0;			/* initialized with ofp_tcp_init */
+	V_tcp_rexmit_min = 0;	/* initialized with ofp_tcp_init */
+	V_tcp_rexmit_slop = 0;	/* initialized with ofp_tcp_init */
+	V_tcp_always_keepalive = 1;
+	V_tcp_fast_finwait2_recycle = 0;
+	V_tcp_finwait2_timeout = 0;	/* initialized with ofp_tcp_init */
+	V_tcp_keepcnt = TCPTV_KEEPCNT;
+	V_tcp_maxpersistidle = 0;	/* initialized with ofp_tcp_init */
+	V_tcp_timer_race = 0;
 	return 0;
 }
 
@@ -139,4 +218,58 @@ int ofp_tcp_var_term_global(void)
 	CHECK_ERROR(ofp_tcp_var_free_shared_memory(), rc);
 
 	return rc;
+}
+
+int ofp_tcp_var_init_local(void)
+{
+	if (ofp_tcp_var_lookup_shared_memory()) {
+		OFP_ERR("ofp_tcp_var_lookup_shared_memory failed");
+		return -1;
+	}
+
+	if (ofp_tcp_input_init_local()) {
+		OFP_ERR("ofp_tcp_input_init_local failed");
+		return -1;
+	}
+
+	if (ofp_tcp_output_init_local()) {
+		OFP_ERR("ofp_tcp_output_init_local failed");
+		return -1;
+	}
+
+	if (ofp_tcp_usrreq_init_local()) {
+		OFP_ERR("ofp_tcp_usrreq_init_local failed");
+		return -1;
+	}
+
+	if (ofp_tcp_sack_init_local()) {
+		OFP_ERR("ofp_tcp_sack_init_local failed");
+		return -1;
+	}
+
+	if (ofp_tcp_syncache_init_local()) {
+		OFP_ERR("ofp_tcp_syncache_init_local failed");
+		return -1;
+	}
+
+	if (ofp_tcp_reass_init_local()) {
+		OFP_ERR("ofp_tcp_reass_init_local failed");
+		return -1;
+	}
+
+	if (ofp_tcp_timewait_init_local()) {
+		OFP_ERR("ofp_tcp_timewait_init_local failed");
+		return -1;
+	}
+
+	if (ofp_tcp_subr_init_local()) {
+		OFP_ERR("ofp_tcp_subr_init_local failed");
+		return -1;
+	}
+
+	if (ofp_tcp_timer_init_local()) {
+		OFP_ERR("ofp_tcp_timer_init_local failed");
+		return -1;
+	}
+	return 0;
 }

@@ -47,6 +47,7 @@
 #include "ofpi_in_pcb.h"
 #include "ofpi_protosw.h"
 #include "ofpi_socketvar.h"
+#include "ofpi_ip_shm.h"
 #include "ofpi_tcp_var.h"
 #include "ofpi_tcp_shm.h"
 #include "ofpi_udp_shm.h"
@@ -323,30 +324,21 @@ ofp_in_pcbbind(struct inpcb *inp, struct ofp_sockaddr *nam, struct ofp_ucred *cr
 	return (0);
 }
 
-/* HJo: FIX: sysctl variables */
-int ofp_ipport_hifirstauto = 1200;	/* sysctl */
-int ofp_ipport_hilastauto = 40000;
-int ofp_ipport_lowfirstauto = 1023;	/* 1023 */
-int ofp_ipport_lowlastauto = 40000;	/* 600 */
-int ofp_ipport_firstauto = 1023;	/* sysctl */
-int ofp_ipport_lastauto = 40000;
+SYSCTL_DECL(net_inet_ip);
+OFP_SYSCTL_NODE_DEF(net_inet_ip, portrange);
+OFP_SYSCTL_INT_DEF(net_inet_ip_portrange, reservedhigh);
+OFP_SYSCTL_INT_DEF(net_inet_ip_portrange, reservedlow);
 
-/*
- * Reserved ports accessible only to root. There are significant
- * security considerations that must be accounted for when changing these,
- * but the security benefits can be great. Please be careful.
- */
-VNET_DEFINE(int, ofp_ipport_reservedhigh) = OFP_IPPORT_RESERVED - 1;	/* 1023 */
-VNET_DEFINE(int, ofp_ipport_reservedlow);
+OFP_SYSCTL_PROC_DEF(net_inet_ip_portrange, lowfirst);
+OFP_SYSCTL_PROC_DEF(net_inet_ip_portrange, lowlast);
+OFP_SYSCTL_PROC_DEF(net_inet_ip_portrange, first);
+OFP_SYSCTL_PROC_DEF(net_inet_ip_portrange, last);
+OFP_SYSCTL_PROC_DEF(net_inet_ip_portrange, hifirst);
+OFP_SYSCTL_PROC_DEF(net_inet_ip_portrange, hilast);
 
-/* Variables dealing with random ephemeral port allocation. */
-VNET_DEFINE(int, ofp_ipport_randomized) = 1;	/* user controlled via sysctl */
-VNET_DEFINE(int, ofp_ipport_randomcps) = 10;	/* user controlled via sysctl */
-VNET_DEFINE(int, ofp_ipport_randomtime) = 45;	/* user controlled via sysctl */
-VNET_DEFINE(int, ofp_ipport_stoprandom);		/* toggled by ipport_tick */
-VNET_DEFINE(int, ofp_ipport_tcpallocs);
-
-#define	V_ipport_tcplastcount		VNET(ipport_tcplastcount)
+OFP_SYSCTL_INT_DEF(net_inet_ip_portrange, randomized);
+//OFP_SYSCTL_INT_DEF(net_inet_ip_portrange, randomcps);
+//OFP_SYSCTL_INT_DEF(net_inet_ip_portrange, randomtime);
 
 #define RANGECHK(var, min, max) \
 	if ((var) < (min)) { (var) = (min); } \
@@ -369,45 +361,6 @@ sysctl_net_ipport_check(OFP_SYSCTL_HANDLER_ARGS)
 	}
 	return (error);
 }
-
-#define SYSCTL_VNET_PROC OFP_SYSCTL_PROC
-#define SYSCTL_VNET_INT OFP_SYSCTL_INT
-
-SYSCTL_DECL(_net_inet_ip);
-OFP_SYSCTL_NODE(_net_inet_ip, OFP_IPPROTO_IP, portrange, OFP_CTLFLAG_RW, 0, "IP Ports");
-
-SYSCTL_VNET_PROC(_net_inet_ip_portrange, OFP_OID_AUTO, lowfirst,
-	OFP_CTLTYPE_INT|OFP_CTLFLAG_RW, &VNET_NAME(ofp_ipport_lowfirstauto), 0,
-	&sysctl_net_ipport_check, "I", "");
-SYSCTL_VNET_PROC(_net_inet_ip_portrange, OFP_OID_AUTO, lowlast,
-	OFP_CTLTYPE_INT|OFP_CTLFLAG_RW, &VNET_NAME(ofp_ipport_lowlastauto), 0,
-	&sysctl_net_ipport_check, "I", "");
-SYSCTL_VNET_PROC(_net_inet_ip_portrange, OFP_OID_AUTO, first,
-	OFP_CTLTYPE_INT|OFP_CTLFLAG_RW, &VNET_NAME(ofp_ipport_firstauto), 0,
-	&sysctl_net_ipport_check, "I", "");
-SYSCTL_VNET_PROC(_net_inet_ip_portrange, OFP_OID_AUTO, last,
-	OFP_CTLTYPE_INT|OFP_CTLFLAG_RW, &VNET_NAME(ofp_ipport_lastauto), 0,
-	&sysctl_net_ipport_check, "I", "");
-SYSCTL_VNET_PROC(_net_inet_ip_portrange, OFP_OID_AUTO, hifirst,
-	OFP_CTLTYPE_INT|OFP_CTLFLAG_RW, &VNET_NAME(ofp_ipport_hifirstauto), 0,
-	&sysctl_net_ipport_check, "I", "");
-SYSCTL_VNET_PROC(_net_inet_ip_portrange, OFP_OID_AUTO, hilast,
-	OFP_CTLTYPE_INT|OFP_CTLFLAG_RW, &VNET_NAME(ofp_ipport_hilastauto), 0,
-	&sysctl_net_ipport_check, "I", "");
-SYSCTL_VNET_INT(_net_inet_ip_portrange, OFP_OID_AUTO, reservedhigh,
-	OFP_CTLFLAG_RW|OFP_CTLFLAG_SECURE, &VNET_NAME(ofp_ipport_reservedhigh), 0, "");
-SYSCTL_VNET_INT(_net_inet_ip_portrange, OFP_OID_AUTO, reservedlow,
-	OFP_CTLFLAG_RW|OFP_CTLFLAG_SECURE, &VNET_NAME(ofp_ipport_reservedlow), 0, "");
-SYSCTL_VNET_INT(_net_inet_ip_portrange, OFP_OID_AUTO, randomized, OFP_CTLFLAG_RW,
-	&VNET_NAME(ofp_ipport_randomized), 0, "Enable random port allocation");
-SYSCTL_VNET_INT(_net_inet_ip_portrange, OFP_OID_AUTO, randomcps, OFP_CTLFLAG_RW,
-	&VNET_NAME(ofp_ipport_randomcps), 0, "Maximum number of random port "
-	"allocations before switching to a sequental one");
-SYSCTL_VNET_INT(_net_inet_ip_portrange, OFP_OID_AUTO, randomtime, OFP_CTLFLAG_RW,
-	&VNET_NAME(ofp_ipport_randomtime), 0,
-	"Minimum time to keep sequental port "
-	"allocation before switching to a random one");
-
 
 int
 ofp_in_pcb_lport(struct inpcb *inp, struct ofp_in_addr *laddrp, uint16_t *lportp,
@@ -434,16 +387,16 @@ ofp_in_pcb_lport(struct inpcb *inp, struct ofp_in_addr *laddrp, uint16_t *lportp
 	INP_HASH_LOCK_ASSERT(pcbinfo);
 
 	if (inp->inp_flags & INP_HIGHPORT) {
-		first = ofp_ipport_hifirstauto;	/* sysctl */
-		last  = ofp_ipport_hilastauto;
+		first = V_ipport_hifirstauto;
+		last  = V_ipport_hilastauto;
 		lastport = &pcbinfo->ipi_lasthi;
 	} else if (inp->inp_flags & INP_LOWPORT) {
-		first = ofp_ipport_lowfirstauto;	/* 1023 */
-		last  = ofp_ipport_lowlastauto;	/* 600 */
+		first = V_ipport_lowfirstauto;
+		last  = V_ipport_lowlastauto;
 		lastport = &pcbinfo->ipi_lastlow;
 	} else {
-		first = ofp_ipport_firstauto;	/* sysctl */
-		last  = ofp_ipport_lastauto;
+		first = V_ipport_firstauto;
+		last  = V_ipport_lastauto;
 		lastport = &pcbinfo->ipi_lastport;
 	}
 	/*
@@ -453,7 +406,7 @@ ofp_in_pcb_lport(struct inpcb *inp, struct ofp_in_addr *laddrp, uint16_t *lportp
 	 * ipport_tick() allows it.
 	 */
 
-	if (ofp_ipport_randomized && pcbinfo == &V_udbinfo)
+	if (V_ipport_randomized && pcbinfo == &V_udbinfo)
 		dorandom = 1;
 	else
 		dorandom = 0;
@@ -1700,3 +1653,56 @@ ofp_in_pcbsosetlabel(struct socket *so)
  * functions often modify hash chains or addresses in pcbs.
  */
 
+int ofp_ipport_init_local(void)
+{
+	OFP_SYSCTL_NODE_SET(net_inet_ip, OFP_OID_AUTO, portrange,
+			    OFP_CTLFLAG_RW, NULL, "IP Ports");
+
+	OFP_SYSCTL_INT_SET(net_inet_ip_portrange, OFP_OID_AUTO, reservedhigh,
+			   OFP_CTLFLAG_RW | OFP_CTLFLAG_SECURE,
+			   &V_ipport_reservedhigh, 0, "");
+
+	OFP_SYSCTL_INT_SET(net_inet_ip_portrange, OFP_OID_AUTO, reservedlow,
+			   OFP_CTLFLAG_RW | OFP_CTLFLAG_SECURE,
+			   &V_ipport_reservedlow, 0, "");
+
+	OFP_SYSCTL_PROC_SET(net_inet_ip_portrange, OFP_OID_AUTO, lowfirst,
+			    OFP_CTLFLAG_RW, &V_ipport_lowfirstauto, 0,
+			    &sysctl_net_ipport_check, "I", "");
+
+	OFP_SYSCTL_PROC_SET(net_inet_ip_portrange, OFP_OID_AUTO, lowlast,
+			    OFP_CTLFLAG_RW, &V_ipport_lowlastauto, 0,
+			    &sysctl_net_ipport_check, "I", "");
+
+	OFP_SYSCTL_PROC_SET(net_inet_ip_portrange, OFP_OID_AUTO, first,
+			    OFP_CTLFLAG_RW, &V_ipport_firstauto, 0,
+			    &sysctl_net_ipport_check, "I", "");
+
+	OFP_SYSCTL_PROC_SET(net_inet_ip_portrange, OFP_OID_AUTO, last,
+			    OFP_CTLFLAG_RW, &V_ipport_lastauto, 0,
+			    &sysctl_net_ipport_check, "I", "");
+
+	OFP_SYSCTL_PROC_SET(net_inet_ip_portrange, OFP_OID_AUTO, hifirst,
+			    OFP_CTLFLAG_RW, &V_ipport_hifirstauto, 0,
+			    &sysctl_net_ipport_check, "I", "");
+
+	OFP_SYSCTL_PROC_SET(net_inet_ip_portrange, OFP_OID_AUTO, hilast,
+			    OFP_CTLFLAG_RW, &V_ipport_hilastauto, 0,
+			    &sysctl_net_ipport_check, "I", "");
+
+	OFP_SYSCTL_INT_SET(net_inet_ip_portrange, OFP_OID_AUTO, randomized,
+			   OFP_CTLFLAG_RW, &V_ipport_randomized, 0,
+			   "Enable random port allocation");
+/*
+	OFP_SYSCTL_INT_SET(net_inet_ip_portrange, OFP_OID_AUTO, randomcps,
+			   OFP_CTLFLAG_RW, &V_ipport_randomcps, 0,
+			   "Maximum number of random port "
+			   "allocations before switching to a sequental one");
+
+	OFP_SYSCTL_INT_SET(net_inet_ip_portrange, OFP_OID_AUTO, randomtime,
+			   OFP_CTLFLAG_RW, &V_ipport_randomtime, 0,
+			   "Minimum time to keep sequental port "
+			   "allocation before switching to a random one");
+*/
+	return 0;
+}

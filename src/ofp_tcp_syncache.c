@@ -69,22 +69,10 @@
 #include "ofpi_md5.h"
 #include "ofpi_tcp_shm.h"
 
-extern int ofp_max_linkhdr;
-
-#define	SYSCTL_VNET_INT OFP_SYSCTL_INT
-#define	SYSCTL_VNET_UINT OFP_SYSCTL_UINT
-
-static VNET_DEFINE(int, tcp_syncookies) = 1;
-#define	V_tcp_syncookies		VNET(tcp_syncookies)
-SYSCTL_VNET_INT(_net_inet_tcp, OFP_OID_AUTO, syncookies, OFP_CTLFLAG_RW,
-    &VNET_NAME(tcp_syncookies), 0,
-    "Use TCP SYN cookies if the syncache overflows");
-
-static VNET_DEFINE(int, tcp_syncookiesonly) = 0;
-#define	V_tcp_syncookiesonly		VNET(tcp_syncookiesonly)
-SYSCTL_VNET_INT(_net_inet_tcp, OFP_OID_AUTO, syncookies_only, OFP_CTLFLAG_RW,
-    &VNET_NAME(tcp_syncookiesonly), 0,
-    "Use only TCP SYN cookies");
+OFP_SYSCTL_INT_DEF(net_inet_tcp, syncookies);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, syncookies_only);
+OFP_SYSCTL_NODE_DEF(net_inet_tcp, syncache);
+OFP_SYSCTL_INT_DEF(net_inet_tcp_syncache, rst_on_sock_fail);
 
 #ifdef TCP_OFFLOAD_DISABLE
 #define TOEPCB_ISSET(sc) (0)
@@ -119,8 +107,6 @@ static struct syncache
 /* Arbitrary values */
 #define TCP_SYNCACHE_BUCKETLIMIT	30
 
-OFP_SYSCTL_NODE(_net_inet_tcp, OFP_OID_AUTO, syncache, OFP_CTLFLAG_RW, 0, "TCP SYN cache");
-
 #if 0
 SYSCTL_VNET_UINT(_net_inet_tcp_syncache, OFP_OID_AUTO, bucketlimit, OFP_CTLFLAG_RDTUN,
     &VNET_NAME(tcp_syncache.bucket_limit), 0,
@@ -142,11 +128,6 @@ SYSCTL_VNET_UINT(_net_inet_tcp_syncache, OFP_OID_AUTO, rexmtlimit, OFP_CTLFLAG_R
     &VNET_NAME(tcp_syncache.rexmt_limit), 0,
     "Limit on SYN/ACK retransmissions");
 #endif /* 0 */
-
-VNET_DEFINE(int, ofp_tcp_sc_rst_sock_fail) = 1;
-SYSCTL_VNET_INT(_net_inet_tcp_syncache, OFP_OID_AUTO, rst_on_sock_fail,
-    OFP_CTLFLAG_RW, &VNET_NAME(ofp_tcp_sc_rst_sock_fail), 0,
-    "Send reset on socket allocation failure");
 
 //static MALLOC_DEFINE(M_SYNCACHE, "syncache", "TCP syncache");
 
@@ -174,6 +155,27 @@ SYSCTL_VNET_INT(_net_inet_tcp_syncache, OFP_OID_AUTO, rst_on_sock_fail,
 #define	SCH_LOCK(sch)		odp_spinlock_lock(&(sch)->sch_mtx)
 #define	SCH_UNLOCK(sch)		odp_spinlock_unlock(&(sch)->sch_mtx)
 #define	SCH_LOCK_ASSERT(sch)	//mtx_assert(&(sch)->sch_mtx, MA_OWNED)
+
+int ofp_tcp_syncache_init_local(void)
+{
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, syncookies,
+			   OFP_CTLFLAG_RW, &V_tcp_syncookies, 0,
+			   "Use TCP SYN cookies if the syncache overflows");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, syncookies_only,
+			   OFP_CTLFLAG_RW,	&V_tcp_syncookiesonly, 0,
+			   "Use only TCP SYN cookies");
+
+	OFP_SYSCTL_NODE_SET(net_inet_tcp, OFP_OID_AUTO, syncache,
+			    OFP_CTLFLAG_RW, 0, "TCP SYN cache");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp_syncache, OFP_OID_AUTO,
+			   rst_on_sock_fail, OFP_CTLFLAG_RW,
+			   &V_tcp_sc_rst_sock_fail, 0,
+			   "Send reset on socket allocation failure");
+
+	return 0;
+}
 
 /*
  * Requires the syncache entry to be already removed from the bucket list.
@@ -1214,11 +1216,12 @@ syncache_respond(struct syncache *sc)
 		 * See if we should do MTU discovery.  Route lookups are
 		 * expensive, so we will only unset the DF bit if:
 		 *
-		 *	1) ofp_path_mtu_discovery is disabled
+		 *	1) V_tcp_path_mtu_discovery is disabled
 		 *	2) the SCF_UNREACH flag has been set
 		 */
-		if (V_path_mtu_discovery && ((sc->sc_flags & SCF_UNREACH) == 0))
-		       ip->ip_off |= OFP_IP_DF;
+		if ((V_tcp_path_mtu_discovery != 0) &&
+		    ((sc->sc_flags & SCF_UNREACH) == 0))
+			ip->ip_off |= OFP_IP_DF;
 
 		th = (struct ofp_tcphdr *)(ip + 1);
 	}

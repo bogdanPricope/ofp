@@ -10,6 +10,7 @@
 #include "api/ofp_types.h"
 #include "api/ofp_ip6.h"
 #include "api/ofp_log.h"
+#include "ofpi_shared_mem.h"
 #include "ofpi_pkt_processing.h"
 #include "ofpi_in.h"
 #include "ofpi_ip.h"

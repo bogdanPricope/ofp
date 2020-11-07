@@ -137,7 +137,7 @@ static const char *tcptimers[] =
  * Force a time value to be in a certain range.
  */
 #define	TCPT_RANGESET(tv, value, tvmin, tvmax) do { \
-	(tv) = (value) + ofp_tcp_rexmit_slop; \
+	(tv) = (value) + V_tcp_rexmit_slop; \
 	if ((uint64_t)(tv) < (uint64_t)(tvmin)) \
 		(tv) = (tvmin); \
 	if ((uint64_t)(tv) > (uint64_t)(tvmax)) \
@@ -159,26 +159,17 @@ struct tcp_timer {
 #define TT_KEEP		0x08
 #define TT_2MSL		0x10
 
-#define	TP_KEEPINIT(tp)	((tp)->t_keepinit ? (int)(tp)->t_keepinit : ofp_tcp_keepinit)
-#define	TP_KEEPIDLE(tp)	((tp)->t_keepidle ? (int)(tp)->t_keepidle : ofp_tcp_keepidle)
-#define	TP_KEEPINTVL(tp) ((tp)->t_keepintvl ? (int)(tp)->t_keepintvl : ofp_tcp_keepintvl)
-#define	TP_KEEPCNT(tp)	((tp)->t_keepcnt ? (int)(tp)->t_keepcnt : ofp_tcp_keepcnt)
+#define	TP_KEEPINIT(tp)	\
+	((tp)->t_keepinit ? (int)(tp)->t_keepinit : V_tcp_keepinit)
+#define	TP_KEEPIDLE(tp)	\
+	((tp)->t_keepidle ? (int)(tp)->t_keepidle : V_tcp_keepidle)
+#define	TP_KEEPINTVL(tp) \
+	((tp)->t_keepintvl ? (int)(tp)->t_keepintvl : V_tcp_keepintvl)
+#define	TP_KEEPCNT(tp)	\
+	((tp)->t_keepcnt ? (int)(tp)->t_keepcnt : V_tcp_keepcnt)
 #define	TP_MAXIDLE(tp)	(TP_KEEPCNT(tp) * TP_KEEPINTVL(tp))
 
-extern int ofp_tcp_keepinit;		/* time to establish connection */
-extern int ofp_tcp_keepidle;		/* time before keepalive probes begin */
-extern int ofp_tcp_keepintvl;		/* time between keepalive probes */
-extern int ofp_tcp_keepcnt;			/* number of keepalives */
-extern int ofp_tcp_delacktime;		/* time before sending a delayed ACK */
-extern int ofp_tcp_maxpersistidle;
-extern int ofp_tcp_rexmit_min;
-extern int ofp_tcp_rexmit_slop;
-extern int ofp_tcp_msl;
-extern int tcp_ttl;			/* time to live for TCP segs */
 extern int ofp_tcp_backoff[];
-
-extern int ofp_tcp_finwait2_timeout;
-extern int ofp_tcp_fast_finwait2_recycle;
 
 void	tcp_timer_init(void);
 void	ofp_tcp_timer_2msl(void *xtp);

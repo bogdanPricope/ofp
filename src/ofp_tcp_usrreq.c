@@ -115,6 +115,9 @@ static void	tcp_usrclosed(struct tcpcb *);
 #define	TCPDEBUG2(req)
 #endif
 
+OFP_SYSCTL_UQUAD_DEF(net_inet_tcp, sendspace);
+OFP_SYSCTL_UQUAD_DEF(net_inet_tcp, recvspace);
+
 /*
  * TCP attaches to socket via pru_attach(), reserving space,
  * and an internet control block.
@@ -1674,17 +1677,18 @@ ofp_tcp_ctloutput(struct socket *so, struct sockopt *sopt)
 }
 #undef INP_WLOCK_RECHECK
 
-/*
- * ofp_tcp_sendspace and ofp_tcp_recvspace are the default send and receive window
- * sizes, respectively.  These are obsolescent (this information should
- * be set by the route).
- */
-uint64_t ofp_tcp_sendspace = 1024*32;
-OFP_SYSCTL_ULONG(_net_inet_tcp, TCPCTL_SENDSPACE, sendspace, OFP_CTLFLAG_RW,
-    &ofp_tcp_sendspace , 0, "Maximum outgoing TCP datagram size");
-uint64_t ofp_tcp_recvspace = 1024*64;
-OFP_SYSCTL_ULONG(_net_inet_tcp, TCPCTL_RECVSPACE, recvspace, OFP_CTLFLAG_RW,
-    &ofp_tcp_recvspace , 0, "Maximum incoming TCP datagram size");
+int ofp_tcp_usrreq_init_local(void)
+{
+	OFP_SYSCTL_UQUAD_SET(net_inet_tcp, OFP_OID_AUTO, sendspace,
+			     OFP_CTLFLAG_RW, &V_tcp_sendspace, 0,
+			     "Maximum outgoing TCP datagram size");
+
+	OFP_SYSCTL_UQUAD_SET(net_inet_tcp, OFP_OID_AUTO, recvspace,
+			     OFP_CTLFLAG_RW, &V_tcp_recvspace, 0,
+			     "Maximum incoming TCP datagram size");
+
+	return 0;
+}
 
 /*
  * Attach TCP protocol to socket, allocating
@@ -1699,7 +1703,7 @@ tcp_attach(struct socket *so)
 	int error;
 
 	if (so->so_snd.sb_hiwat == 0 || so->so_rcv.sb_hiwat == 0) {
-		error = ofp_soreserve(so, ofp_tcp_sendspace, ofp_tcp_recvspace);
+		error = ofp_soreserve(so, V_tcp_sendspace, V_tcp_recvspace);
 		if (error)
 			return (error);
 	}
@@ -1831,8 +1835,8 @@ again:
 		if (tp->t_state == TCPS_FIN_WAIT_2) {
 			int timeout;
 
-			timeout = (ofp_tcp_fast_finwait2_recycle) ?
-			    ofp_tcp_finwait2_timeout : TP_MAXIDLE(tp);
+			timeout = (V_tcp_fast_finwait2_recycle) ?
+			    V_tcp_finwait2_timeout : TP_MAXIDLE(tp);
 			ofp_tcp_timer_activate(tp, TT_2MSL, timeout);
 		}
 	}

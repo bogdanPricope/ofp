@@ -107,7 +107,6 @@ AC_CONFIG_FILES([
 	example/ofp_netwrap_crt/Makefile
 	example/ofp_netwrap_proc/Makefile
 	example/socket/Makefile
-	example/sysctl/Makefile
 	example/tcpperf/Makefile
 	example/udp_fwd_socket/Makefile
 	example/udpecho/Makefile

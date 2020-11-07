@@ -39,7 +39,7 @@
 #include "ofpi_sockopt.h"
 #include "ofpi_ip_var.h"
 #include "ofpi_udp.h"
-#include "api/ofp_sysctl.h"
+#include "ofpi_sysctl.h"
 #include "ofpi_vnet.h"
 
 struct mbuf;
@@ -95,30 +95,9 @@ struct ofp_udpstat {
 	uint64_t	udps_filtermcast;	/* blocked by multicast filter */
 };
 
-/*
- * Names for UDP sysctl objects.
- */
-#define	UDPCTL_CHECKSUM		1	/* checksum UDP packets */
-#define	UDPCTL_STATS		2	/* statistics (read-only) */
-#define	UDPCTL_MAXDGRAM		3	/* max datagram size */
-#define	UDPCTL_RECVSPACE	4	/* default receive buffer space */
-#define	UDPCTL_PCBLIST		5	/* list of PCBs for UDP sockets */
-#define	UDPCTL_MAXID		6
-
-#define	UDPCTL_NAMES	{						\
-	{ 0, 0 },							\
-	{ "checksum", OFP_CTLTYPE_INT },					\
-	{ "stats", OFP_CTLTYPE_STRUCT },					\
-	{ "maxdgram", OFP_CTLTYPE_INT },					\
-	{ "recvspace", OFP_CTLTYPE_INT },					\
-	{ "pcblist", OFP_CTLTYPE_STRUCT },					\
-}
-
-SYSCTL_DECL(_net_inet_udp);
+SYSCTL_DECL(net_inet_udp);
 
 extern struct pr_usrreqs	ofp_udp_usrreqs;
-extern uint64_t			ofp_udp_sendspace;
-extern uint64_t			ofp_udp_recvspace;
 
 int		 udp_newudpcb(struct inpcb *);
 void		 udp_discardcb(struct udpcb *);
@@ -132,5 +111,7 @@ void		 ofp_udp_netstat(int fd);
 enum ofp_return_code ofp_udp_input(odp_packet_t *, int);
 struct inpcb	*ofp_udp_notify(struct inpcb *, int);
 int		 ofp_udp_shutdown(struct socket *so);
+
+int ofp_udp_init_local_sysctl(void);
 
 #endif

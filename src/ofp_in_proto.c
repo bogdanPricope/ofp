@@ -206,23 +206,63 @@ struct domain ofp_inetdomain = {
 			sizeof(ofp_inetsw[0])],
 };
 
-OFP_SYSCTL_NODE(_net,      OFP_PF_INET,		inet,	OFP_CTLFLAG_RW, 0,
-	"Internet Family");
+OFP_SYSCTL_NODE_DEF(net, inet);
+OFP_SYSCTL_NODE_DEF(net_inet, ip);
+OFP_SYSCTL_NODE_DEF(net_inet, icmp);
+OFP_SYSCTL_NODE_DEF(net_inet, udp);
+OFP_SYSCTL_NODE_DEF(net_inet, tcp);
+OFP_SYSCTL_NODE_DEF(net_inet, igmp);
+OFP_SYSCTL_NODE_DEF(net_inet, raw);
 
-OFP_SYSCTL_NODE(_net_inet, OFP_IPPROTO_IP,	ip,	OFP_CTLFLAG_RW, 0,	"IP");
-OFP_SYSCTL_NODE(_net_inet, OFP_IPPROTO_ICMP,	icmp,	OFP_CTLFLAG_RW, 0,	"ICMP");
-OFP_SYSCTL_NODE(_net_inet, OFP_IPPROTO_UDP,	udp,	OFP_CTLFLAG_RW, 0,	"UDP");
-OFP_SYSCTL_NODE(_net_inet, OFP_IPPROTO_TCP,	tcp,	OFP_CTLFLAG_RW, 0,	"TCP");
 #ifdef SCTP
-OFP_SYSCTL_NODE(_net_inet, OFP_IPPROTO_SCTP,	sctp,	OFP_CTLFLAG_RW, 0,	"SCTP");
-#endif
-OFP_SYSCTL_NODE(_net_inet, OFP_IPPROTO_IGMP,	igmp,	OFP_CTLFLAG_RW, 0,	"IGMP");
+	OFP_SYSCTL_NODE_DEF(net_inet, sctp);
+#endif /*SCTP*/
+
 #ifdef IPSEC
-/* XXX no protocol # to use, pick something "reserved" */
-OFP_SYSCTL_NODE(_net_inet, 253,		ipsec,	OFP_CTLFLAG_RW, 0,	"IPSEC");
-OFP_SYSCTL_NODE(_net_inet, OFP_IPPROTO_AH,	ah,	OFP_CTLFLAG_RW, 0,	"AH");
-OFP_SYSCTL_NODE(_net_inet, OFP_IPPROTO_ESP,	esp,	OFP_CTLFLAG_RW, 0,	"ESP");
-OFP_SYSCTL_NODE(_net_inet, OFP_IPPROTO_IPCOMP,	ipcomp,	OFP_CTLFLAG_RW, 0,	"IPCOMP");
-OFP_SYSCTL_NODE(_net_inet, OFP_IPPROTO_IPIP,	ipip,	OFP_CTLFLAG_RW, 0,	"IPIP");
+	/* XXX no protocol # to use, pick something "reserved" */
+	OFP_SYSCTL_NODE_DEF(net_inet, ipsec);
+	OFP_SYSCTL_NODE_DEF(net_inet, ah);
+	OFP_SYSCTL_NODE_DEF(net_inet, esp);
+	OFP_SYSCTL_NODE_DEF(net_inet, ipcomp);
+	OFP_SYSCTL_NODE_DEF(net_inet, ipip);
 #endif /* IPSEC */
-OFP_SYSCTL_NODE(_net_inet, OFP_IPPROTO_RAW,	raw,	OFP_CTLFLAG_RW, 0,	"RAW");
+
+int ofp_in_proto_init_local(void)
+{
+	OFP_SYSCTL_NODE_SET(net, OFP_OID_AUTO, inet, OFP_CTLFLAG_RW,
+			    0, "Internet Family");
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, ip, OFP_CTLFLAG_RW,
+			    0, "IP");
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, icmp, OFP_CTLFLAG_RW,
+			    0, "ICMP");
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, udp, OFP_CTLFLAG_RW,
+			    0, "UDP");
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, tcp, OFP_CTLFLAG_RW,
+			    0, "TCP");
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, igmp, OFP_CTLFLAG_RW,
+			    0, "IGMP");
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, raw, OFP_CTLFLAG_RW,
+			    0, "RAW");
+
+#ifdef SCTP
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, sctp, OFP_CTLFLAG_RW,
+			    0, "SCTP");
+#endif
+
+#ifdef IPSEC
+	/* XXX no protocol # to use, pick something "reserved" */
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, ipsec, OFP_CTLFLAG_RW,
+			    0, "IPSEC");
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, ah,	OFP_CTLFLAG_RW,
+			    0, "AH");
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, esp, OFP_CTLFLAG_RW,
+			    0, "ESP");
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, ipcomp, OFP_CTLFLAG_RW,
+			    0, "IPCOMP");
+	OFP_SYSCTL_NODE_SET(net_inet, OFP_OID_AUTO, ipip, OFP_CTLFLAG_RW,
+			    0, "IPIP");
+#endif /* IPSEC */
+
+	return 0;
+}
+

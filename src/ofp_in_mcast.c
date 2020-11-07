@@ -44,6 +44,7 @@
 #include "ofpi_sysctl.h"
 #include "ofpi_portconf.h"
 #include "ofpi_in_var.h"
+#include "ofpi_in_mcast.h"
 #include "ofpi_in.h"
 #include "ofpi_igmp.h"
 #include "ofpi_igmp_var.h"
@@ -243,28 +244,39 @@ static int	inp_set_multicast_if(struct inpcb *, struct sockopt *);
 static int	inp_set_source_filters(struct inpcb *, struct sockopt *);
 static int	sysctl_ip_mcast_filters(OFP_SYSCTL_HANDLER_ARGS);
 
-OFP_SYSCTL_NODE(_net_inet_ip, OFP_OID_AUTO, mcast, OFP_CTLFLAG_RW, 0, "IPv4 multicast");
+SYSCTL_DECL(net_inet_ip);
+OFP_SYSCTL_NODE_DEF(net_inet_ip, mcast);
+OFP_SYSCTL_UQUAD_DEF(net_inet_ip_mcast, maxgrpsrc);
+OFP_SYSCTL_UQUAD_DEF(net_inet_ip_mcast, maxsocksrc);
+OFP_SYSCTL_INT_DEF(net_inet_ip_mcast, loop);
+OFP_SYSCTL_PROC_DEF(net_inet_ip_mcast, filters);
 
-static uint64_t in_mcast_maxgrpsrc = OFP_IP_MAX_GROUP_SRC_FILTER;
-OFP_SYSCTL_ULONG(_net_inet_ip_mcast, OFP_OID_AUTO, maxgrpsrc,
-    OFP_CTLFLAG_RW | OFP_CTLFLAG_TUN, &in_mcast_maxgrpsrc, 0,
-    "Max source filters per group");
-//HJo TUNABLE_ULONG("net.inet.ip.mcast.maxgrpsrc", &in_mcast_maxgrpsrc);
+int ofp_in_mcast_init_local(void)
+{
+	OFP_SYSCTL_NODE_SET(net_inet_ip, OFP_OID_AUTO, mcast,
+			    OFP_CTLFLAG_RW, NULL, "IPv4 multicast");
 
-static uint64_t in_mcast_maxsocksrc = OFP_IP_MAX_SOCK_SRC_FILTER;
-OFP_SYSCTL_ULONG(_net_inet_ip_mcast, OFP_OID_AUTO, maxsocksrc,
-    OFP_CTLFLAG_RW | OFP_CTLFLAG_TUN, &in_mcast_maxsocksrc, 0,
-    "Max source filters per socket");
-//HJo TUNABLE_ULONG("net.inet.ip.mcast.maxsocksrc", &in_mcast_maxsocksrc);
+	OFP_SYSCTL_UQUAD_SET(net_inet_ip_mcast, OFP_OID_AUTO, maxgrpsrc,
+			     OFP_CTLFLAG_RW | OFP_CTLFLAG_TUN,
+			     &V_in_mcast_maxgrpsrc, 0,
+			     "Max source filters per group");
 
-int ofp_in_mcast_loop = OFP_IP_DEFAULT_MULTICAST_LOOP;
-OFP_SYSCTL_INT(_net_inet_ip_mcast, OFP_OID_AUTO, loop, OFP_CTLFLAG_RW | OFP_CTLFLAG_TUN,
-    &ofp_in_mcast_loop, 0, "Loopback multicast datagrams by default");
-//HJo TUNABLE_INT("net.inet.ip.mcast.loop", &ofp_in_mcast_loop);
+	OFP_SYSCTL_UQUAD_SET(net_inet_ip_mcast, OFP_OID_AUTO, maxsocksrc,
+			     OFP_CTLFLAG_RW | OFP_CTLFLAG_TUN,
+			     &V_in_mcast_maxsocksrc, 0,
+			     "Max source filters per socket");
 
-OFP_SYSCTL_NODE(_net_inet_ip_mcast, OFP_OID_AUTO, filters,
-    OFP_CTLFLAG_RD | OFP_CTLFLAG_MPSAFE, sysctl_ip_mcast_filters,
-    "Per-interface stack-wide source filters");
+	OFP_SYSCTL_INT_SET(net_inet_ip_mcast, OFP_OID_AUTO, loop,
+			   OFP_CTLFLAG_RW | OFP_CTLFLAG_TUN,
+			   &V_in_mcast_in_mcast_loop, 0,
+			   "Loopback multicast datagrams by default");
+
+	OFP_SYSCTL_PROC_SET(net_inet_ip_mcast, OFP_OID_AUTO, filters,
+			    OFP_CTLFLAG_RD | OFP_CTLFLAG_MPSAFE,  NULL, 0,
+			    sysctl_ip_mcast_filters, "",
+			    "Per-interface stack-wide source filters");
+	return 0;
+}
 
 #ifdef KTR
 /*
@@ -673,7 +685,7 @@ ofp_inm_record_source(struct ofp_in_multi *inm, const ofp_in_addr_t naddr)
 	if (ims && ims->ims_stp)
 		return (0);
 	if (ims == NULL) {
-		if (inm->inm_nsrc == in_mcast_maxgrpsrc)
+		if (inm->inm_nsrc == V_in_mcast_maxgrpsrc)
 			return (-OFP_ENOSPC);
 		nims = malloc0(sizeof(struct ofp_ip_msource));
 		if (nims == NULL)
@@ -723,7 +735,7 @@ imf_get_source(struct ofp_in_mfilter *imf, const struct ofp_sockaddr_in *psin,
 	ims = RB_FIND(ip_msource_tree, &imf->imf_sources, &find);
 	lims = (struct ofp_in_msource *)ims;
 	if (lims == NULL) {
-		if (imf->imf_nsrc == in_mcast_maxsocksrc)
+		if (imf->imf_nsrc == V_in_mcast_maxsocksrc)
 			return (OFP_ENOSPC);
 		nims = malloc0(sizeof(struct ofp_in_msource));
 		if (nims == NULL)
@@ -917,7 +929,7 @@ inm_get_source(struct ofp_in_multi *inm, const ofp_in_addr_t haddr,
 	find.ims_haddr = haddr;
 	ims = RB_FIND(ip_msource_tree, &inm->inm_srcs, &find);
 	if (ims == NULL && !noalloc) {
-		if (inm->inm_nsrc == in_mcast_maxgrpsrc)
+		if (inm->inm_nsrc == V_in_mcast_maxgrpsrc)
 			return (OFP_ENOSPC);
 		nims = malloc0(sizeof(struct ofp_ip_msource));
 		if (nims == NULL)
@@ -1580,7 +1592,7 @@ inp_findmoptions(struct inpcb *inp)
 	imo->imo_multicast_addr.s_addr = OFP_INADDR_ANY;
 	imo->imo_multicast_vif = -1;
 	imo->imo_multicast_ttl = OFP_IP_DEFAULT_MULTICAST_TTL;
-	imo->imo_multicast_loop = ofp_in_mcast_loop;
+	imo->imo_multicast_loop = V_in_mcast_in_mcast_loop;
 	imo->imo_num_memberships = 0;
 	imo->imo_max_memberships = OFP_IP_MIN_MEMBERSHIPS;
 	imo->imo_membership = immp;
@@ -2525,7 +2537,7 @@ inp_set_source_filters(struct inpcb *inp, struct sockopt *sopt)
 	if (error)
 		return (error);
 
-	if (msfr.msfr_nsrcs > in_mcast_maxsocksrc)
+	if (msfr.msfr_nsrcs > V_in_mcast_maxsocksrc)
 		return (OFP_ENOBUFS);
 
 	if ((msfr.msfr_fmode != OFP_MCAST_EXCLUDE &&
@@ -2910,6 +2922,7 @@ sysctl_ip_mcast_filters(OFP_SYSCTL_HANDLER_ARGS)
 	uint32_t			 fmode, ifindex;
 	(void)oidp;
 
+	/*ToDo: Check this implementation */
 	name = (int *)arg1;
 	namelen = arg2;
 
@@ -2941,7 +2954,9 @@ sysctl_ip_mcast_filters(OFP_SYSCTL_HANDLER_ARGS)
 	}
 #if 0 //HJo
 	retval = sysctl_wire_old_buffer(req,
-	    sizeof(uint32_t) + (in_mcast_maxgrpsrc * sizeof(struct ofp_in_addr)));
+					sizeof(uint32_t) +
+					(V_in_mcast_maxgrpsrc *
+					 sizeof(struct ofp_in_addr)));
 	if (retval)
 		return (retval);
 #endif

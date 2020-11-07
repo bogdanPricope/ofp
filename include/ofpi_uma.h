@@ -42,7 +42,7 @@ typedef int uma_zone_t;
 #define uma_zfree(zone, item) \
 	ofp_uma_pool_free(item)
 
-#define uma_zone_set_max(zone, nitems)
+#define uma_zone_set_max(zone, nitems) (void)(zone)
 
 uma_zone_t ofp_uma_pool_create(const char *name, int nitems, int size);
 int ofp_uma_pool_destroy(uma_zone_t zone);

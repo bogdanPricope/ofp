@@ -92,12 +92,6 @@ struct inpcb;
 struct route;
 struct sockopt;
 
-VNET_DECLARE(struct ofp_ipstat, ofp_ipstat);
-VNET_DECLARE(int, ofp_ip_defttl);			/* default IP ttl */
-VNET_DECLARE(int, ofp_ipforwarding);		/* ip forwarding */
-#ifdef IPSTEALTH
-VNET_DECLARE(int, ipstealth);			/* stealth forwarding */
-#endif
 extern uint8_t	ofp_ip_protox[];
 extern uint8_t ofp_ip_protox_udp;
 extern uint8_t ofp_ip_protox_tcp;
@@ -106,18 +100,10 @@ VNET_DECLARE(struct socket *, ofp_ip_rsvpd);	/* reservation protocol daemon*/
 VNET_DECLARE(struct socket *, ofp_ip_mrouter);	/* multicast routing daemon */
 extern int	(*legal_vif_num)(int);
 extern uint64_t	(*ip_mcast_src)(int);
-VNET_DECLARE(int, ofp_rsvp_on);
 extern struct	pr_usrreqs rip_usrreqs;
 
-#define	V_ipstat		VNET(ofp_ipstat)
-#define	V_ip_defttl		VNET(ofp_ip_defttl)
-#define	V_ipforwarding		VNET(ofp_ipforwarding)
-#ifdef IPSTEALTH
-#define	V_ipstealth		VNET(ipstealth)
-#endif
-#define	V_ip_rsvpd		VNET(ofp_ip_rsvpd)
-#define	V_ip_mrouter		VNET(ofp_ip_mrouter)
-#define	V_rsvp_on		VNET(ofp_rsvp_on)
+#define	V_ip_rsvpd	VNET(ofp_ip_rsvpd)
+#define	V_ip_mrouter	VNET(ofp_ip_mrouter)
 
 void	ofp_inp_freemoptions(struct ofp_ip_moptions *);
 int	ofp_inp_getmoptions(struct inpcb *, struct sockopt *);

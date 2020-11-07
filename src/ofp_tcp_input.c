@@ -83,94 +83,26 @@
 
 #define log(a, f...) OFP_INFO(f)
 
-const int ofp_tcprexmtthresh = 3;
+#define OFP_TCPREXMTTHRESH 3
 
-VNET_DEFINE(struct ofp_tcpstat, ofp_tcpstat);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, log_in_vain);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, blackhole);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, delayed_ack);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, drop_synfin);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, rfc3042);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, rfc3390);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, rfc3465);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, abc_l_var);
 
-int ofp_tcp_log_in_vain = 0;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, log_in_vain, OFP_CTLFLAG_RW,
-	   &ofp_tcp_log_in_vain, 0,
-	   "Log all incoming TCP segments to closed ports");
+OFP_SYSCTL_NODE_DEF(net_inet_tcp, ecn);
+OFP_SYSCTL_INT_DEF(net_inet_tcp_ecn, enable);
+OFP_SYSCTL_INT_DEF(net_inet_tcp_ecn, maxretries);
 
-VNET_DEFINE(int, ofp_blackhole) = 0;
-#define	V_blackhole		VNET(ofp_blackhole)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, blackhole, OFP_CTLFLAG_RW,
-	   &ofp_blackhole, 0,
-	   "Do not send RST on segments to closed ports");
-
-VNET_DEFINE(int, ofp_tcp_delack_enabled) = 1;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, delayed_ack, OFP_CTLFLAG_RW,
-	   &ofp_tcp_delack_enabled, 0,
-	   "Delay ACK to try and piggyback it onto a data packet");
-
-VNET_DEFINE(int, ofp_drop_synfin) = 0;
-#define	V_drop_synfin		VNET(ofp_drop_synfin)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, drop_synfin, OFP_CTLFLAG_RW,
-	   &ofp_drop_synfin, 0,
-	   "Drop TCP packets with SYN+FIN set");
-
-VNET_DEFINE(int, ofp_tcp_do_rfc3042) = 0;
-#define	V_tcp_do_rfc3042	VNET(ofp_tcp_do_rfc3042)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, rfc3042, OFP_CTLFLAG_RW,
-	   &ofp_tcp_do_rfc3042, 0,
-	   "Enable RFC 3042 (Limited Transmit)");
-
-VNET_DEFINE(int, ofp_tcp_do_rfc3390) = 1;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, rfc3390, OFP_CTLFLAG_RW,
-	   &ofp_tcp_do_rfc3390, 0,
-	   "Enable RFC 3390 (Increasing TCP's Initial Congestion Window)");
-
-VNET_DEFINE(int, ofp_tcp_do_rfc3465) = 1;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, rfc3465, OFP_CTLFLAG_RW,
-	   &ofp_tcp_do_rfc3465, 0,
-	   "Enable RFC 3465 (Appropriate Byte Counting)");
-
-VNET_DEFINE(int, ofp_tcp_abc_l_var) = 2;
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, abc_l_var, OFP_CTLFLAG_RW,
-	   &ofp_tcp_abc_l_var, 2,
-	   "Cap the max cwnd increment during slow-start to this number of segments");
-
-OFP_SYSCTL_NODE(_net_inet_tcp, OFP_OID_AUTO, ecn, OFP_CTLFLAG_RW, 0, "TCP ECN");
-
-VNET_DEFINE(int, ofp_tcp_do_ecn) = 0;
-OFP_SYSCTL_INT(_net_inet_tcp_ecn, OFP_OID_AUTO, enable, OFP_CTLFLAG_RW,
-	   &ofp_tcp_do_ecn, 0,
-	   "TCP ECN support");
-
-VNET_DEFINE(int, ofp_tcp_ecn_maxretries) = 1;
-OFP_SYSCTL_INT(_net_inet_tcp_ecn, OFP_OID_AUTO, maxretries, OFP_CTLFLAG_RW,
-	   &ofp_tcp_ecn_maxretries, 0,
-	   "Max retries before giving up on ECN");
-
-VNET_DEFINE(int, ofp_tcp_insecure_rst) = 0;
-#define	V_tcp_insecure_rst	VNET(ofp_tcp_insecure_rst)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, insecure_rst, OFP_CTLFLAG_RW,
-	   &ofp_tcp_insecure_rst, 0,
-	   "Follow the old (insecure) criteria for accepting RST packets");
-
-VNET_DEFINE(int, ofp_tcp_do_autorcvbuf) = 1;
-#define	V_tcp_do_autorcvbuf	VNET(ofp_tcp_do_autorcvbuf)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, recvbuf_auto, OFP_CTLFLAG_RW,
-	   &ofp_tcp_do_autorcvbuf, 0,
-	   "Enable automatic receive buffer sizing");
-
-VNET_DEFINE(int, ofp_tcp_autorcvbuf_inc) = 16*1024;
-#define	V_tcp_autorcvbuf_inc	VNET(ofp_tcp_autorcvbuf_inc)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, recvbuf_inc, OFP_CTLFLAG_RW,
-	   &ofp_tcp_autorcvbuf_inc, 0,
-	   "Incrementor step size of automatic receive buffer");
-
-VNET_DEFINE(int, ofp_tcp_autorcvbuf_max) = 2*1024*1024;
-#define	V_tcp_autorcvbuf_max	VNET(ofp_tcp_autorcvbuf_max)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, recvbuf_max, OFP_CTLFLAG_RW,
-	   &ofp_tcp_autorcvbuf_max, 0,
-	   "Max size of automatic receive buffer");
-
-VNET_DEFINE(int, ofp_tcp_passive_trace) = 0;
-#define	V_tcp_passive_trace	VNET(ofp_tcp_passive_trace)
-OFP_SYSCTL_INT(_net_inet_tcp, OFP_OID_AUTO, passive_trace, OFP_CTLFLAG_RW,
-	   &ofp_tcp_passive_trace, 0,
-	   "Enable temporary passive debug traces");
+OFP_SYSCTL_INT_DEF(net_inet_tcp, insecure_rst);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, recvbuf_auto);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, recvbuf_inc);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, recvbuf_max);
+OFP_SYSCTL_INT_DEF(net_inet_tcp, passive_trace);
 
 static void	 tcp_dooptions(struct tcpopt *, uint8_t *, int, int);
 static void	 tcp_dropwithreset(odp_packet_t , struct ofp_tcphdr *,
@@ -192,10 +124,81 @@ inline static void	cc_post_recovery(struct tcpcb *tp, struct ofp_tcphdr *th);
 inline static void	hhook_run_tcp_est_in(struct tcpcb *tp,
 			    struct ofp_tcphdr *th, struct tcpopt *to);
 
+int ofp_tcp_input_init_local(void)
+{
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, log_in_vain,
+			   OFP_CTLFLAG_RW, &V_tcp_log_in_vain, 0,
+			   "Log all incoming TCP segments to closed ports");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, blackhole,
+			   OFP_CTLFLAG_RW, &V_tcp_blackhole, 0,
+			   "Do not send RST on segments to closed ports");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, delayed_ack,
+			   OFP_CTLFLAG_RW, &V_tcp_delack_enabled, 0,
+			   "Delay ACK to try and piggyback it onto a "
+			   "data packet");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, drop_synfin,
+			   OFP_CTLFLAG_RW, &V_tcp_drop_synfin, 0,
+			   "Drop TCP packets with SYN+FIN set");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, rfc3042,
+			   OFP_CTLFLAG_RW, &V_tcp_do_rfc3042, 0,
+			   "Enable RFC 3042 (Limited Transmit)");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, rfc3390,
+			   OFP_CTLFLAG_RW, &V_tcp_do_rfc3390, 0,
+			   "Enable RFC 3390 (Increasing TCP's Initial"
+			   " Congestion Window)");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, rfc3465, OFP_CTLFLAG_RW,
+			   &V_tcp_do_rfc3465, 0,
+			   "Enable RFC 3465 (Appropriate Byte Counting)");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, abc_l_var,
+			   OFP_CTLFLAG_RW, &V_tcp_abc_l_var, 2,
+			   "Cap the max cwnd increment during slow-start to "
+			   "this number of segments");
+
+	OFP_SYSCTL_NODE_SET(net_inet_tcp, OFP_OID_AUTO, ecn,
+			    OFP_CTLFLAG_RW, 0, "TCP ECN");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp_ecn, OFP_OID_AUTO, enable,
+			   OFP_CTLFLAG_RW, &V_tcp_do_ecn, 0, "TCP ECN support");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp_ecn, OFP_OID_AUTO, maxretries,
+			   OFP_CTLFLAG_RW, &V_tcp_ecn_maxretries, 0,
+			   "Max retries before giving up on ECN");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, insecure_rst,
+			   OFP_CTLFLAG_RW, &V_tcp_insecure_rst, 0,
+			   "Follow the old (insecure) criteria for "
+			   "accepting RST packets");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, recvbuf_auto,
+			   OFP_CTLFLAG_RW, &V_tcp_do_autorcvbuf, 0,
+			   "Enable automatic receive buffer sizing");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, recvbuf_inc,
+			   OFP_CTLFLAG_RW, &V_tcp_autorcvbuf_inc, 0,
+			   "Incrementor step size of automatic receive buffer");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, recvbuf_max,
+			   OFP_CTLFLAG_RW, &V_tcp_autorcvbuf_max, 0,
+			   "Max size of automatic receive buffer");
+
+	OFP_SYSCTL_INT_SET(net_inet_tcp, OFP_OID_AUTO, passive_trace,
+			   OFP_CTLFLAG_RW, &V_tcp_passive_trace, 0,
+			   "Enable temporary passive debug traces");
+
+	return 0;
+}
+
 /*
- * Kernel module interface for updating ofp_tcpstat.  The argument is an index
- * into ofp_tcpstat treated as an array of uint64_t.  While this encodes the
- * general layout of ofp_tcpstat into the caller, it doesn't encode its location,
+ * Kernel module interface for updating V_tcpstat.  The argument is an index
+ * into V_tcpstat treated as an array of uint64_t.  While this encodes the
+ * general layout of V_tcpstat into the caller, it doesn't encode its location,
  * so that future changes to add, for example, per-CPU stats support won't
  * cause binary compatibility problems for kernel modules.
  */
@@ -341,18 +344,18 @@ cc_conn_init(struct tcpcb *tp)
 		    max(2 * tp->t_maxseg, 4380));
 #ifdef INET6
 	else if (isipv6 /*&& in6_localaddr(&inp->in6p_faddr)*/)
-		tp->snd_cwnd = tp->t_maxseg * V_ss_fltsz_local;
+		tp->snd_cwnd = tp->t_maxseg * V_tcp_ss_fltsz_local;
 #endif
 #if defined(INET) && defined(INET6)
 	else if (!isipv6 /*&& in_localaddr(inp->inp_faddr)*/)
-		tp->snd_cwnd = tp->t_maxseg * V_ss_fltsz_local;
+		tp->snd_cwnd = tp->t_maxseg * V_tcp_ss_fltsz_local;
 #endif
 #ifdef INET
 	else if (in_localaddr(inp->inp_faddr))
-		tp->snd_cwnd = tp->t_maxseg * V_ss_fltsz_local;
+		tp->snd_cwnd = tp->t_maxseg * V_tcp_ss_fltsz_local;
 #endif
 	else
-		tp->snd_cwnd = tp->t_maxseg * V_ss_fltsz;
+		tp->snd_cwnd = tp->t_maxseg * V_tcp_ss_fltsz;
 
 	if (CC_ALGO(tp)->conn_init != NULL)
 		CC_ALGO(tp)->conn_init(tp->ccv);
@@ -790,8 +793,8 @@ findpcb:
 		 * in use.
 		 */
 
-		if ((ofp_tcp_log_in_vain == 1 && (thflags & OFP_TH_SYN)) ||
-		    ofp_tcp_log_in_vain == 2) {
+		if ((V_tcp_log_in_vain == 1 && (thflags & OFP_TH_SYN)) ||
+		    V_tcp_log_in_vain == 2) {
 			if ((s = ofp_tcp_log_vain(NULL, th, (void *)ip, ip6)))
 				log(LOG_INFO, "%s; %s: Connection attempt "
 				    "to closed port\n", s, __func__);
@@ -800,8 +803,8 @@ findpcb:
 		 * When blackholing do not respond with a RST but
 		 * completely ignore the segment and drop it.
 		 */
-		if ((V_blackhole == 1 && (thflags & OFP_TH_SYN)) ||
-		    V_blackhole == 2)
+		if ((V_tcp_blackhole == 1 && (thflags & OFP_TH_SYN)) ||
+		    V_tcp_blackhole == 2)
 			goto dropunlock;
 
 		if (ti_locked == TI_WLOCKED) {
@@ -1084,7 +1087,7 @@ relocked:
 		}
 
 		/*
-		 * If the ofp_drop_synfin option is enabled, drop all
+		 * If the V_tcp_drop_synfin option is enabled, drop all
 		 * segments with both the SYN and FIN bits set.
 		 * This prevents e.g. nmap from identifying the
 		 * TCP/IP stack.
@@ -1094,7 +1097,7 @@ relocked:
 		 * XXX: This is a violation of the TCP specification
 		 * and was used by RFC1644.
 		 */
-		if ((thflags & OFP_TH_FIN) && V_drop_synfin) {
+		if ((thflags & OFP_TH_FIN) && V_tcp_drop_synfin) {
 			if ((s = ofp_tcp_log_addrs(&inc, th, NULL, NULL)))
 				log(LOG_DEBUG, "%s; %s: Listen socket: "
 				    "SYN|FIN segment ignored (based on "
@@ -1826,7 +1829,7 @@ ofp_tcp_do_segment(odp_packet_t m, struct ofp_tcphdr *th, struct socket *so,
 
 			if (DELAY_ACK(tp) && tlen != 0)
 				ofp_tcp_timer_activate(tp, TT_DELACK,
-				    ofp_tcp_delacktime);
+				    V_tcp_delacktime);
 			else
 				t_flags_or(tp->t_flags, TF_ACKNOW);
 
@@ -2342,8 +2345,8 @@ ofp_tcp_do_segment(odp_packet_t m, struct ofp_tcphdr *th, struct socket *so,
 				if (!ofp_tcp_timer_active(tp, TT_REXMT) ||
 				    th->th_ack != tp->snd_una)
 					tp->t_dupacks = 0;
-				else if (++tp->t_dupacks > ofp_tcprexmtthresh ||
-				     IN_FASTRECOVERY(tp->t_flags)) {
+				else if (++tp->t_dupacks > OFP_TCPREXMTTHRESH ||
+					 IN_FASTRECOVERY(tp->t_flags)) {
 					/* HJo: FIX:
 					cc_ack_received(tp, th, CC_DUPACK);
 					*/
@@ -2368,7 +2371,8 @@ ofp_tcp_do_segment(odp_packet_t m, struct ofp_tcphdr *th, struct socket *so,
 						tp->snd_cwnd += tp->t_maxseg;
 					(void) ofp_tcp_output(tp);
 					goto drop;
-				} else if (tp->t_dupacks == ofp_tcprexmtthresh) {
+				} else if (tp->t_dupacks ==
+					   OFP_TCPREXMTTHRESH) {
 					tcp_seq onxt = tp->snd_nxt;
 
 					/*
@@ -2623,8 +2627,8 @@ process_ACK:
 				if (so->so_rcv.sb_state & SBS_CANTRCVMORE) {
 					ofp_soisdisconnected(so);
 					ofp_tcp_timer_activate(tp, TT_2MSL,
-					    (ofp_tcp_fast_finwait2_recycle ?
-					    ofp_tcp_finwait2_timeout :
+					    (V_tcp_fast_finwait2_recycle ?
+					    V_tcp_finwait2_timeout :
 					    TP_MAXIDLE(tp)));
 				}
 				tp->t_state = TCPS_FIN_WAIT_2;
@@ -2940,7 +2944,7 @@ check_delack:
 			//OFP_INFO("no_unlock set; but calling ofp_tcp_timer_activate()?");
 		}
 		t_flags_and(tp->t_flags, ~TF_DELACK);
-		ofp_tcp_timer_activate(tp, TT_DELACK, ofp_tcp_delacktime);
+		ofp_tcp_timer_activate(tp, TT_DELACK, V_tcp_delacktime);
 	}
 	if (no_unlock == 0)
 		INP_WUNLOCK(tp->t_inpcb);
@@ -3396,7 +3400,7 @@ ofp_tcp_mss_update(struct tcpcb *tp, int offer, int mtuoffer,
 		case 0:
 			/*
 			 * Offer == 0 means that there was no MSS on the SYN
-			 * segment, in this case we use ofp_tcp_mssdflt as
+			 * segment, in this case we use V_tcp_mssdflt as
 			 * already assigned to t_maxopd above.
 			 */
 			offer = tp->t_maxopd;
@@ -3434,7 +3438,7 @@ ofp_tcp_mss_update(struct tcpcb *tp, int offer, int mtuoffer,
 #ifdef INET6
 		if (isipv6) {
 			mss = maxmtu - min_protoh;
-			if (!V_path_mtu_discovery /*&&
+			if (!V_tcp_path_mtu_discovery /*&&
 			    !in6_localaddr(&inp->in6p_faddr)*/)
 				mss = min(mss, V_tcp_v6mssdflt);
 		}
@@ -3442,7 +3446,7 @@ ofp_tcp_mss_update(struct tcpcb *tp, int offer, int mtuoffer,
 #endif
 		{
 			mss = maxmtu - min_protoh;
-			if (!V_path_mtu_discovery /* HJo: FIX &&
+			if (!V_tcp_path_mtu_discovery /* HJo: FIX &&
 			    !in_localaddr(inp->inp_faddr)*/)
 				mss = min(mss, V_tcp_mssdflt);
 		}
@@ -3531,7 +3535,7 @@ ofp_tcp_mss(struct tcpcb *tp, int offer)
 	 */
 	so = inp->inp_socket;
 	SOCKBUF_LOCK(&so->so_snd);
-	if ((so->so_snd.sb_hiwat == ofp_tcp_sendspace) && metrics.rmx_sendpipe)
+	if ((so->so_snd.sb_hiwat == V_tcp_sendspace) && metrics.rmx_sendpipe)
 		bufsize = metrics.rmx_sendpipe;
 	else
 		bufsize = so->so_snd.sb_hiwat;
@@ -3549,7 +3553,7 @@ ofp_tcp_mss(struct tcpcb *tp, int offer)
 	tp->t_maxseg = mss;
 
 	SOCKBUF_LOCK(&so->so_rcv);
-	if ((so->so_rcv.sb_hiwat == ofp_tcp_recvspace) && metrics.rmx_recvpipe)
+	if ((so->so_rcv.sb_hiwat == V_tcp_recvspace) && metrics.rmx_recvpipe)
 		bufsize = metrics.rmx_recvpipe;
 	else
 		bufsize = so->so_rcv.sb_hiwat;

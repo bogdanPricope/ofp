@@ -134,7 +134,7 @@ struct ofp_tcphdr {
  * Connections requesting lower MSS values will be rounded up to this value
  * and the OFP_IP_DF flag will be cleared to allow fragmentation along the path.
  *
- * See tcp_subr.c ofp_tcp_minmss SYSCTL declaration for more comments.  Setting
+ * See tcp_subr.c V_tcp_minmss SYSCTL declaration for more comments.  Setting
  * it to "0" disables the minmss check.
  *
  * The default value is fine for TCP across the Internet's smallest official

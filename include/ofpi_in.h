@@ -69,4 +69,6 @@ struct __msfilterreq {
 						 */
 };
 
+int ofp_in_proto_init_local(void);
+
 #endif /* __OFPI_IN_H__ */
