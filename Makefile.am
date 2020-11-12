@@ -40,6 +40,7 @@ include_HEADERS = \
 		$(top_srcdir)/include/api/ofp_ipsec_init.h
 
 noinst_HEADERS = \
+		  $(top_srcdir)/include/ofpi_global_param_shm.h \
 		  $(top_srcdir)/include/ofpi_netlink.h \
 		  $(top_srcdir)/include/ofpi_pkt_processing.h \
 		  $(top_srcdir)/include/ofpi_arp.h \

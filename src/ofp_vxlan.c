@@ -62,9 +62,9 @@ struct ofp_vxlan_mem {
 	struct mac_dst mac_to_dst[NUM_MAC_DST_ENTRIES];
 	uint32_t       next_check;	/* Index of entry to check */
 	uint32_t       tick;		/* Time now */
-};
 
-odp_timer_t ofp_vxlan_timer = ODP_TIMER_INVALID;
+	odp_timer_t vxlan_timer;
+};
 
 static __thread struct ofp_vxlan_mem *shm;
 
@@ -161,8 +161,8 @@ static void ofp_vxlan_tmo(void *arg)
 
 	shm->tick++;
 	shm->next_check = (shm->next_check + 1) & (NUM_MAC_DST_ENTRIES - 1);
-	ofp_vxlan_timer = ofp_timer_start(VXLAN_TICK, ofp_vxlan_tmo, NULL, 0);
-	if (ODP_TIMER_INVALID == ofp_vxlan_timer)
+	shm->vxlan_timer = ofp_timer_start(VXLAN_TICK, ofp_vxlan_tmo, NULL, 0);
+	if (ODP_TIMER_INVALID == shm->vxlan_timer)
 		OFP_ERR("Failed to restart VXLAN timer.");
 }
 
@@ -319,8 +319,8 @@ int ofp_vxlan_init_global(void)
 
 	memset(shm, 0, sizeof(*shm));
 
-	ofp_vxlan_timer = ofp_timer_start(VXLAN_TICK, ofp_vxlan_tmo, NULL, 0);
-	if (ODP_TIMER_INVALID == ofp_vxlan_timer) {
+	shm->vxlan_timer = ofp_timer_start(VXLAN_TICK, ofp_vxlan_tmo, NULL, 0);
+	if (ODP_TIMER_INVALID == shm->vxlan_timer) {
 		OFP_ERR("Failed to start VXLAN timer.");
 		return -1;
 	}
@@ -334,12 +334,12 @@ int ofp_vxlan_term_global(void)
 	if (ofp_vxlan_lookup_shared_memory())
 		return -1;
 
-	if (ofp_vxlan_timer != ODP_TIMER_INVALID) {
-		if (ofp_timer_cancel(ofp_vxlan_timer)) {
+	if (shm->vxlan_timer != ODP_TIMER_INVALID) {
+		if (ofp_timer_cancel(shm->vxlan_timer)) {
 			OFP_ERR("Failed to cancel VXLAN timer.");
 			rc = -1;
 		}
-		ofp_vxlan_timer = ODP_TIMER_INVALID;
+		shm->vxlan_timer = ODP_TIMER_INVALID;
 	}
 
 	CHECK_ERROR(ofp_vxlan_free_shared_memory(), rc);

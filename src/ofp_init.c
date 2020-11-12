@@ -47,83 +47,11 @@
 #include "ofpi_log.h"
 #include "ofpi_debug.h"
 
-static __thread struct ofp_global_config_mem *shm;
-
-__thread ofp_global_param_t *global_param = NULL;
-
 static void drain_scheduler(void);
 static void drain_scheduler_for_global_term(void);
 static void cleanup_pkt_queue(odp_queue_t pkt_queue);
 
-static int ofp_global_config_alloc_shared_memory(void)
-{
-	shm = ofp_shared_memory_alloc(SHM_NAME_GLOBAL_CONFIG, sizeof(*shm));
-	if (shm == NULL) {
-		OFP_ERR("ofp_shared_memory_alloc failed");
-		return -1;
-	}
-	global_param = &shm->global_param;
-	return 0;
-}
-
-static int ofp_global_config_free_shared_memory(void)
-{
-	int rc = 0;
-
-	if (ofp_shared_memory_free(SHM_NAME_GLOBAL_CONFIG) == -1) {
-		OFP_ERR("ofp_shared_memory_free failed");
-		rc = -1;
-	}
-	shm = NULL;
-	return rc;
-}
-
-static int ofp_global_config_lookup_shared_memory(void)
-{
-	shm = ofp_shared_memory_lookup(SHM_NAME_GLOBAL_CONFIG);
-	if (shm == NULL) {
-		OFP_ERR("ofp_shared_memory_lookup failed");
-		return -1;
-	}
-	global_param = &shm->global_param;
-
-	return 0;
-}
-
-struct ofp_global_config_mem *ofp_get_global_config(void)
-{
-	if (ofp_global_config_lookup_shared_memory() == -1)
-		return NULL;
-	return shm;
-}
-
-void ofp_stop_processing(void)
-{
-	if (shm)
-		shm->is_running = 0;
-}
-
-odp_bool_t *ofp_get_processing_state(void)
-{
-	if (ofp_global_config_lookup_shared_memory() == -1)
-		return NULL;
-	return &shm->is_running;
-}
-
-int ofp_get_parameters(ofp_param_t *params)
-{
-	if (!params)
-		return -1;
-
-	if (ofp_global_config_lookup_shared_memory() == -1)
-		return -1;
-
-	memset(params, 0, sizeof(*params));
-
-	params->global_param = *global_param;
-
-	return 0;
-}
+static int ofp_term_post_global(const char *pool_name);
 
 #ifdef OFP_USE_LIBCONFIG
 
@@ -427,19 +355,11 @@ static void ofp_init_prepare(void)
 
 static int ofp_init_pre_global(ofp_global_param_t *params)
 {
-        /*
+	/*
 	 * Allocate and initialize global config memory first so that it
 	 * is available to later init phases.
 	 */
-	HANDLE_ERROR(ofp_global_config_alloc_shared_memory());
-	memset(shm, 0, sizeof(*shm));
-	shm->is_running = 1;
-#ifdef SP
-	shm->nl_thread_is_running = 0;
-#endif /* SP */
-	shm->cli_thread_is_running = 0;
-
-	*global_param = *params;
+	HANDLE_ERROR(ofp_global_param_init_global(params));
 
 	/* Initialize shared memory infra before preallocations */
 	HANDLE_ERROR(ofp_shared_memory_init_global());
@@ -488,13 +408,13 @@ static int ofp_init_pre_global(ofp_global_param_t *params)
 	pool_params.pkt.uarea_size = ofp_packet_min_user_area();
 	pool_params.type           = ODP_POOL_PACKET;
 
-	ofp_packet_pool = ofp_pool_create(SHM_PKT_POOL_NAME, &pool_params);
-	if (ofp_packet_pool == ODP_POOL_INVALID) {
+	V_global_packet_pool = ofp_pool_create(SHM_PKT_POOL_NAME, &pool_params);
+	if (V_global_packet_pool == ODP_POOL_INVALID) {
 		OFP_ERR("odp_pool_create failed");
 		return -1;
 	}
 
-	HANDLE_ERROR(ofp_socket_init_global(ofp_packet_pool));
+	HANDLE_ERROR(ofp_socket_init_global(V_global_packet_pool));
 	HANDLE_ERROR(ofp_ip_init_global());
 	HANDLE_ERROR(ofp_tcp_var_init_global());
 	HANDLE_ERROR(ofp_udp_var_init_global());
@@ -505,10 +425,6 @@ static int ofp_init_pre_global(ofp_global_param_t *params)
 	return 0;
 }
 
-odp_pool_t ofp_packet_pool;
-odp_cpumask_t cpumask;
-int ofp_init_global_called = 0;
-
 int ofp_init_global(odp_instance_t instance, ofp_global_param_t *params)
 {
 	int i;
@@ -516,19 +432,11 @@ int ofp_init_global(odp_instance_t instance, ofp_global_param_t *params)
 	odp_pktin_queue_param_t pktin_param;
 	const char *err;
 
-	ofp_init_global_called = 1;
-
 #if ODP_VERSION_API_GENERATION >= 1 && ODP_VERSION_API_MAJOR >= 21
 	odp_schedule_config(NULL);
 #endif
 
 	HANDLE_ERROR(ofp_init_pre_global(params));
-
-	/* cpu mask for slow path threads */
-	odp_cpumask_zero(&cpumask);
-	odp_cpumask_set(&cpumask, params->linux_core_id);
-
-	OFP_INFO("Slow path threads on core %d", odp_cpumask_first(&cpumask));
 
 	HANDLE_ERROR(ofp_set_vxlan_interface_queue());
 
@@ -546,6 +454,9 @@ int ofp_init_global(odp_instance_t instance, ofp_global_param_t *params)
 			&pktio_param, &pktin_param, NULL));
 
 #ifdef SP
+	OFP_INFO("Slow path threads on core %d",
+		 odp_cpumask_first(&V_global_linux_cpumask));
+
 	if (params->enable_nl_thread) {
 		odph_odpthread_params_t thr_params;
 
@@ -554,12 +465,13 @@ int ofp_init_global(odp_instance_t instance, ofp_global_param_t *params)
 		thr_params.arg = NULL;
 		thr_params.thr_type = ODP_THREAD_CONTROL;
 		thr_params.instance = instance;
-		if (!odph_odpthreads_create(&shm->nl_thread, &cpumask,
+		if (!odph_odpthreads_create(&V_global_nl_thread,
+					    &V_global_linux_cpumask,
 					    &thr_params)) {
 			OFP_ERR("Failed to start Netlink thread.");
 			return -1;
 		}
-		shm->nl_thread_is_running = 1;
+		V_global_nl_thread_is_running = 1;
 	}
 #endif /* SP */
 
@@ -583,8 +495,8 @@ int ofp_init_local(void)
 	HANDLE_ERROR(ofp_shared_memory_init_local());
 
 	/* Lookup shared memories */
+	HANDLE_ERROR(ofp_global_param_init_local());
 	HANDLE_ERROR(ofp_uma_lookup_shared_memory());
-	HANDLE_ERROR(ofp_global_config_lookup_shared_memory());
 	HANDLE_ERROR(ofp_sysctl_init_local());
 	HANDLE_ERROR(ofp_portconf_lookup_shared_memory());
 	HANDLE_ERROR(ofp_vlan_lookup_shared_memory());
@@ -625,9 +537,9 @@ int ofp_term_global(void)
 
 #ifdef SP
 	/* Terminate Netlink thread*/
-	if (shm->nl_thread_is_running) {
-		odph_odpthreads_join(&shm->nl_thread);
-		shm->nl_thread_is_running = 0;
+	if (V_global_nl_thread_is_running) {
+		odph_odpthreads_join(&V_global_nl_thread);
+		V_global_nl_thread_is_running = 0;
 	}
 #endif /* SP */
 
@@ -806,9 +718,9 @@ int ofp_term_post_global(const char *pool_name)
 
 	CHECK_ERROR(ofp_sysctl_term_global(), rc);
 
-	CHECK_ERROR(ofp_global_config_free_shared_memory(), rc);
-
 	CHECK_ERROR(ofp_uma_term_global(), rc);
+
+	CHECK_ERROR(ofp_global_param_term_global(), rc);
 
 	return rc;
 }

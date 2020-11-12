@@ -31,7 +31,6 @@
 #endif
 
 void *shm;
-odp_pool_t ofp_packet_pool;
 int (*pru_attach)(struct socket *so, int proto, struct thread *td);
 int sleeper_called;
 uint32_t sleeper_timeout;
@@ -63,7 +62,7 @@ static void *allocator(const char *name, uint64_t size);
 static void setup_with_shm(void)
 {
 	ofp_set_custom_allocator(allocator);
-	ofp_socket_init_global(ofp_packet_pool);
+	ofp_socket_init_global(ODP_POOL_INVALID);
 	sleeper_called = 0;
 	sleeper_timeout = 0;
 }

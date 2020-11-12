@@ -129,6 +129,7 @@ struct ofp_tcp_var_mem {
 	VNET_DEFINE(int, icmp_may_rst);
 	VNET_DEFINE(int, tcp_isn_reseed_interval);
 	VNET_DEFINE(int, tcp_soreceive_stream);
+	VNET_DEFINE(odp_spinlock_t, isn_mtx);
 
 	/* TCP timer */
 	VNET_DEFINE(int, tcp_keepinit); /* time to establish connection */
@@ -247,6 +248,7 @@ extern __thread struct syncache_head *shm_tcp_syncachehashtbl;
 #define	V_tcp_icmp_may_rst	VNET(shm_tcp->icmp_may_rst)
 #define	V_tcp_isn_reseed_interval	VNET(shm_tcp->tcp_isn_reseed_interval)
 #define	V_tcp_soreceive_stream	VNET(shm_tcp->tcp_soreceive_stream)
+#define	V_tcp_isn_mtx	VNET(shm_tcp->isn_mtx)
 
 #define	V_tcp_keepinit	VNET(shm_tcp->tcp_keepinit)
 #define	V_tcp_keepidle	VNET(shm_tcp->tcp_keepidle)

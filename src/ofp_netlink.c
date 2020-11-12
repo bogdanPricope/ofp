@@ -568,7 +568,7 @@ static int add_link(struct ifinfomsg *ifinfo_entry, int vlan, int link,
 				dev->physvlan = dev_link->vlan;
 			}
 			dev->ip_p2p = tun_rem;
-			dev->pkt_pool = ofp_packet_pool;
+			dev->pkt_pool = ofp_get_packet_pool();
 			dev->if_type = OFP_IFT_VXLAN;
 		} else {
 			if (tun_loc)

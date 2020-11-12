@@ -24,7 +24,7 @@ struct ofp_locks_str {
 	odp_rwlock_t lock_route_rw;
 };
 
-extern struct ofp_locks_str *ofp_locks_shm;
+extern __thread struct ofp_locks_str *ofp_locks_shm;
 
 int ofp_route_lookup_shared_memory(void);
 int ofp_vrf_route_lookup_shared_memory(void);

@@ -75,8 +75,6 @@
 #include "ofpi_hook.h"
 #include "ofpi_util.h"
 
-extern odp_pool_t ofp_packet_pool;
-
 #define UDPSTAT_INC(x)
 
 #define	CSUM_DATA_VALID		0x0400		/* csum_data field is valid */
@@ -493,7 +491,7 @@ ofp_udp_input(odp_packet_t *m, int off)
 			if (last != NULL) {
 				odp_packet_t n;
 
-				n = odp_packet_copy(*m, ofp_packet_pool);
+				n = odp_packet_copy(*m, ofp_get_packet_pool());
 				udp_append(last, ip, n, iphlen, &udp_in);
 				INP_RUNLOCK(last);
 			}

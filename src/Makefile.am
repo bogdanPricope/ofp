@@ -18,6 +18,7 @@ AM_CFLAGS +=  $(VISIBILITY_CFLAGS)
 LIBS  += $(OFP_LIBS)
 
 __LIB__libofp_la_SOURCES = \
+ofp_global_param_shm.c \
 ofp_pkt_processing.c \
 ofp_pkt_send_burst.c \
 ofp_avl.c \

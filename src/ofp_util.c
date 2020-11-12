@@ -17,8 +17,6 @@
 #include "ofpi_util.h"
 #include "ofpi_log.h"
 
-int ofp_first_log_time = 0;
-
 void *rpl_malloc (size_t n)
 {
 	if (n == 0)

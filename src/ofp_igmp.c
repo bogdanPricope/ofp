@@ -3249,7 +3249,7 @@ igmp_v3_merge_state_changes(struct ofp_in_multi *inm, struct ofp_ifqueue *ifscq)
 			m = HDR2PKT(PKT2HDR(m0)->next);
 		} else {
 			CTR2(KTR_IGMPV3, "%s: copying %p", __func__, m);
-			m0 = odp_packet_copy(m, ofp_packet_pool);
+			m0 = odp_packet_copy(m, ofp_get_packet_pool());
 			if (m0 == ODP_PACKET_INVALID)
 				return (OFP_ENOMEM);
 			*PKT2HDR(m0) = *PKT2HDR(m);

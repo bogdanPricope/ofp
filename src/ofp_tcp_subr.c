@@ -169,24 +169,22 @@ struct tcpcb_mem {
 	struct	osd		osd;
 };
 
-static odp_spinlock_t isn_mtx;
-
 #if 0
-#define	ISN_LOCK_INIT()	mtx_init(&isn_mtx, "isn_mtx", NULL, MTX_DEF)
-#define	ISN_LOCK()	mtx_lock(&isn_mtx)
-#define	ISN_UNLOCK()	mtx_unlock(&isn_mtx)
+#define	ISN_LOCK_INIT()	mtx_init(&V_tcp_isn_mtx, "V_tcp_isn_mtx", NULL, MTX_DEF)
+#define	ISN_LOCK()	mtx_lock(&V_tcp_isn_mtx)
+#define	ISN_UNLOCK()	mtx_unlock(&V_tcp_isn_mtx)
 #else
 #define	ISN_LOCK_INIT()	do { \
 		/*OFP_DBG("isn lock init");*/ \
-		odp_spinlock_init(&isn_mtx); \
+		odp_spinlock_init(&V_tcp_isn_mtx); \
 	} while (0)
 #define	ISN_LOCK() do { \
 		/*OFP_DBG("isn lock");*/ \
-		odp_spinlock_lock(&isn_mtx); \
+		odp_spinlock_lock(&V_tcp_isn_mtx); \
 	} while (0)
 #define	ISN_UNLOCK() do { \
 		/*OFP_DBG("isn unlock");*/ \
-		odp_spinlock_unlock(&isn_mtx); \
+		odp_spinlock_unlock(&V_tcp_isn_mtx); \
 	} while (0)
 #endif
 

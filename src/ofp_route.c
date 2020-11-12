@@ -66,7 +66,7 @@ struct vrf_route_mem {
 static __thread struct ofp_route_mem *shm;
 static __thread struct vrf_route_mem *vrf_shm;
 
-struct ofp_locks_str *ofp_locks_shm;
+__thread struct ofp_locks_str *ofp_locks_shm;
 
 #ifdef INET6
 static void route6_cleanup(int fd, uint8_t *key, int level,

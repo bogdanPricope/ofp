@@ -304,7 +304,7 @@ int ofp_ifnet_create(odp_instance_t instance,
 	ifnet->if_state = OFP_IFT_STATE_USED;
 	strncpy(ifnet->if_name, if_name, OFP_IFNAMSIZ);
 	ifnet->if_name[OFP_IFNAMSIZ-1] = 0;
-	ifnet->pkt_pool = ofp_packet_pool;
+	ifnet->pkt_pool = ofp_get_packet_pool();
 
 	if (!pktio_param) {
 		pktio_param = &pktio_param_local;
@@ -400,7 +400,7 @@ int ofp_ifnet_create(odp_instance_t instance,
 	thr_params.thr_type = ODP_THREAD_CONTROL;
 	thr_params.instance = instance;
 	odph_odpthreads_create(ifnet->rx_tbl,
-			       &cpumask,
+			       &V_global_linux_cpumask,
 			       &thr_params);
 
 	/* Start VIF slowpath transmitter thread */
@@ -409,7 +409,7 @@ int ofp_ifnet_create(odp_instance_t instance,
 	thr_params.thr_type = ODP_THREAD_CONTROL;
 	thr_params.instance = instance;
 	odph_odpthreads_create(ifnet->tx_tbl,
-			       &cpumask,
+			       &V_global_linux_cpumask,
 			       &thr_params);
 #endif /* SP */
 

@@ -68,7 +68,7 @@ static inline odp_packet_t ofp_packet_alloc_from_pool(odp_pool_t pool,
 
 static inline odp_packet_t ofp_packet_alloc(uint32_t len)
 {
-	return ofp_packet_alloc_from_pool(ofp_packet_pool, len);
+	return ofp_packet_alloc_from_pool(ofp_get_packet_pool(), len);
 }
 
 enum ofp_return_code send_pkt_out(struct ofp_ifnet *dev,

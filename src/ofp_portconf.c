@@ -70,7 +70,7 @@ struct ofp_vlan_mem {
  * Data per core
  */
 static __thread struct ofp_portconf_mem *shm;
-struct ofp_ifnet_locks_str  *ofp_ifnet_locks_shm;
+__thread struct ofp_ifnet_locks_str  *ofp_ifnet_locks_shm;
 
 static __thread struct ofp_vlan_mem *vlan_shm;
 
@@ -893,9 +893,9 @@ const char *ofp_config_interface_up_vxlan(uint16_t vrf, uint32_t addr, int mlen,
 	data->if_mtu = dev_root->if_mtu - sizeof(struct ofp_vxlan_udp_ip);
 	data->physport = physport;
 	data->physvlan = physvlan;
-	data->pkt_pool = ofp_packet_pool;
+	data->pkt_pool = ofp_get_packet_pool();
 
-	shm->ofp_ifnet_data[VXLAN_PORTS].pkt_pool = ofp_packet_pool;
+	shm->ofp_ifnet_data[VXLAN_PORTS].pkt_pool = ofp_get_packet_pool();
 	ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, vni, VXLAN_PORTS,
 			addr, 32, 0, OFP_RTF_LOCAL);
 	ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, vni, VXLAN_PORTS,

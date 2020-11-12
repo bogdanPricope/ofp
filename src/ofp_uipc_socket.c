@@ -171,8 +171,6 @@ static __thread struct ofp_socket_mem *shm;
 static __thread struct socket *shm_socket_list;
 static __thread struct sleeper *shm_sleeper_list;
 
-/*static struct ofp_socket_mem *shm;*/
-
 #if 0
 /* For debugging */
 void print_open_conns(void);

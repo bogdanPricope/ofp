@@ -56,7 +56,7 @@ struct ofp_ifnet_locks_str {
 #endif /* INET6 */
 };
 
-extern struct ofp_ifnet_locks_str *ofp_ifnet_locks_shm;
+extern __thread struct ofp_ifnet_locks_str *ofp_ifnet_locks_shm;
 
 OFP_TAILQ_HEAD(ofp_in_ifaddrhead, ofp_ifnet);
 

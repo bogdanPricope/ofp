@@ -17,16 +17,15 @@
 
 #define SHM_NAME_STAT "OfpStatShMem"
 
-
 typedef struct {
 	struct ofp_packet_stat ofp_packet_statistics;
 	struct ofp_perf_stat ofp_perf_stat;
 	odp_time_t prev_poll;
+
+	unsigned long int stat_flags;
 } stat_shm_t;
 
 static __thread stat_shm_t *shm_stat;
-
-unsigned long int ofp_stat_flags = 0;
 
 struct ofp_packet_stat *ofp_get_packet_statistics(void)
 {
@@ -53,7 +52,7 @@ static void ofp_perf_tmo(void *arg)
 	uint64_t diff;
 	(void)arg;
 
-	if (ofp_stat_flags & OFP_STAT_COMPUTE_PERF)
+	if (shm_stat->stat_flags & OFP_STAT_COMPUTE_PERF)
 		ofp_timer_start(US_PER_SEC/PROBES, ofp_perf_tmo, NULL, 0);
 
 	odp_mb_release();
@@ -131,6 +130,8 @@ int ofp_stat_init_global(void)
 
 	memset(shm_stat, 0, sizeof(*shm_stat));
 
+	shm_stat->stat_flags = 0;
+
 	return 0;
 }
 
@@ -148,15 +149,15 @@ int ofp_stat_term_global(void)
 
 void ofp_set_stat_flags(unsigned long int flags)
 {
-	unsigned long int old_flags = ofp_stat_flags;
+	unsigned long int old_flags = shm_stat->stat_flags;
 
-	ofp_stat_flags = flags;
+	shm_stat->stat_flags = flags;
 
 	if ((!(old_flags & OFP_STAT_COMPUTE_PERF)) &&
-	    (ofp_stat_flags & OFP_STAT_COMPUTE_PERF))
+	    (shm_stat->stat_flags & OFP_STAT_COMPUTE_PERF))
 		ofp_start_perf_stat();
 }
 unsigned long int ofp_get_stat_flags(void)
 {
-	return ofp_stat_flags;
+	return shm_stat->stat_flags;
 }

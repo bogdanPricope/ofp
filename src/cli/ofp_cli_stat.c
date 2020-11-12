@@ -70,6 +70,8 @@ void f_stat_show(struct cli_conn *conn, const char *s)
 	odp_thrmask_t thrmask;
 	int last_entry;
 
+	unsigned long int stat_flags = ofp_get_stat_flags();
+
 	(void)s;
 
 	if (!st)
@@ -78,8 +80,8 @@ void f_stat_show(struct cli_conn *conn, const char *s)
 	ofp_sendf(conn->fd, "Settings: \r\n"
 		"  compute latency - %s\r\n"
 		"  compute performance - %s\r\n\r\n",
-		ofp_stat_flags & OFP_STAT_COMPUTE_LATENCY ? "yes" : "no",
-		ofp_stat_flags & OFP_STAT_COMPUTE_PERF ? "yes" : "no");
+		stat_flags & OFP_STAT_COMPUTE_LATENCY ? "yes" : "no",
+		stat_flags & OFP_STAT_COMPUTE_PERF ? "yes" : "no");
 
 	odp_thrmask_control(&thrmask);
 	ofp_sendf(conn->fd, "Packet counters of control threads:\r\n\r\n");
@@ -95,7 +97,7 @@ void f_stat_show(struct cli_conn *conn, const char *s)
 	ofp_print_avl_stat(conn->fd);
 	ofp_print_rt_stat(conn->fd);
 
-	if (ofp_stat_flags & OFP_STAT_COMPUTE_LATENCY) {
+	if (stat_flags & OFP_STAT_COMPUTE_LATENCY) {
 		ofp_sendf(conn->fd, "\r\n  Latency graph | log/log scale | "
 			"X = occurrences, Y = cycles");
 
@@ -123,7 +125,7 @@ void f_stat_show(struct cli_conn *conn, const char *s)
 			next_thr = odp_thrmask_next(&thrmask, next_thr);
 		}
 	}
-	if (ofp_stat_flags & OFP_STAT_COMPUTE_PERF) {
+	if (stat_flags & OFP_STAT_COMPUTE_PERF) {
 		struct ofp_perf_stat *ps = ofp_get_perf_statistics();
 
 		ofp_sendf(conn->fd, "\r\n");
@@ -146,7 +148,7 @@ void f_stat_perf(struct cli_conn *conn, const char *s)
 {
 	(void)s;
 
-	if (ofp_stat_flags & OFP_STAT_COMPUTE_PERF) {
+	if (ofp_get_stat_flags() & OFP_STAT_COMPUTE_PERF) {
 		struct ofp_perf_stat *ps = ofp_get_perf_statistics();
 
 		ofp_sendf(conn->fd, "%4.3f Mpps - Throughput\r\n",
