@@ -27,6 +27,8 @@ struct ofp_global_config_mem {
 
 	VNET_DEFINE(odp_pool_t, packet_pool);
 
+	VNET_DEFINE(enum ofp_log_level_s, loglevel);
+
 	ofp_global_param_t global_param;
 };
 
@@ -43,6 +45,8 @@ extern __thread ofp_global_param_t *global_param;
 
 #define	V_global_linux_cpumask VNET(shm_global->linux_cpumask)
 #define	V_global_packet_pool VNET(shm_global->packet_pool)
+
+#define	V_global_loglevel VNET(shm_global->loglevel)
 
 int ofp_global_param_init_global(ofp_global_param_t *params);
 int ofp_global_param_term_global(void);

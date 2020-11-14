@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
 
 	sleep(5);
 
-	ofp_loglevel = OFP_LOG_INFO;
+	ofp_loglevel_set(OFP_LOG_INFO);
 
 	config_suite_framework(app_init_params.linux_core_id);
 

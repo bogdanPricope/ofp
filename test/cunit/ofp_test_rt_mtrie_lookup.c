@@ -581,15 +581,15 @@ int main(void)
 
 enum ofp_log_level_s disable_logging(void)
 {
-	const enum ofp_log_level_s previous = ofp_loglevel;
+	const enum ofp_log_level_s previous = ofp_loglevel_get();
 
-	ofp_loglevel = OFP_LOG_DISABLED;
+	ofp_loglevel_set(OFP_LOG_DISABLED);
 	return previous;
 }
 
 void restore_logging(enum ofp_log_level_s log_level)
 {
-	ofp_loglevel = log_level;
+	ofp_loglevel_set(log_level);
 }
 
 void prevent_freeing_of(struct ofp_rtl_node *root)

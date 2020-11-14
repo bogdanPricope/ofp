@@ -101,6 +101,14 @@ struct lookup_entry lt_ipsec_op_mode[] = {
 	ENTRY(ODP_IPSEC_OP_MODE_DISABLED),
 };
 
+struct lookup_entry lt_loglevel[] = {
+	{"DISABLED",	OFP_LOG_DISABLED},
+	{"ERROR",	OFP_LOG_ERROR},
+	{"WARNING",	OFP_LOG_WARNING},
+	{"INFO",	OFP_LOG_INFO},
+	{"DEBUG",	OFP_LOG_DEBUG}
+};
+
 /*
  * Based on a string, lookup a value in a struct lookup_entry
  * array. Return the value from the entry or -1 if not found.
@@ -218,6 +226,8 @@ static void read_conf_file(ofp_global_param_t *params, const char *filename)
 	GET_CONF_INT(int, udp.pcbport_hashtbl_size);
 
 	GET_CONF_INT(bool, if_loopback);
+
+	GET_CONF_STR(loglevel, loglevel);
 done:
 	config_destroy(&conf);
 }
@@ -273,6 +283,12 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
 	params->udp.pcbport_hashtbl_size = 0; /* to be computed */
 
 	params->if_loopback = 0;
+
+#ifdef OFP_DEBUG
+	params->loglevel = OFP_LOG_DEBUG;
+#else
+	params->loglevel = OFP_LOG_INFO;
+#endif
 
 	read_conf_file(params, filename);
 

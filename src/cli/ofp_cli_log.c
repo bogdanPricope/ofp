@@ -47,7 +47,7 @@ void f_loglevel_show(struct cli_conn *conn, const char *s)
 {
 	(void)s;
 	ofp_sendf(conn->fd, "Log level: %s\r\n",
-		loglevel_descript[ofp_loglevel]);
+		loglevel_descript[ofp_loglevel_get()]);
 
 	sendcrlf(conn);
 }
@@ -60,7 +60,7 @@ void f_loglevel(struct cli_conn *conn, const char *s)
 	for (i = 0; i < OFP_LOG_MAX_LEVEL; i++) {
 		if (strncmp(loglevel_descript[i], s,
 			strlen(loglevel_descript[i])) == 0) {
-			ofp_loglevel = i;
+			ofp_loglevel_set(i);
 			sendcrlf(conn);
 			return;
 		}

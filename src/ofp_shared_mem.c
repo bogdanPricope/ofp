@@ -9,7 +9,7 @@
 #include <inttypes.h>
 #include "ofpi_shared_mem.h"
 #include "ofpi_odp_compat.h"
-#include "ofp_log.h"
+#include "ofpi_log.h"
 
 #define SHM_NAME_COMMON "OfpCommon"
 #define SHM_NAME_INTERNAL "OfpShmInternal"

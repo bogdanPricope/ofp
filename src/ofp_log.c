@@ -6,9 +6,28 @@
  */
 
 #include "ofpi_log.h"
+#include "ofpi_global_param_shm.h"
 
-#ifdef OFP_DEBUG
-enum ofp_log_level_s ofp_loglevel = OFP_LOG_DEBUG;
-#else
-enum ofp_log_level_s ofp_loglevel = OFP_LOG_INFO;
-#endif
+enum ofp_log_level_s ofp_loglevel_get(void)
+{
+	if (!shm_global)
+		return OFP_LOG_DISABLED;
+
+	return V_global_loglevel;
+}
+
+void ofp_loglevel_set(enum ofp_log_level_s loglevel)
+{
+	if (!shm_global)
+		return;
+
+	V_global_loglevel = loglevel;
+}
+
+int ofp_debug_logging_enabled(void)
+{
+	if (!shm_global)
+		return 0;
+	return (V_global_loglevel == OFP_LOG_DEBUG);
+}
+

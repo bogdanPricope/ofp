@@ -349,10 +349,11 @@ int main(int argc, char *argv[])
 
 	uint32_t neighbors = 1<<arg.neighbor_bits, routes = 1<<arg.route_bits;
 	addr_mask = (1 << (arg.route_bits + (32 - arg.masklen))) - 1;
-	ofp_loglevel = arg.loglevel;
 
 	ASSERT(!odp_init_global(&instance, NULL, NULL));
 	ASSERT(!odp_init_local(instance, ODP_THREAD_CONTROL));
+
+	ofp_loglevel_set(arg.loglevel);
 
 	print_info();
 

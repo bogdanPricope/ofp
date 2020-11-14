@@ -6,7 +6,7 @@
 
 #include "ofpi_ip_shm.h"
 #include "ofpi_shared_mem.h"
-#include "api/ofp_log.h"
+#include "ofpi_log.h"
 #include "ofpi_in_pcb.h"
 #include "ofpi_in_mcast.h"
 

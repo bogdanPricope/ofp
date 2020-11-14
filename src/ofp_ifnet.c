@@ -11,7 +11,7 @@
 #include "ofpi_util.h"
 
 #include "ofp_errno.h"
-#include "ofp_log.h"
+#include "ofpi_log.h"
 
 /* Open a packet IO instance for this ifnet device for the pktin_mode. */
 int ofp_pktio_open(struct ofp_ifnet *ifnet, odp_pktio_param_t *pktio_param)

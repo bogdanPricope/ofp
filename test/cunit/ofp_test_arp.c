@@ -16,7 +16,7 @@
 #include "ofpi.h"
 #include "ofpi_arp.h"
 
-#include "ofp_log.h"
+#include "ofpi_log.h"
 #include "ofp_route_arp.h"
 
 #include <odp_api.h>

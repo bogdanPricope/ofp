@@ -6,6 +6,7 @@
 
 #include "ofpi_global_param_shm.h"
 #include "ofpi_util.h"
+#include "ofpi_log.h"
 
 #define SHM_NAME_GLOBAL_CONFIG "OfpGlobalConfigShMem"
 
@@ -65,6 +66,8 @@ int ofp_global_param_init_global(ofp_global_param_t *params)
 	odp_cpumask_set(&V_global_linux_cpumask, params->linux_core_id);
 
 	V_global_packet_pool = ODP_POOL_INVALID;
+
+	V_global_loglevel = params->loglevel;
 
 	*global_param = *params;
 
@@ -131,4 +134,3 @@ odp_pool_t ofp_get_packet_pool(void)
 
 	return V_global_packet_pool;
 }
-

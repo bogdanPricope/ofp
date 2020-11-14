@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "api/ofp_log.h"
+#include "ofpi_log.h"
 #include "api/ofp_utils.h"
 #include "ofpi_timer.h"
 #include "ofpi_shared_mem.h"

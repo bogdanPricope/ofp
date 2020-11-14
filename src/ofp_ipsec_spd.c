@@ -8,7 +8,7 @@
 #include <odp_api.h>
 #include "api/ofp_types.h"
 #include "api/ofp_pkt_processing.h"
-#include "api/ofp_log.h"
+#include "ofpi_log.h"
 #include "api/ofp_ipsec.h"
 #include "api/ofp_icmp.h"
 #include "ofpi_in.h"

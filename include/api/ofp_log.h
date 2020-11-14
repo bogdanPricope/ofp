@@ -65,8 +65,10 @@
 #define OFP_DBG(fmt, ...) do {} while (0)
 #endif
 
+#define OFP_LOGLEVEL_GET ofp_loglevel_get()
+
 #define OFP_LOG_NO_CTX(level, fmt, ...) do {		\
-		if (level > ofp_loglevel)		\
+		if (level > OFP_LOGLEVEL_GET)		\
 			break;				\
 		fprintf(stderr, fmt, ##__VA_ARGS__);	\
 	} while (0)
@@ -83,12 +85,28 @@ enum ofp_log_level_s {
 	OFP_LOG_MAX_LEVEL
 };
 
-extern enum ofp_log_level_s ofp_loglevel;
+/**
+ * Get log level
+ *
+ * @retval log level
+*/
+enum ofp_log_level_s ofp_loglevel_get(void);
 
-static inline int ofp_debug_logging_enabled(void)
-{
-	return (ofp_loglevel == OFP_LOG_DEBUG);
-}
+/**
+ * Set log level
+ *
+ * @param loglevel log level to be set
+*/
+void ofp_loglevel_set(enum ofp_log_level_s loglevel);
+
+/**
+ * Check if logging level is 'debug'
+ *
+ * @retval !0 debug log level is set
+ * @retval 0 debug log level is not set
+ *
+*/
+int ofp_debug_logging_enabled(void);
 
 /*
  * Do not use these macros.
@@ -97,7 +115,7 @@ static inline int ofp_debug_logging_enabled(void)
 	(strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
 #define _OFP_LOG(level, fmt, ...) do {					\
-		if (level > ofp_loglevel)				\
+		if (level > OFP_LOGLEVEL_GET)				\
 			break;						\
 		fprintf(stderr, "%s %d %d:%u %s:%d] " fmt "\n",		\
 			(level == OFP_LOG_ERROR)   ? "E" :		\

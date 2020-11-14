@@ -6,7 +6,7 @@
 
 #include "ofpi_igmp_shm.h"
 #include "ofpi_shared_mem.h"
-#include "api/ofp_log.h"
+#include "ofpi_log.h"
 
 #define SHM_NAME_IGMP "OfpIGMPShMem"
 

@@ -26,6 +26,7 @@
 #include <odp_api.h>
 #include "ofp_hook.h"
 #include "ofp_ipsec_init.h"
+#include "ofp_log.h"
 
 #if __GNUC__ >= 4
 #pragma GCC visibility push(default)
@@ -308,6 +309,11 @@ typedef struct ofp_global_param_t {
 	 * ofp_config_interface_up_local() API.
 	 */
 	odp_bool_t if_loopback;
+
+	/**
+	 * Log level
+	*/
+	enum ofp_log_level_s loglevel;
 } ofp_global_param_t;
 
 /**

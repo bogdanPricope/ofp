@@ -76,7 +76,7 @@
 #include "ofpi_tcp.h"
 #include "ofpi_tcp_syncache.h"
 #include "ofpi_icmp.h"
-#include "ofp_log.h"
+#include "ofpi_log.h"
 #include "ofp_pkt_processing.h"
 #include "ofpi_pkt_processing.h"
 
