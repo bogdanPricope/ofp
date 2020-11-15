@@ -48,6 +48,8 @@ extern __thread ofp_global_param_t *global_param;
 
 #define	V_global_loglevel VNET(shm_global->loglevel)
 
+#define	V_global_param VNET(shm_global->global_param)
+
 int ofp_global_param_init_global(ofp_global_param_t *params);
 int ofp_global_param_term_global(void);
 int ofp_global_param_init_local(void);

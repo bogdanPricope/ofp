@@ -22,7 +22,7 @@
  * @param work Work queue entry.
  */
 #define ofp_printf(a, b...) do { \
-		if (ofp_debug_flags & OFP_DEBUG_PRINT_CONSOLE) {\
+		if (V_debug_flags & OFP_DEBUG_PRINT_CONSOLE) {\
 			OFP_LOG_NO_CTX_NO_LEVEL(b); \
 		} \
 		fprintf(a, b); } \
@@ -272,7 +272,6 @@ static void print_pkt_binary(odp_packet_t pkt)
 /* for local debug */
 void ofp_print_packet_buffer(const char *comment, uint8_t *p)
 {
-	static int first = 1;
 	FILE *f;
 	struct ofp_ip *ip;
 	uint16_t proto;
@@ -287,16 +286,20 @@ void ofp_print_packet_buffer(const char *comment, uint8_t *p)
 	if (p[12] == 0x01 && p[13] == 0x98)
 		return;
 #endif
-	if (first) {
-		f = fopen(DEFAULT_DEBUG_TXT_FILE_NAME, "w");
-		fclose(f);
-		first = 0;
+
+	odp_rwlock_write_lock(&V_debug_lock_rw);
+
+	if (V_debug_print_first) {
+		f = fopen(V_debug_print_file_name, "w");
+		V_debug_print_first = 0;
+	} else {
+		f = fopen(V_debug_print_file_name, "a");
 	}
 
-	f = fopen(DEFAULT_DEBUG_TXT_FILE_NAME, "a");
-
-	if (!f)
+	if (!f) {
+		odp_rwlock_write_unlock(&V_debug_lock_rw);
 		return;
+	}
 
 	static struct timeval tv0;
 	struct timeval tv;
@@ -369,6 +372,7 @@ void ofp_print_packet_buffer(const char *comment, uint8_t *p)
 	ofp_printf(f, "\n");
 	fclose(f);
 	fflush(stdout);
+	odp_rwlock_write_unlock(&V_debug_lock_rw);
 }
 
 void ofp_print_packet(const char *comment, odp_packet_t pkt)
@@ -385,4 +389,39 @@ void ofp_print_packet(const char *comment, odp_packet_t pkt)
 #ifdef PRINT_PACKETS_BINARY
 	print_pkt_binary(pkt);
 #endif
+}
+
+void ofp_set_print_file(const char *filename)
+{
+	char *p;
+
+	if (!strlen(filename))
+		return;
+
+	odp_rwlock_write_lock(&V_debug_lock_rw);
+
+	strncpy(V_debug_print_file_name, filename,
+		sizeof(V_debug_print_file_name) - 1);
+	V_debug_print_file_name[sizeof(V_debug_print_file_name) - 1] = 0;
+
+	/* There may be trailing spaces. Remove. */
+	p = &V_debug_print_file_name[strlen(V_debug_print_file_name) - 1];
+	while (p != V_debug_print_file_name && *p == ' ') {
+		*p = '\0';
+		p--;
+	}
+
+	V_debug_print_first = 1;
+
+	odp_rwlock_write_unlock(&V_debug_lock_rw);
+}
+
+void ofp_get_print_file(char *filename, int max_size)
+{
+	odp_rwlock_write_lock(&V_debug_lock_rw);
+
+	strncpy(filename, V_debug_print_file_name, max_size - 1);
+	filename[max_size - 1] = 0;
+
+	odp_rwlock_write_unlock(&V_debug_lock_rw);
 }

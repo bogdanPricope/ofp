@@ -701,6 +701,11 @@ struct cli_command commands[] = {
 		f_debug_capture_file
 	},
 	{
+		"debug print file STRING",
+		"File to save printed packets",
+		f_debug_print_file
+	},
+	{
 		"loglevel",
 		"Show or set log level",
 		f_loglevel_show

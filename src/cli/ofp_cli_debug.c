@@ -17,15 +17,15 @@
 void f_debug(struct cli_conn *conn, const char *s)
 {
 	(void)s;
-	ofp_debug_flags = (ofp_debug_flags &
+	V_debug_flags = (V_debug_flags &
 		(~OFP_DEBUG_PCAP_PORT_MASK)) |
 		strtol(s, NULL, 0);
 
-	if ((ofp_debug_flags & OFP_DEBUG_CAPTURE) &&
-		(ofp_debug_capture_ports == 0)) {
+	if ((V_debug_flags & OFP_DEBUG_CAPTURE) &&
+	    (V_debug_pcap_ports == 0)) {
 
 		/*enable capture on first port*/
-		ofp_debug_capture_ports = 0x1;
+		V_debug_pcap_ports = 0x1;
 	}
 	sendcrlf(conn);
 }
@@ -34,48 +34,46 @@ void f_debug(struct cli_conn *conn, const char *s)
 void f_debug_show(struct cli_conn *conn, const char *s)
 {
 	int i;
-	char filename[128];
 
 	(void)s;
 
-	if (ofp_debug_flags & (OFP_DEBUG_PRINT_RECV_NIC |
+	if (V_debug_flags & (OFP_DEBUG_PRINT_RECV_NIC |
 				 OFP_DEBUG_PRINT_SEND_NIC |
 				 OFP_DEBUG_PRINT_RECV_KNI |
 				 OFP_DEBUG_PRINT_SEND_KNI)) {
 		ofp_sendf(conn->fd,
 			"Printing traffic on file%s:%s%s%s%s\r\n",
-			ofp_debug_flags & OFP_DEBUG_PRINT_CONSOLE ?
+			V_debug_flags & OFP_DEBUG_PRINT_CONSOLE ?
 			" (and console)" : "",
-			ofp_debug_flags & OFP_DEBUG_PRINT_RECV_NIC ?
+			V_debug_flags & OFP_DEBUG_PRINT_RECV_NIC ?
 			" ODP-to-FP" : "",
-			ofp_debug_flags & OFP_DEBUG_PRINT_SEND_NIC ?
+			V_debug_flags & OFP_DEBUG_PRINT_SEND_NIC ?
 			" FP-to-ODP" : "",
-			ofp_debug_flags & OFP_DEBUG_PRINT_RECV_KNI ?
+			V_debug_flags & OFP_DEBUG_PRINT_RECV_KNI ?
 			" FP-to-SP" : "",
-			ofp_debug_flags & OFP_DEBUG_PRINT_SEND_KNI ?
+			V_debug_flags & OFP_DEBUG_PRINT_SEND_KNI ?
 			" SP-to-ODP" : "");
-		ofp_sendf(conn->fd, "  Printing file: "
-			DEFAULT_DEBUG_TXT_FILE_NAME"\r\n");
+		ofp_sendf(conn->fd, "  Printing file: %s\r\n",
+			  V_debug_print_file_name);
 	} else {
 		ofp_sendf(conn->fd, "Printing NO traffic.\r\n");
 	}
 
-	if (ofp_debug_flags & OFP_DEBUG_CAPTURE) {
+	if (V_debug_flags & OFP_DEBUG_CAPTURE) {
 		ofp_sendf(conn->fd,
 			    "Capturing traffic from ports%s:",
-			    ofp_debug_capture_ports &
+			    V_debug_pcap_ports &
 			    OFP_DEBUG_PCAP_CONF_ADD_INFO ?
 			    " (with info)" : "");
 
 		for (i = 0; i < 30; i++)
-			if (ofp_debug_capture_ports & (1 << i))
+			if (V_debug_pcap_ports & (1 << i))
 				ofp_sendf(conn->fd, " %d", i);
 
 		ofp_sendf(conn->fd, "\r\n");
 
-		ofp_get_capture_file(filename, sizeof(filename));
-
-		ofp_sendf(conn->fd, "  Capturing file: %s\r\n", filename);
+		ofp_sendf(conn->fd, "  Capturing file: %s\r\n",
+			  V_debug_pcap_file_name);
 	} else {
 		ofp_sendf(conn->fd, "Capturing NO traffic.\r\n");
 	}
@@ -86,12 +84,12 @@ void f_debug_show(struct cli_conn *conn, const char *s)
 /* debug capture NUMBER */
 void f_debug_capture(struct cli_conn *conn, const char *s)
 {
-	ofp_debug_capture_ports = strtol(s, NULL, 0);
+	V_debug_pcap_ports = strtol(s, NULL, 0);
 
-	if (ofp_debug_capture_ports)
-		ofp_debug_flags |= OFP_DEBUG_CAPTURE;
+	if (V_debug_pcap_ports)
+		V_debug_flags |= OFP_DEBUG_CAPTURE;
 	else
-		ofp_debug_flags &= ~OFP_DEBUG_CAPTURE;
+		V_debug_flags &= ~OFP_DEBUG_CAPTURE;
 
 	sendcrlf(conn);
 }
@@ -100,9 +98,9 @@ void f_debug_capture(struct cli_conn *conn, const char *s)
 void f_debug_info(struct cli_conn *conn, const char *s)
 {
 	if (atoi(s))
-		ofp_debug_capture_ports |= OFP_DEBUG_PCAP_CONF_ADD_INFO;
+		V_debug_pcap_ports |= OFP_DEBUG_PCAP_CONF_ADD_INFO;
 	else
-		ofp_debug_capture_ports &= ~OFP_DEBUG_PCAP_CONF_ADD_INFO;
+		V_debug_pcap_ports &= ~OFP_DEBUG_PCAP_CONF_ADD_INFO;
 
 	sendcrlf(conn);
 }
@@ -112,6 +110,14 @@ void f_debug_capture_file(struct cli_conn *conn, const char *s)
 {
 	(void)s;
 	ofp_set_capture_file(s);
+	sendcrlf(conn);
+}
+
+/* debug print file STRING */
+void f_debug_print_file(struct cli_conn *conn, const char *s)
+{
+	(void)s;
+	ofp_set_print_file(s);
 	sendcrlf(conn);
 }
 
@@ -164,6 +170,12 @@ void f_help_debug(struct cli_conn *conn, const char *s)
 	  "  debug capture file <filename>\r\n"
 	  "  Example:\r\n"
 	  "    debug capture file /root/my-fifo\r\n\r\n");
+
+	ofp_sendf(conn->fd,
+		  "Set packet print file\r\n"
+		  "  debug print file <filename>\r\n"
+		  "  Example:\r\n"
+		  "    debug print file /root/my_file\r\n\r\n");
 
 	ofp_sendf(conn->fd,
 	  "Set the first octet of the destination MAC address "

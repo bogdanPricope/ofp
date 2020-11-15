@@ -47,14 +47,19 @@ uint8_t pcap_header[24] = {
 };
 
 /*
+ * Helpers
+ */
+#define fail_with_odp(msg) do { OFP_ERR(msg); CU_FAIL(msg); } while (0)
+
+/*
  * INIT
  */
 static int
 init_suite(void)
 {
-	odp_pool_param_t pool_params;
 	odp_pool_t pool;
 	odp_instance_t instance;
+	ofp_global_param_t params;
 
 	/* Init ODP before calling anything else */
 	if (odp_init_global(&instance, NULL, NULL)) {
@@ -68,17 +73,13 @@ init_suite(void)
 		return -1;
 	}
 
-	HANDLE_ERROR(ofp_pcap_init_global());
+	ofp_init_global_param(&params);
 
-	odp_pool_param_init(&pool_params);
-	pool_params.pkt.seg_len = SHM_PKT_POOL_BUFFER_SIZE;
-	pool_params.pkt.len = SHM_PKT_POOL_BUFFER_SIZE;
-	pool_params.pkt.num = SHM_PKT_POOL_NB_PKTS;
-	pool_params.type = ODP_POOL_PACKET;
+	(void)ofp_init_global(instance, &params);
 
-	pool = odp_pool_create("packet_pool", &pool_params);
+	pool = odp_pool_lookup("packet_pool");
 	if (pool == ODP_POOL_INVALID) {
-		OFP_ERR("Error: packet pool create failed.\n");
+		fail_with_odp("ODP packet_pool not found\n");
 		return -1;
 	}
 
@@ -93,11 +94,6 @@ clean_suite(void)
 {
 	return 0;
 }
-
-/*
- * Helpers
- */
-#define fail_with_odp(msg) do { OFP_ERR(msg); CU_FAIL(msg); } while (0)
 
 static int
 create_odp_packet_ip4(odp_packet_t *opkt, uint8_t *pkt_data, int plen)
@@ -191,8 +187,8 @@ test_pcap(void)
 	uint8_t *buf;
 
 	/* INIT */
-	ofp_debug_capture_ports = 1 << port;
-	ofp_debug_flags = OFP_DEBUG_PRINT_RECV_NIC |
+	V_debug_pcap_ports = 1 << port;
+	V_debug_flags = OFP_DEBUG_PRINT_RECV_NIC |
 			    OFP_DEBUG_PRINT_SEND_NIC |
 			    OFP_DEBUG_CAPTURE;
 
@@ -246,8 +242,8 @@ test_pcap(void)
 		goto err;
 
 err:
-	ofp_debug_capture_ports = 0;
-	ofp_debug_flags = ofp_debug_flags ^ OFP_DEBUG_CAPTURE;
+	V_debug_pcap_ports = 0;
+	V_debug_flags = V_debug_flags ^ OFP_DEBUG_CAPTURE;
 }
 
 /*

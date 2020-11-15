@@ -27,6 +27,7 @@
 #include "ofp_hook.h"
 #include "ofp_ipsec_init.h"
 #include "ofp_log.h"
+#include "ofp_config.h"
 
 #if __GNUC__ >= 4
 #pragma GCC visibility push(default)
@@ -312,8 +313,48 @@ typedef struct ofp_global_param_t {
 
 	/**
 	 * Log level
-	*/
+	 */
 	enum ofp_log_level_s loglevel;
+
+	/**
+	 * Debug parameters
+	 */
+	struct debug_s {
+		/**
+		 * Bitmask options for printing traffic on file (and console) in
+		 * text format and capturing traffic on file in pcap format.
+		 *	bit 0: print packets from ODP to FP.
+		 *		Use OFP_DEBUG_PRINT_RECV_NIC to set this flag.
+		 *	bit 1: print packets from FP to ODP.
+		 *		Use OFP_DEBUG_PRINT_SEND_NIC to set this flag.
+		 *	bit 2: print packets from FP to SP.
+		 *		Use OFP_DEBUG_PRINT_RECV_KNI to set this flag.
+		 *	bit 3: print packets from SP to ODP.
+		 *		Use OFP_DEBUG_PRINT_SEND_KNI to set this flag.
+		 *	bit 4: print packets to console.
+		 *		Use OFP_DEBUG_PRINT_CONSOLE to set this flag.
+		 *	bit 6: capture packets to pcap file.
+		 *		Use OFP_DEBUG_CAPTURE to set this flag.
+		 */
+		int flags;
+
+		/**
+		 * Name of the file where the packets are printed (text format)
+		 * Default value is givern by DEFAULT_DEBUG_TXT_FILE_NAME macro.
+		 */
+		char print_filename[OFP_FILE_NAME_SIZE_MAX];
+
+		/**
+		 * Bitmask of the ports for which the packets are captures
+		 */
+		int capture_ports;
+
+		/**
+		 * Name of the file where the packets are captured (pcap format)
+		 * Default value is given by DEFAULT_DEBUG_PCAP_FILE_NAME macro.
+		 */
+		char capture_filename[OFP_FILE_NAME_SIZE_MAX];
+	} debug;
 } ofp_global_param_t;
 
 /**

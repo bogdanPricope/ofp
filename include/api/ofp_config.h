@@ -162,4 +162,7 @@
 #define OFP_CHKSUM_OFFLOAD_UDP_TX  1
 #define OFP_CHKSUM_OFFLOAD_TCP_TX  1
 
+/** Maximum size of a file name */
+#define OFP_FILE_NAME_SIZE_MAX 256
+
 #endif

@@ -52,6 +52,7 @@ void f_debug(struct cli_conn *conn, const char *s);
 void f_debug_show(struct cli_conn *conn, const char *s);
 void f_debug_capture(struct cli_conn *conn, const char *s);
 void f_debug_info(struct cli_conn *conn, const char *s);
+void f_debug_print_file(struct cli_conn *conn, const char *s);
 void f_debug_capture_file(struct cli_conn *conn, const char *s);
 void f_help_debug(struct cli_conn *conn, const char *s);
 

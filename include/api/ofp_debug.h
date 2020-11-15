@@ -22,7 +22,7 @@
 #define OFP_DEBUG_PRINT_RECV_KNI 4
 #define OFP_DEBUG_PRINT_SEND_KNI 8
 #define OFP_DEBUG_PRINT_CONSOLE 16
-#define OFP_DEBUG_CAPTURE       64
+#define OFP_DEBUG_CAPTURE       32
 
 void ofp_set_debug_flags(int flags);
 int ofp_get_debug_flags(void);
@@ -30,14 +30,17 @@ int ofp_get_debug_flags(void);
 #define OFP_DEBUG_PCAP_PORT_MASK 0x3f
 #define OFP_DEBUG_PCAP_CONF_ADD_INFO 0x80000000
 
-void ofp_set_debug_capture_ports(int ports);
-int ofp_get_debug_capture_ports(void);
-
 /*
  * Debug PCAP interface
  */
+void ofp_set_debug_capture_ports(int ports);
+int ofp_get_debug_capture_ports(void);
+
 void ofp_set_capture_file(const char *filename);
 void ofp_get_capture_file(char *filename, int max_size);
+
+void ofp_set_print_file(const char *filename);
+void ofp_get_print_file(char *filename, int max_size);
 
 /*
  * Debug PRINT interface

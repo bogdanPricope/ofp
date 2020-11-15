@@ -138,6 +138,7 @@ static void read_conf_file(ofp_global_param_t *params, const char *filename)
 	config_setting_t *setting;
 	int length;
 	const char *str;
+	size_t str_len;
 	int i;
 
 	if (!filename) {
@@ -176,14 +177,24 @@ static void read_conf_file(ofp_global_param_t *params, const char *filename)
 		if (i >= 0) params->p = i;				\
 	}
 
-	GET_CONF_STR(pktin_mode, pktin_mode);
-	GET_CONF_STR(pktout_mode, pktout_mode);
-	GET_CONF_STR(sched_sync, sched_sync);
-	GET_CONF_STR(sched_group, sched_group);
+#define GET_CONF_STRING(p) do {					\
+	if (config_lookup_string(&conf, "ofp_global_param." STR(p), &str)) { \
+		str_len  = strlen(str);					\
+		if (str_len >= sizeof(params->p) - 1)			\
+			str_len = sizeof(params->p) - 1;		\
+		strncpy(params->p, str, str_len);			\
+		params->p[str_len] = '\0';				\
+	}								\
+} while (0)
 
 #define GET_CONF_INT(type, p)						\
 	if (config_lookup_ ## type(&conf, "ofp_global_param." STR(p), &i)) \
 		params->p = i;
+
+	GET_CONF_STR(pktin_mode, pktin_mode);
+	GET_CONF_STR(pktout_mode, pktout_mode);
+	GET_CONF_STR(sched_sync, sched_sync);
+	GET_CONF_STR(sched_group, sched_group);
 
 	GET_CONF_INT(int, linux_core_id);
 	GET_CONF_INT(bool, enable_nl_thread);
@@ -228,6 +239,11 @@ static void read_conf_file(ofp_global_param_t *params, const char *filename)
 	GET_CONF_INT(bool, if_loopback);
 
 	GET_CONF_STR(loglevel, loglevel);
+
+	GET_CONF_INT(int, debug.flags);
+	GET_CONF_STRING(debug.print_filename);
+	GET_CONF_INT(int, debug.capture_ports);
+	GET_CONF_STRING(debug.capture_filename);
 done:
 	config_destroy(&conf);
 }
@@ -289,6 +305,11 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
 #else
 	params->loglevel = OFP_LOG_INFO;
 #endif
+
+	params->debug.flags = 0;
+	params->debug.print_filename[0] = 0;
+	params->debug.capture_ports = 0;
+	params->debug.capture_filename[0] = 0;
 
 	read_conf_file(params, filename);
 
@@ -352,7 +373,7 @@ static void ofp_init_prepare(void)
 	ofp_sysctl_init_prepare();
 	ofp_avl_init_prepare();
 	ofp_reassembly_init_prepare();
-	ofp_pcap_init_prepare();
+	ofp_debug_init_prepare();
 	ofp_stat_init_prepare();
 	ofp_timer_init_prepare();
 	ofp_hook_init_prepare();
@@ -393,7 +414,7 @@ static int ofp_init_pre_global(ofp_global_param_t *params)
 
 	HANDLE_ERROR(ofp_reassembly_init_global());
 
-	HANDLE_ERROR(ofp_pcap_init_global());
+	HANDLE_ERROR(ofp_debug_init_global());
 
 	HANDLE_ERROR(ofp_stat_init_global());
 
@@ -520,7 +541,7 @@ int ofp_init_local(void)
 	HANDLE_ERROR(ofp_vrf_route_lookup_shared_memory());
 	HANDLE_ERROR(ofp_avl_lookup_shared_memory());
 	HANDLE_ERROR(ofp_reassembly_lookup_shared_memory());
-	HANDLE_ERROR(ofp_pcap_lookup_shared_memory());
+	HANDLE_ERROR(ofp_debug_lookup_shared_memory());
 	HANDLE_ERROR(ofp_stat_lookup_shared_memory());
 	HANDLE_ERROR(ofp_socket_lookup_shared_memory());
 	HANDLE_ERROR(ofp_timer_lookup_shared_memory());
@@ -683,8 +704,8 @@ int ofp_term_post_global(const char *pool_name)
 	/* Cleanup stats */
 	CHECK_ERROR(ofp_stat_term_global(), rc);
 
-	/* Cleanup packet capture */
-	CHECK_ERROR(ofp_pcap_term_global(), rc);
+	/* Cleanup debug */
+	CHECK_ERROR(ofp_debug_term_global(), rc);
 
 	/* Cleanup reassembly queues*/
 	CHECK_ERROR(ofp_reassembly_term_global(), rc);
