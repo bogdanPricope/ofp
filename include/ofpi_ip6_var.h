@@ -69,20 +69,7 @@
 #include "ofpi_in6.h"
 #include "ofpi_vnet.h"
 #include "ofpi_systm.h"
-
-VNET_DECLARE(int, ip6_v6only);
-#define	V_ip6_v6only			VNET(ip6_v6only)
-
-VNET_DECLARE(int, ip6_auto_flowlabel);
-#define	V_ip6_auto_flowlabel		VNET(ip6_auto_flowlabel)
-
-VNET_DECLARE(int, ip6_use_defzone);	/* Whether to use the default scope
-					 * zone when unspecified */
-#define	V_ip6_use_defzone		VNET(ip6_use_defzone)
-
-VNET_DECLARE(int, ip6_defhlim);		/* default hop limit */
-
-#define	V_ip6_defhlim			VNET(ip6_defhlim)
+#include "ofpi_ip6_shm.h"
 
 #if 0
 /*

@@ -268,10 +268,3 @@ struct domain ofp_inet6domain = {
 				&ofp_inet6sw[sizeof(ofp_inet6sw) /
 					sizeof(ofp_inet6sw[0])],
 };
-
-VNET_DEFINE(int, ip6_v6only) = 1;
-VNET_DEFINE(int, ip6_auto_flowlabel) = 1;
-VNET_DEFINE(int, ip6_defhlim) = OFP_IPV6_DEFHLIM;
-
-VNET_DEFINE(int, icmp6_rediraccept) = 1;/* accept and process redirects */
-VNET_DEFINE(int, icmp6_redirtimeout) = 10 * 60;	/* 10 minutes */

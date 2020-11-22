@@ -41,6 +41,7 @@ include_HEADERS = \
 
 noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_global_param_shm.h \
+		  $(top_srcdir)/include/ofpi_sp_shm.h \
 		  $(top_srcdir)/include/ofpi_netlink.h \
 		  $(top_srcdir)/include/ofpi_pkt_processing.h \
 		  $(top_srcdir)/include/ofpi_arp.h \
@@ -73,6 +74,7 @@ noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_in_mcast.h \
 		  $(top_srcdir)/include/ofpi_in_var.h \
 		  $(top_srcdir)/include/ofpi_ioctl.h \
+		  $(top_srcdir)/include/ofpi_ip6_shm.h \
 		  $(top_srcdir)/include/ofpi_ip6.h \
 		  $(top_srcdir)/include/ofpi_ip6_var.h \
 		  $(top_srcdir)/include/ofpi_ip6protosw.h \

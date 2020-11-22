@@ -2705,7 +2705,7 @@ step6:
 		 * actually wanting to send this much urgent data.
 		 */
 		SOCKBUF_LOCK(&so->so_rcv);
-		if (th->th_urp + so->so_rcv.sb_cc > ofp_sb_max) {
+		if (th->th_urp + so->so_rcv.sb_cc > V_sb_max) {
 			th->th_urp = 0;			/* XXX */
 			thflags &= ~OFP_TH_URG;		/* XXX */
 			SOCKBUF_UNLOCK(&so->so_rcv);	/* XXX */
@@ -3544,8 +3544,8 @@ ofp_tcp_mss(struct tcpcb *tp, int offer)
 	else {
 #define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
 		bufsize = roundup(bufsize, mss);
-		if (bufsize > ofp_sb_max)
-			bufsize = ofp_sb_max;
+		if (bufsize > V_sb_max)
+			bufsize = V_sb_max;
 		if (bufsize > so->so_snd.sb_hiwat)
 			(void)ofp_sbreserve_locked(&so->so_snd, bufsize, so, NULL);
 	}
@@ -3559,8 +3559,8 @@ ofp_tcp_mss(struct tcpcb *tp, int offer)
 		bufsize = so->so_rcv.sb_hiwat;
 	if ((int)bufsize > mss) {
 		bufsize = roundup(bufsize, mss);
-		if (bufsize > ofp_sb_max)
-			bufsize = ofp_sb_max;
+		if (bufsize > V_sb_max)
+			bufsize = V_sb_max;
 		if (bufsize > so->so_rcv.sb_hiwat)
 			(void)ofp_sbreserve_locked(&so->so_rcv, bufsize, so, NULL);
 	}

@@ -62,10 +62,6 @@
 //#define MCLBYTES	(1 << MCLSHIFT)	/* size of an mbuf cluster */
 #endif
 
-uint64_t ofp_sb_max = SB_MAX;
-
-static uint64_t sb_efficiency = 8;	/* parameter for ofp_sbreserve() */
-
 int packet_accepted_as_event(struct socket *so, odp_packet_t pkt)
 {
 	struct ofp_sigevent *ev;
@@ -501,12 +497,14 @@ ofp_sbreserve_locked(struct sockbuf *sb, uint64_t cc, struct socket *so,
 	 * we don't apply a process limit.
 	 */
 
+	/* adjusted V_sb_max */
 	uint64_t ofp_sb_max_adj =
-		(int64_t)SB_MAX * global_param->pkt_pool.buffer_size / (MSIZE + mclbytes); /* adjusted ofp_sb_max */
+		(int64_t)SB_MAX * global_param->pkt_pool.buffer_size /
+		(MSIZE + mclbytes);
 	if (cc > ofp_sb_max_adj)
 		return (0);
 	sb->sb_hiwat = cc;
-	sb->sb_mbmax = min(cc * sb_efficiency, ofp_sb_max);
+	sb->sb_mbmax = min(cc * V_sb_efficiency, V_sb_max);
 	if (sb->sb_lowat > (int)sb->sb_hiwat)
 		sb->sb_lowat = sb->sb_hiwat;
 	return (1);

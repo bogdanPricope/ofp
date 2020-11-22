@@ -26,6 +26,8 @@ int ofp_ip_init_global(void)
 		OFP_ERR("ofp_shared_memory_alloc(\"" SHM_NAME_IP "\") failed");
 		return -1;
 	}
+	odp_memset(ofp_ip_shm, 0, sizeof(*ofp_ip_shm));
+
 	odp_atomic_init_u32(&ofp_ip_shm->ip_id, 0);
 
 	V_l2_max_linkhdr = 64;

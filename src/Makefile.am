@@ -93,6 +93,7 @@ endif
 
 if OFP_SP
 __LIB__libofp_la_SOURCES += \
+ofp_sp_shm.c \
 ofp_netlink.c \
 ofp_quagga.c \
 ofp_tunthread.c
@@ -100,6 +101,7 @@ endif
 
 if OFP_IPv6
 __LIB__libofp_la_SOURCES += \
+ofp_ip6_shm.c \
 ofp_ip6_init.c \
 ofp_in6_proto.c \
 ofp_in6.c \

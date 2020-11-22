@@ -319,9 +319,10 @@ MALLOC_DECLARE(M_PCB);
 MALLOC_DECLARE(M_SONAME);
 #endif
 
-extern uint64_t	ofp_sb_max;
+#if 0
 extern struct uma_zone *socket_zone;
 extern so_gen_t so_gencnt;
+#endif/*0*/
 
 struct mbuf;
 struct ofp_sockaddr;

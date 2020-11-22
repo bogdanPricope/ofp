@@ -22,7 +22,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#ifndef __OFPI_NETLINK_H__
+#define __OFPI_NETLINK_H__
+
 #include <config.h>
+
+#define NUM_NS_SOCKETS 128
+
+typedef struct {
+	int vrf;
+	int fd;
+} ofp_netlink_sock_t;
 
 #ifdef HAVE_QUAGGA
 #define START_NL_SERVER start_quagga_nl_server
@@ -32,3 +43,5 @@ int start_quagga_nl_server(void *arg);
 int start_netlink_nl_server(void *arg);
 int ofp_create_ns_socket(int vrf);
 #endif
+
+#endif /*__OFPI_NETLINK_H__*/

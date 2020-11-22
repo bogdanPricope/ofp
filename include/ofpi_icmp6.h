@@ -10,6 +10,7 @@
 
 #include "api/ofp_icmp6.h"
 #include "ofpi_vnet.h"
+#include "ofpi_ip6_shm.h"
 /*
 void	icmp6_paramerror(struct mbuf *, int);
 */
@@ -30,15 +31,8 @@ struct	ip6ctlparam;
 void	icmp6_mtudisc_update(struct ip6ctlparam *, int);
 */
 
-
 #define ofp_icmp6_ifstat_inc(ifp, tag)
 #define ofp_icmp6_ifoutstat_inc(ifp, type, code)
-
-VNET_DECLARE(int, icmp6_rediraccept);	/* accept/process redirects */
-VNET_DECLARE(int, icmp6_redirtimeout);	/* cache time for redirect routes */
-
-#define	V_icmp6_rediraccept	VNET(icmp6_rediraccept)
-#define	V_icmp6_redirtimeout	VNET(icmp6_redirtimeout)*/
 
 void ofp_nd6_ns_input(odp_packet_t, int, int);
 enum ofp_return_code ofp_nd6_ns_output(struct ofp_ifnet *,

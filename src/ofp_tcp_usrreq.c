@@ -1152,7 +1152,7 @@ tcp_connect(struct tcpcb *tp, struct ofp_sockaddr *nam, struct thread *td)
 	 * XXX: This should move to ofp_tcp_output().
 	 */
 	while (tp->request_r_scale < OFP_TCP_MAX_WINSHIFT &&
-	       ((uint64_t)OFP_TCP_MAXWIN << tp->request_r_scale) < ofp_sb_max)
+	       ((uint64_t)OFP_TCP_MAXWIN << tp->request_r_scale) < V_sb_max)
 		tp->request_r_scale++;
 
 	ofp_soisconnecting(so);
@@ -1229,7 +1229,7 @@ tcp6_connect(struct tcpcb *tp, struct ofp_sockaddr *nam, struct thread *td)
 
 	/* Compute window scaling to request.  */
 	while (tp->request_r_scale < OFP_TCP_MAX_WINSHIFT &&
-	    (uint64_t)(OFP_TCP_MAXWIN << tp->request_r_scale) < ofp_sb_max)
+	    (uint64_t)(OFP_TCP_MAXWIN << tp->request_r_scale) < V_sb_max)
 		tp->request_r_scale++;
 
 	ofp_soisconnecting(so);

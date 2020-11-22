@@ -139,35 +139,12 @@
 /*
  * Shared data
  */
-struct ofp_socket_mem {
-	struct socket *free_sockets;
-	int sockets_allocated, max_sockets_allocated;
-	int socket_zone;
 
-	odp_rwlock_t so_global_mtx;
-	odp_rwlock_t ofp_accept_mtx;
-	int somaxconn;
-	odp_pool_t pool;
-
-	struct sleeper {
-		struct sleeper *next;
-		void *channel;
-		const char *wmesg;
-		int   go;
-		odp_timer_t tmo;
-		int woke_by_timer;
-	} *sleep_list;
-	struct sleeper *free_sleepers;
-	odp_spinlock_t sleep_lock;
-
-	uint32_t socket_list_off;
-	uint32_t sleeper_list_off;
-};
 
 /*
  * Data per core
  */
-static __thread struct ofp_socket_mem *shm;
+__thread struct ofp_socket_mem *shm_socket;
 static __thread struct socket *shm_socket_list;
 static __thread struct sleeper *shm_sleeper_list;
 
@@ -187,7 +164,7 @@ void ofp_print_sockets(void)
 			  so->so_snd.sb_put, so->so_snd.sb_get);
 	}
 
-	struct sleeper *s = shm->sleep_list;
+	struct sleeper *s = shm_socket->sleep_list;
 	while (s) {
 		OFP_INFO("Sleeper %s, tmo=%x go=%d timer=%d",
 			  s->wmesg, s->tmo, s->go, s->woke_by_timer);
@@ -206,22 +183,22 @@ void f_sockets(struct cli_conn *conn, const char *s)
 
 odp_packet_t ofp_socket_packet_alloc(uint32_t len)
 {
-	return ofp_packet_alloc_from_pool(shm->pool, len);
+	return ofp_packet_alloc_from_pool(shm_socket->pool, len);
 }
 
 odp_rwlock_t *ofp_accept_mtx(void)
 {
-	return &shm->ofp_accept_mtx;
+	return &shm_socket->ofp_accept_mtx;
 }
 
 void ofp_accept_lock(void)
 {
-	odp_rwlock_write_lock(&shm->ofp_accept_mtx);
+	odp_rwlock_write_lock(&shm_socket->ofp_accept_mtx);
 }
 
 void ofp_accept_unlock(void)
 {
-	odp_rwlock_write_unlock(&shm->ofp_accept_mtx);
+	odp_rwlock_write_unlock(&shm_socket->ofp_accept_mtx);
 }
 
 static uint64_t ofp_socket_get_shm_socket_list_size(void)
@@ -236,16 +213,16 @@ static uint64_t ofp_socket_get_shm_sleeper_list_size(void)
 
 static uint64_t ofp_socket_get_shm_size(void)
 {
-	return sizeof(*shm) +
+	return sizeof(*shm_socket) +
 		ofp_socket_get_shm_socket_list_size() +
 		ofp_socket_get_shm_sleeper_list_size();
 }
 
 static int ofp_socket_alloc_shared_memory(void)
 {
-	shm = ofp_shared_memory_alloc(SHM_NAME_SOCKET,
-				      ofp_socket_get_shm_size());
-	if (shm == NULL) {
+	shm_socket = ofp_shared_memory_alloc(SHM_NAME_SOCKET,
+					     ofp_socket_get_shm_size());
+	if (shm_socket == NULL) {
 		OFP_ERR("ofp_shared_memory_alloc failed");
 		return -1;
 	}
@@ -260,22 +237,22 @@ static int ofp_socket_free_shared_memory(void)
 		OFP_ERR("ofp_shared_memory_free failed");
 		rc = -1;
 	}
-	shm = NULL;
+	shm_socket = NULL;
 	return rc;
 }
 
 
 int ofp_socket_lookup_shared_memory(void)
 {
-	shm = ofp_shared_memory_lookup(SHM_NAME_SOCKET);
-	if (shm == NULL) {
+	shm_socket = ofp_shared_memory_lookup(SHM_NAME_SOCKET);
+	if (shm_socket == NULL) {
 		OFP_ERR("ofp_shared_memory_lookup failed");
 		return -1;
 	}
-	shm_socket_list = (struct socket *)((uint8_t *)shm +
-		shm->socket_list_off);
-	shm_sleeper_list = (struct sleeper *)((uint8_t *)shm +
-		shm->sleeper_list_off);
+	shm_socket_list = (struct socket *)((uint8_t *)shm_socket +
+		shm_socket->socket_list_off);
+	shm_sleeper_list = (struct sleeper *)((uint8_t *)shm_socket +
+		shm_socket->sleeper_list_off);
 
 	return 0;
 }
@@ -293,17 +270,17 @@ int ofp_socket_init_global(odp_pool_t pool)
 	struct sleeper *sl;
 
 	HANDLE_ERROR(ofp_socket_alloc_shared_memory());
-	memset(shm, 0, ofp_socket_get_shm_size());
+	memset(shm_socket, 0, ofp_socket_get_shm_size());
 
-	shm->socket_list_off = sizeof(*shm);
-	shm->sleeper_list_off = shm->socket_list_off +
+	shm_socket->socket_list_off = sizeof(*shm_socket);
+	shm_socket->sleeper_list_off = shm_socket->socket_list_off +
 		ofp_socket_get_shm_socket_list_size();
 
-	shm->pool = ODP_POOL_INVALID;
-	shm_socket_list = (struct socket *)((uint8_t *)shm +
-		shm->socket_list_off);
-	shm_sleeper_list = (struct sleeper *)((uint8_t *)shm +
-		shm->sleeper_list_off);
+	shm_socket->pool = ODP_POOL_INVALID;
+	shm_socket_list = (struct socket *)((uint8_t *)shm_socket +
+		shm_socket->socket_list_off);
+	shm_sleeper_list = (struct sleeper *)((uint8_t *)shm_socket +
+		shm_socket->sleeper_list_off);
 
 	for (i = 0; i < global_param->socket.num_max; i++) {
 		so = &shm_socket_list[i];
@@ -311,20 +288,23 @@ int ofp_socket_init_global(odp_pool_t pool)
 			NULL : &(shm_socket_list[i + 1]);
 		so->so_number = i + global_param->socket.sd_offset;
 	}
-	shm->free_sockets = shm_socket_list;
+	shm_socket->free_sockets = shm_socket_list;
 
 	for (i = 0; i < global_param->socket.num_max; i++) {
 		sl = &shm_sleeper_list[i];
 		sl->next = (i == global_param->socket.num_max - 1) ?
 			NULL : &(shm_sleeper_list[i + 1]);
 	}
-	shm->free_sleepers = shm_sleeper_list;
+	shm_socket->free_sleepers = shm_sleeper_list;
 
-	shm->somaxconn = SOMAXCONN;
-	shm->pool = pool;
-	odp_rwlock_init(&shm->so_global_mtx);
-	odp_rwlock_init(&shm->ofp_accept_mtx);
-	odp_spinlock_init(&shm->sleep_lock);
+	shm_socket->somaxconn = SOMAXCONN;
+	shm_socket->pool = pool;
+	odp_rwlock_init(&shm_socket->so_global_mtx);
+	odp_rwlock_init(&shm_socket->ofp_accept_mtx);
+	odp_spinlock_init(&shm_socket->sleep_lock);
+
+	V_sb_max = SB_MAX;
+	V_sb_efficiency = 8;	/* parameter for ofp_sbreserve() */
 
 	return 0;
 }
@@ -334,7 +314,7 @@ int ofp_socket_term_global(void)
 	struct sleeper *p, *next;
 	int rc = 0;
 
-	p = shm->sleep_list;
+	p = shm_socket->sleep_list;
 	while (p) {
 		next = p->next;
 		if (p->tmo != ODP_TIMER_INVALID) {
@@ -367,17 +347,20 @@ struct socket *ofp_get_sock_by_fd(int fd)
 static struct socket *soalloc(void)
 {
 #if 1
-	odp_rwlock_write_lock(&shm->so_global_mtx);
-	struct socket *so = shm->free_sockets;
-	if (shm->free_sockets) {
-		shm->free_sockets = shm->free_sockets->next;
-		shm->sockets_allocated++;
-		if (shm->sockets_allocated > shm->max_sockets_allocated)
-			shm->max_sockets_allocated = shm->sockets_allocated;
+	odp_rwlock_write_lock(&shm_socket->so_global_mtx);
+	struct socket *so = shm_socket->free_sockets;
+
+	if (shm_socket->free_sockets) {
+		shm_socket->free_sockets = shm_socket->free_sockets->next;
+		shm_socket->sockets_allocated++;
+		if (shm_socket->sockets_allocated >
+			shm_socket->max_sockets_allocated)
+			shm_socket->max_sockets_allocated =
+				shm_socket->sockets_allocated;
 	}
-	odp_rwlock_write_unlock(&shm->so_global_mtx);
+	odp_rwlock_write_unlock(&shm_socket->so_global_mtx);
 #else
-	struct socket *so = ofp_socket_pool_alloc(shm->socket_zone);
+	struct socket *so = ofp_socket_pool_alloc(shm_socket->socket_zone);
 #endif
 
 	if (so == NULL) {
@@ -411,11 +394,11 @@ sodealloc(struct socket *so)
 	KASSERT(so->so_pcb == NULL, ("sodealloc(): so_pcb != NULL"));
 
 	so->so_proto = 0;
-	odp_rwlock_write_lock(&shm->so_global_mtx);
-	so->next = shm->free_sockets;
-	shm->free_sockets = so;
-	shm->sockets_allocated--;
-	odp_rwlock_write_unlock(&shm->so_global_mtx);
+	odp_rwlock_write_lock(&shm_socket->so_global_mtx);
+	so->next = shm_socket->free_sockets;
+	shm_socket->free_sockets = so;
+	shm_socket->sockets_allocated--;
+	odp_rwlock_write_unlock(&shm_socket->so_global_mtx);
 }
 
 /*
@@ -614,8 +597,8 @@ ofp_solisten_proto(struct socket *so, int backlog)
 {
 	OFP_SOCK_LOCK_ASSERT(so);
 
-	if (backlog < 0 || backlog > shm->somaxconn)
-		backlog = shm->somaxconn;
+	if (backlog < 0 || backlog > shm_socket->somaxconn)
+		backlog = shm_socket->somaxconn;
 	so->so_qlimit = backlog;
 	so->so_options |= OFP_SO_ACCEPTCONN;
 }
@@ -1741,7 +1724,8 @@ dontblock:
 						copy_flag = M_WAIT;
 					if (copy_flag == M_WAIT)
 						SOCKBUF_UNLOCK(&so->so_rcv);
-					*mp = odp_packet_copy(m, shm->pool);
+					*mp = odp_packet_copy(m,
+							      shm_socket->pool);
 					if (copy_flag == M_WAIT)
 						SOCKBUF_LOCK(&so->so_rcv);
  					if (*mp == ODP_PACKET_INVALID) {
@@ -2600,27 +2584,27 @@ ofp_msleep(void *channel, odp_rwlock_t *mtx, int priority, const char *wmesg,
 	(void)mtx;
 	(void)priority;
 
-	odp_spinlock_lock(&shm->sleep_lock);
-	if (!shm->free_sleepers) {
-		odp_spinlock_unlock(&shm->sleep_lock);
+	odp_spinlock_lock(&shm_socket->sleep_lock);
+	if (!shm_socket->free_sleepers) {
+		odp_spinlock_unlock(&shm_socket->sleep_lock);
 		OFP_ERR("Out of sleepers");
 		return OFP_ENOMEM;
 	}
-	sleepy = shm->free_sleepers;
-	shm->free_sleepers = sleepy->next;
+	sleepy = shm_socket->free_sleepers;
+	shm_socket->free_sleepers = sleepy->next;
 
-	sleepy->next = shm->sleep_list;
+	sleepy->next = shm_socket->sleep_list;
 	sleepy->channel = channel;
 	sleepy->wmesg = wmesg;
 	sleepy->go = 0;
 	sleepy->woke_by_timer = 0;
 	sleepy->tmo = ODP_TIMER_INVALID;
-	shm->sleep_list = sleepy;
+	shm_socket->sleep_list = sleepy;
 	if (timeout) {
 		arg.p = channel;
 		sleepy->tmo = ofp_timer_start(timeout, sleep_timeout, &arg, sizeof(arg));
 	}
-	odp_spinlock_unlock(&shm->sleep_lock);
+	odp_spinlock_unlock(&shm_socket->sleep_lock);
 
 	while (sleepy->go == 0) {
 		if (mtx) {
@@ -2632,17 +2616,17 @@ ofp_msleep(void *channel, odp_rwlock_t *mtx, int priority, const char *wmesg,
 		}
 	}
 
-	odp_spinlock_lock(&shm->sleep_lock);
+	odp_spinlock_lock(&shm_socket->sleep_lock);
 
 	if (sleepy->tmo != ODP_TIMER_INVALID)
 		ofp_timer_cancel(sleepy->tmo);
 
 	ret = sleepy->woke_by_timer ? OFP_EWOULDBLOCK : 0;
 
-	sleepy->next = shm->free_sleepers;
-	shm->free_sleepers = sleepy;
+	sleepy->next = shm_socket->free_sleepers;
+	shm_socket->free_sleepers = sleepy;
 
-	odp_spinlock_unlock(&shm->sleep_lock);
+	odp_spinlock_unlock(&shm_socket->sleep_lock);
 
 	return ret;
 }
@@ -2652,16 +2636,16 @@ _ofp_wakeup(void *channel, int one, int tmo)
 {
 	struct sleeper *p, *prev = NULL, *next;
 
-	odp_spinlock_lock(&shm->sleep_lock);
+	odp_spinlock_lock(&shm_socket->sleep_lock);
 
-	p = shm->sleep_list;
+	p = shm_socket->sleep_list;
 	while (p) {
 		next = p->next;
 		if (channel == p->channel) {
 			if (prev)
 				prev->next = p->next;
 			else
-				shm->sleep_list = p->next;
+				shm_socket->sleep_list = p->next;
 			if (tmo) {
 				p->tmo = ODP_TIMER_INVALID;
 				p->woke_by_timer = 1;
@@ -2674,7 +2658,7 @@ _ofp_wakeup(void *channel, int one, int tmo)
 		p = next;
 	}
 
-	odp_spinlock_unlock(&shm->sleep_lock);
+	odp_spinlock_unlock(&shm_socket->sleep_lock);
 	return -1;
 }
 

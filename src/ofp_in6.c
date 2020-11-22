@@ -70,8 +70,6 @@
 #include "api/ofp_errno.h"
 #include "ofpi_vnet.h"
 
-VNET_DEFINE(int, ip6_use_defzone) = 1;
-
 /*
  * Definitions of some costant IP6 addresses.
  */

@@ -41,20 +41,78 @@
 #include "ofpi_util.h"
 #include "ofpi_netlink.h"
 #include "ofpi_init.h"
+#include "ofpi_sp_shm.h"
+
+#define STACK_SIZE (128 * 1024)
 
 #define ARPHRD_VXLAN 799
 #define NETNS_RUN_DIR "/var/run/netns"
-#define NUM_NS_SOCKETS 128
 
-static struct {
-	int vrf;
-	int fd;
-} ns_sockets[NUM_NS_SOCKETS];
-static int sock_cnt = 0;
 #define ALLVRF ((int)0xffffffff)
 
+static int route_recv(int fd, int vrf);
+
+/* Variable that remain with netlink thread (no shm)*/
 #define BUFFER_SIZE 4096
 static char buffer[BUFFER_SIZE];
+static fd_set read_fd;
+
+/* Netlink thread */
+int start_netlink_nl_server(void *arg)
+{
+	int i, r;
+	fd_set fds;
+	struct timeval timeout;
+	struct ofp_global_config_mem *ofp_global_cfg = NULL;
+
+	(void)arg;
+
+	/* Lookup shared memories */
+	if (ofp_init_local()) {
+		OFP_ERR("Error: OFP local init failed.\n");
+		return -1;
+	}
+
+	FD_ZERO(&read_fd);
+
+	ofp_create_ns_socket(ALLVRF);
+
+	ofp_global_cfg = ofp_get_global_config();
+	if (!ofp_global_cfg) {
+		OFP_ERR("Error: Failed to retrieve global configuration.");
+		ofp_term_local();
+		return -1;
+	}
+
+	while (ofp_global_cfg->is_running) {
+		fds = read_fd;
+
+		timeout.tv_sec = 0;
+		timeout.tv_usec = 10000;
+
+		r = select(FD_SETSIZE, &fds, NULL, NULL, &timeout);
+
+		if (r < 0)
+			continue;
+
+		for (i = 0; i < V_sp_netlink_sock_cnt; i++) {
+			if (V_sp_netlink_sockets[i].fd > 0 &&
+			    FD_ISSET(V_sp_netlink_sockets[i].fd, &fds)) {
+				route_recv(V_sp_netlink_sockets[i].fd,
+					   V_sp_netlink_sockets[i].vrf);
+			}
+		}
+	}
+
+	for (i = 0; i < V_sp_netlink_sock_cnt; i++) {
+		if (V_sp_netlink_sockets[i].fd > 0)
+			close(V_sp_netlink_sockets[i].fd);
+	}
+
+	OFP_DBG("Netlink server exiting");
+	ofp_term_local();
+	return 0;
+}
 
 #ifdef NETLINK_DEBUG
 static const char *rtm_msgtype_to_string(unsigned short type)
@@ -891,75 +949,9 @@ static int route_recv(int fd, int vrf)
 	return rtn;
 }
 
-static fd_set read_fd;
-
-int start_netlink_nl_server(void *arg)
-{
-	int i, r;
-	fd_set fds;
-	struct timeval timeout;
-	struct ofp_global_config_mem *ofp_global_cfg = NULL;
-
-	(void)arg;
-
-	/* Lookup shared memories */
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
-		return -1;
-	}
-
-	for (i = 0; i < NUM_NS_SOCKETS; i++) {
-		ns_sockets[i].vrf = -1;
-		ns_sockets[i].fd = -1;
-	}
-
-	FD_ZERO(&read_fd);
-
-	ofp_create_ns_socket(ALLVRF);
-
-	ofp_global_cfg = ofp_get_global_config();
-	if (!ofp_global_cfg) {
-		OFP_ERR("Error: Failed to retrieve global configuration.");
-		ofp_term_local();
-		return -1;
-	}
-
-	while (ofp_global_cfg->is_running) {
-		fds = read_fd;
-
-		timeout.tv_sec = 0;
-		timeout.tv_usec = 10000;
-
-		r = select(FD_SETSIZE, &fds, NULL, NULL, &timeout);
-
-		if (r < 0)
-			continue;
-
-		for (i = 0; i < sock_cnt; i++) {
-			if (ns_sockets[i].fd > 0 &&
-			    FD_ISSET(ns_sockets[i].fd, &fds)) {
-				route_recv(ns_sockets[i].fd, ns_sockets[i].vrf /*la.nl_groups*/);
-			}
-		}
-	}
-
-	for (i = 0; i < sock_cnt; i++) {
-		if (ns_sockets[i].fd > 0)
-			close(ns_sockets[i].fd);
-	}
-
-	OFP_DBG("Netlink server exiting");
-	ofp_term_local();
-	return 0;
-}
-
 extern int setns (int __fd, int __nstype) __THROW;
 extern int clone (int (*__fn) (void *__arg), void *__child_stack,
                   int __flags, void *__arg, ...) __THROW;
-
-#define STACK_SIZE (128 * 1024)
-static char child_stack[STACK_SIZE] ODP_ALIGNED_CACHE;
-
 
 static int open_nl_socket(int vrf)
 {
@@ -1006,10 +998,10 @@ static int open_nl_socket(int vrf)
 		return -1;
 	}
 
-	ns_sockets[sock_cnt].vrf = vrf;
-	ns_sockets[sock_cnt].fd = fd;
+	V_sp_netlink_sockets[V_sp_netlink_sock_cnt].vrf = vrf;
+	V_sp_netlink_sockets[V_sp_netlink_sock_cnt].fd = fd;
 	FD_SET(fd, &read_fd);
-	sock_cnt++;
+	V_sp_netlink_sock_cnt++;
 
 	return 0;
 }
@@ -1031,7 +1023,7 @@ static int get_ns_socket_child(void *arg)
 		dir = opendir(NETNS_RUN_DIR);
 		if (dir) {
 			while ((entry = readdir(dir)) != NULL &&
-			       sock_cnt < NUM_NS_SOCKETS) {
+			       V_sp_netlink_sock_cnt < NUM_NS_SOCKETS) {
 				if(strncmp(entry->d_name, "vrf", 3))
 					continue;
 
@@ -1052,9 +1044,10 @@ static int get_ns_socket_child(void *arg)
 
 int ofp_create_ns_socket(int vrf)
 {
-	pid_t child_pid;
+	pid_t child_pid = -1;
+	char child_stack[STACK_SIZE] ODP_ALIGNED_CACHE;
 
-	if (sock_cnt >= NUM_NS_SOCKETS)
+	if (V_sp_netlink_sock_cnt >= NUM_NS_SOCKETS)
 		return -1;
 
 	child_pid = clone(get_ns_socket_child, child_stack + STACK_SIZE,

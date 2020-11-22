@@ -23,7 +23,6 @@
 #include "ofpi_sysctl.h"
 #include "ofpi_util.h"
 #include "ofpi_stat.h"
-#include "ofpi_netlink.h"
 #include "ofpi_portconf.h"
 #include "ofpi_route.h"
 #include "ofpi_rt_lookup.h"
@@ -46,6 +45,13 @@
 
 #include "ofpi_log.h"
 #include "ofpi_debug.h"
+#ifdef INET6
+#include "ofpi_ip6_shm.h"
+#endif /*INET6*/
+
+#ifdef SP
+#	include "ofpi_sp_shm.h"
+#endif /*SP*/
 
 static void drain_scheduler(void);
 static void drain_scheduler_for_global_term(void);
@@ -370,6 +376,9 @@ static void ofp_init_prepare(void)
 	 * can be called.
 	 */
 	ofp_uma_init_prepare();
+#ifdef SP
+	ofp_sp_init_prepare();
+#endif /*SP*/
 	ofp_sysctl_init_prepare();
 	ofp_avl_init_prepare();
 	ofp_reassembly_init_prepare();
@@ -387,6 +396,9 @@ static void ofp_init_prepare(void)
 	ofp_udp_var_init_prepare();
 	ofp_igmp_var_init_prepare();
 	ofp_ip_init_prepare();
+#ifdef INET6
+	ofp_ip6_init_prepare();
+#endif /*INET6*/
 	ofp_ipsec_init_prepare(&global_param->ipsec);
 }
 
@@ -407,8 +419,12 @@ static int ofp_init_pre_global(ofp_global_param_t *params)
 
 	HANDLE_ERROR(ofp_sysctl_init_global());
 
-        /* Initialize the UM allocator before doing other inits */
+	/* Initialize the UM allocator before doing other inits */
 	HANDLE_ERROR(ofp_uma_init_global());
+
+#ifdef SP
+	HANDLE_ERROR(ofp_sp_init_global());
+#endif /*SP*/
 
 	HANDLE_ERROR(ofp_avl_init_global());
 
@@ -453,6 +469,9 @@ static int ofp_init_pre_global(ofp_global_param_t *params)
 
 	HANDLE_ERROR(ofp_socket_init_global(V_global_packet_pool));
 	HANDLE_ERROR(ofp_ip_init_global());
+#ifdef INET6
+	HANDLE_ERROR(ofp_ip6_init_global());
+#endif /*INET6*/
 	HANDLE_ERROR(ofp_tcp_var_init_global());
 	HANDLE_ERROR(ofp_udp_var_init_global());
 	HANDLE_ERROR(ofp_igmp_var_init_global());
@@ -534,6 +553,9 @@ int ofp_init_local(void)
 	/* Lookup shared memories */
 	HANDLE_ERROR(ofp_global_param_init_local());
 	HANDLE_ERROR(ofp_uma_lookup_shared_memory());
+#ifdef SP
+	HANDLE_ERROR(ofp_sp_init_local());
+#endif /*SP*/
 	HANDLE_ERROR(ofp_sysctl_init_local());
 	HANDLE_ERROR(ofp_portconf_lookup_shared_memory());
 	HANDLE_ERROR(ofp_vlan_lookup_shared_memory());
@@ -551,6 +573,9 @@ int ofp_init_local(void)
 	HANDLE_ERROR(ofp_in_proto_init_local());
 	HANDLE_ERROR(ofp_arp_init_local());
 	HANDLE_ERROR(ofp_ip_init_local());
+#ifdef INET6
+	HANDLE_ERROR(ofp_ip6_init_local());
+#endif /*INET6*/
 	HANDLE_ERROR(ofp_tcp_var_init_local());
 	HANDLE_ERROR(ofp_udp_var_init_local());
 	HANDLE_ERROR(ofp_igmp_var_init_local());
@@ -685,6 +710,11 @@ int ofp_term_post_global(const char *pool_name)
 	/* Cleanup of IP content */
 	CHECK_ERROR(ofp_ip_term_global(), rc);
 
+#ifdef INET6
+	/* Cleanup of IP6 content */
+	CHECK_ERROR(ofp_ip6_term_global(), rc);
+#endif /*INET6*/
+
 	/* Cleanup vxlan */
 	CHECK_ERROR(ofp_vxlan_term_global(), rc);
 
@@ -755,6 +785,10 @@ int ofp_term_post_global(const char *pool_name)
 
 	CHECK_ERROR(ofp_sysctl_term_global(), rc);
 
+#ifdef SP
+	CHECK_ERROR(ofp_sp_term_global(), rc);
+#endif /*SP*/
+
 	CHECK_ERROR(ofp_uma_term_global(), rc);
 
 	CHECK_ERROR(ofp_global_param_term_global(), rc);
@@ -770,6 +804,9 @@ int ofp_term_local(void)
 	drain_scheduler();
 
 	CHECK_ERROR(ofp_ip_term_local(), rc);
+#ifdef INET6
+	CHECK_ERROR(ofp_ip6_term_local(), rc);
+#endif /*INET6*/
 	CHECK_ERROR(ofp_send_pkt_out_term_local(), rc);
 
 	return rc;

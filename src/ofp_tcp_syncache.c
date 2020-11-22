@@ -1071,7 +1071,7 @@ _syncache_add(struct in_conninfo *inc, struct tcpopt *to, struct ofp_tcphdr *th,
 
 			/*
 			 * Pick the smallest possible scaling factor that
-			 * will still allow us to scale up to ofp_sb_max, aka
+			 * will still allow us to scale up to V_sb_max, aka
 			 * kern.ipc.maxsockbuf.
 			 *
 			 * We do this because there are broken firewalls that
@@ -1091,7 +1091,7 @@ _syncache_add(struct in_conninfo *inc, struct tcpopt *to, struct ofp_tcphdr *th,
 			 * or <SYN,ACK>) segment itself is never scaled.
 			 */
 			while (wscale < OFP_TCP_MAX_WINSHIFT &&
-			       (OFP_TCP_MAXWIN << wscale) < (int)ofp_sb_max)
+			       (OFP_TCP_MAXWIN << wscale) < (int)V_sb_max)
 				wscale++;
 			sc->sc_requested_r_scale = wscale;
 			sc->sc_requested_s_scale = to->to_wscale;
