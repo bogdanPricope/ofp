@@ -60,11 +60,13 @@ int ofp_sp_init_global(void)
 	memset(shm_sp, 0, sizeof(*shm_sp));
 
 	for (i = 0; i < NUM_NS_SOCKETS; i++) {
-		V_sp_netlink_sockets[i].vrf = -1;
-		V_sp_netlink_sockets[i].fd = -1;
+		V_sp_nl_sockets[i].vrf = -1;
+		V_sp_nl_sockets[i].fd = -1;
 	}
 
-	V_sp_netlink_sock_cnt = 0;
+	V_sp_nl_sock_cnt = 0;
+
+	odp_rwlock_init(&V_sp_nl_rwlock);
 
 	return 0;
 }

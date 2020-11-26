@@ -95,6 +95,7 @@ if OFP_SP
 __LIB__libofp_la_SOURCES += \
 ofp_sp_shm.c \
 ofp_netlink.c \
+ofp_netlink_msg.c \
 ofp_quagga.c \
 ofp_tunthread.c
 endif
