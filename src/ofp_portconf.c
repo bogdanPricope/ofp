@@ -2087,8 +2087,17 @@ static inline int get_first_free_ifnet_pos(struct ofp_ifnet *dev)
 
 inline int ofp_ifnet_ip_add(struct ofp_ifnet *dev, uint32_t addr)
 {
+	int i;
+	int free_idx;
+
 	IP_ADDR_LIST_WLOCK(dev);
-	int free_idx = get_first_free_ifnet_pos(dev);
+	i = ofp_ifnet_ip_find(dev, addr);
+	if (i != -1) {	/* already set */
+		IP_ADDR_LIST_WUNLOCK(dev);
+		return 0;
+	}
+
+	free_idx = get_first_free_ifnet_pos(dev);
 	if (odp_likely(free_idx < OFP_NUM_IFNET_IP_ADDRS))
 		dev->ip_addr_info[free_idx].ip_addr = addr;
 	else {
