@@ -25,7 +25,7 @@
 #include "test_raw_frames.h"
 #include "ofpi.h"
 #include "ofpi_debug.h"
-#include "../../src/ofp_debug_print.c"
+#include "../../src/dbg/ofp_debug_print.c"
 
 
 /*
@@ -44,6 +44,9 @@ uint8_t pcap_header[24] = {
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0xff, 0xff, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00
 };
+
+struct ofp_debug_mem debug_mem = {0};
+__thread struct ofp_debug_mem *shm_debug;
 
 /*
  * INIT
@@ -80,6 +83,12 @@ init_suite(void)
 	}
 
 	odp_pool_print(pool);
+
+	shm_debug = &debug_mem;
+
+	shm_debug->flags = 0xf;
+	strcpy(shm_debug->print_file_name, DEFAULT_DEBUG_TXT_FILE_NAME);
+	shm_debug->print_first = 1;
 
 	return 0;
 }

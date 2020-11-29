@@ -24,7 +24,7 @@
 #include <ofpi_ethernet.h>
 #include "ofpi.h"
 #include "ofpi_log.h"
-#include "../../src/ofp_in_cksum.c"
+#include "../../src/net/ip4net/ofp_in_cksum.c"
 #include "fragmented_packet.h"
 #include "cksum_packets.h"
 
