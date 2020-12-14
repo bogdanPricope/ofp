@@ -15,6 +15,9 @@
 struct ofp_global_config_mem {
 	odp_bool_t is_running ODP_ALIGNED_CACHE;
 
+	VNET_DEFINE(odp_instance_t, odp_instance);
+	VNET_DEFINE(odp_bool_t, odp_instance_owner);
+
 #ifdef SP
 	VNET_DEFINE(odph_odpthread_t, nl_thread);
 	VNET_DEFINE(odp_bool_t, nl_thread_is_running);
@@ -35,6 +38,9 @@ struct ofp_global_config_mem {
 extern __thread struct ofp_global_config_mem *shm_global;
 extern __thread ofp_global_param_t *global_param;
 
+#define	V_global_odp_instance	VNET(shm_global->odp_instance)
+#define	V_global_odp_instance_owner	VNET(shm_global->odp_instance_owner)
+
 #ifdef SP
 #define	V_global_nl_thread	VNET(shm_global->nl_thread)
 #define	V_global_nl_thread_is_running	VNET(shm_global->nl_thread_is_running)
@@ -50,7 +56,9 @@ extern __thread ofp_global_param_t *global_param;
 
 #define	V_global_param VNET(shm_global->global_param)
 
-int ofp_global_param_init_global(ofp_global_param_t *params);
+int ofp_global_param_init_global(ofp_global_param_t *params,
+				 odp_instance_t instance,
+				 odp_bool_t instance_owner);
 int ofp_global_param_term_global(void);
 int ofp_global_param_init_local(void);
 

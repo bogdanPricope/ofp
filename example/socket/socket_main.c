@@ -78,12 +78,19 @@ int main(int argc, char *argv[])
 	/* Parse and store the application arguments */
 	parse_args(argc, argv, &params);
 
-	if (odp_init_global(&instance, NULL, NULL)) {
-		OFP_ERR("Error: ODP global init failed.\n");
+	ofp_init_global_param(&app_init_params);
+	app_init_params.if_count = params.if_count;
+	app_init_params.if_names = params.if_names;
+
+	if (ofp_init_global(&app_init_params)) {
+		OFP_ERR("Error: OFP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
-	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
-		OFP_ERR("Error: ODP local init failed.\n");
+
+	instance = ofp_get_odp_instance();
+	if (OFP_ODP_INSTANCE_INVALID == instance) {
+		OFP_ERR("Error: Invalid odp instance.\n");
+		ofp_term_global();
 		exit(EXIT_FAILURE);
 	}
 
@@ -108,15 +115,6 @@ int main(int argc, char *argv[])
 	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
 	printf("cpu mask:           %s\n", cpumaskstr);
 
-	ofp_init_global_param(&app_init_params);
-	app_init_params.if_count = params.if_count;
-	app_init_params.if_names = params.if_names;
-
-	if (ofp_init_global(instance, &app_init_params)) {
-		OFP_ERR("Error: OFP global init failed.\n");
-		exit(EXIT_FAILURE);
-	}
-
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 	/* Start dataplane dispatcher worker threads */
 	thr_params.start = default_event_dispatcher;
@@ -128,6 +126,7 @@ int main(int argc, char *argv[])
 			       &thr_params);
 
 	/* other app code here.*/
+	sleep(2);
 	/* Start CLI */
 	ofp_start_cli_thread(instance,
 		app_init_params.linux_core_id, params.cli_file);
@@ -511,6 +510,10 @@ int main(int argc, char *argv[])
 #endif /*INET6*/
 
 	odph_odpthreads_join(thread_tbl);
+
+	if (ofp_term_global() < 0)
+		printf("Error: ofp_term_global failed.\n");
+
 	printf("End Main()\n");
 	return 0;
 }

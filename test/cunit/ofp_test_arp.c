@@ -30,7 +30,6 @@
 
 #define ALLOW_UNUSED_LOCAL(x) false ? (void)x : (void)0
 
-static odp_instance_t instance;
 static odp_atomic_u32_t still_running;
 static odph_odpthread_t pp_thread_handle;
 int pp_thread(void *arg);
@@ -40,26 +39,10 @@ static int init_suite(void)
 	ofp_global_param_t params;
 	odph_odpthread_params_t thr_params;
 
-	/* Init ODP before calling anything else */
-	if (odp_init_global(&instance, NULL, NULL)) {
-		OFP_ERR("Error: ODP global init failed.\n");
-		return -1;
-	}
-
-	/* Init this thread */
-	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
-		OFP_ERR("Error: ODP local init failed.\n");
-		return -1;
-	}
-
 	ofp_init_global_param(&params);
 	params.enable_nl_thread = 0;
 	params.arp.entry_timeout = ENTRY_TIMEOUT;
-	(void) ofp_init_global(instance, &params);
-
-	if (ofp_init_local()) {
-		return -1;
-	}
+	(void)ofp_init_global(&params);
 
 	/*
 	 * Start a packet processing thread to service timer events.
@@ -72,7 +55,7 @@ static int init_suite(void)
 	thr_params.start = pp_thread;
 	thr_params.arg = NULL;
 	thr_params.thr_type = ODP_THREAD_WORKER;
-	thr_params.instance = instance;
+	thr_params.instance = ofp_get_odp_instance();
 	odph_odpthreads_create(&pp_thread_handle,
 			       &cpumask,
 			       &thr_params);
@@ -86,11 +69,7 @@ static int end_suite(void)
 
 	odph_odpthreads_join(&pp_thread_handle);
 
-	ofp_term_local();
 	ofp_term_global();
-
-	odp_term_local();
-	odp_term_global(instance);
 
 	return 0;
 }

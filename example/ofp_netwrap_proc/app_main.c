@@ -52,7 +52,6 @@ enum netwrap_state_enum {
 	NETWRAP_ODP_INIT_GLOBAL,
 	NETWRAP_ODP_INIT_LOCAL,
 	NETWRAP_OFP_INIT_GLOBAL,
-	NETWRAP_OFP_INIT_LOCAL,
 	NETWRAP_WORKERS_STARTED
 };
 
@@ -103,8 +102,9 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 	print_info("ofp_netwrap", &params);
 
 	/*
-	 * Get the number of cores available to ODP, one run-to-completion
-	 * thread will be created per core.
+	 * This example assumes that core #0 runs Linux kernel background tasks.
+	 * By default, cores #1 and beyond will be populated with a OFP
+	 * processing thread each.
 	 */
 	core_count = odp_cpu_count();
 	num_workers = core_count;
@@ -113,13 +113,6 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 		num_workers = params.core_count;
 	if (num_workers > MAX_WORKERS)
 		num_workers = MAX_WORKERS;
-
-	/*
-	 * This example assumes that core #0 runs Linux kernel background tasks.
-	 * By default, cores #1 and beyond will be populated with a OFP
-	 * processing thread each.
-	 */
-	ofp_init_global_param(&app_init_params);
 
 	if (core_count > 1)
 		num_workers--;
@@ -141,8 +134,11 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
 	printf("cpu mask:           %s\n", cpumaskstr);
 
+	/* Initialize OFP */
+	ofp_init_global_param(&app_init_params);
 	app_init_params.if_count = params.if_count;
 	app_init_params.if_names = params.if_names;
+	app_init_params.instance = netwrap_proc_instance;
 
 	/*
 	 * Now that ODP has been initalized, we can initialize OFP. This will
@@ -152,21 +148,12 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 	 * General configuration will be to pktio and schedluer queues here in
 	 * addition will fast path interface configuration.
 	 */
-	if (ofp_init_global(netwrap_proc_instance, &app_init_params) != 0) {
+	if (ofp_init_global(&app_init_params) != 0) {
 		printf("Error: OFP global init failed.\n");
-		netwrap_state = NETWRAP_OFP_INIT_GLOBAL;
 		ofp_netwrap_main_dtor();
 		return;
 	}
 	netwrap_state = NETWRAP_OFP_INIT_GLOBAL;
-
-	if (ofp_init_local() != 0) {
-		printf("Error: OFP local init failed.\n");
-		netwrap_state = NETWRAP_OFP_INIT_LOCAL;
-		ofp_netwrap_main_dtor();
-		return;
-	}
-	netwrap_state = NETWRAP_OFP_INIT_LOCAL;
 
 	/*
 	 * Create and launch dataplane dispatcher worker threads to be placed
@@ -228,10 +215,6 @@ static void ofp_netwrap_main_dtor(void)
 	 * resources allocated by odp_init_global().
 	 */
 		odph_odpthreads_join(thread_tbl);
-		/* fall through */
-	case NETWRAP_OFP_INIT_LOCAL:
-		if (ofp_term_local() < 0)
-			printf("Error: ofp_term_local failed\n");
 		/* fall through */
 	case NETWRAP_OFP_INIT_GLOBAL:
 		if (ofp_term_global() < 0)

@@ -12,6 +12,7 @@
 #include <sys/socket.h>
 
 #include "ofp.h"
+#include "linux_sigaction.h"
 
 #if ODP_VERSION_API_GENERATION <= 1 && ODP_VERSION_API_MAJOR < 20
 	#define ODP_PMR_INVALID ODP_PMR_INVAL
@@ -19,8 +20,6 @@
 
 #define MAX_WORKERS		32
 #define TEST_PORT 54321
-
-#define IP4(a, b, c, d) (a|(b<<8)|(c<<16)|(d<<24))
 
 /**
  * Parsed command line application arguments
@@ -48,6 +47,19 @@ ofp_global_param_t app_init_params; /**< global OFP init parms */
 #define NO_PATH(file_name) (strrchr((file_name), '/') ? \
 				strrchr((file_name), '/') + 1 : (file_name))
 
+/**
+ * Signal handler function
+ *
+ * @param signum int
+ * @return void
+ *
+ */
+static void sig_func_stop(int signum)
+{
+	printf("Signal handler (signum = %d) ... exiting.\n", signum);
+
+	ofp_stop_processing();
+}
 
 /** main() Application entry point
  *
@@ -66,6 +78,12 @@ int main(int argc, char *argv[])
 	odph_odpthread_params_t thr_params;
 	odp_instance_t instance;
 
+	/* add handler for Ctr+C */
+	if (ofp_sigactions_set(sig_func_stop)) {
+		printf("Error: failed to set signal actions.\n");
+		return EXIT_FAILURE;
+	}
+
 	/* Parse and store the application arguments */
 	parse_args(argc, argv, &params);
 
@@ -75,12 +93,19 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (odp_init_global(&instance, NULL, NULL)) {
-		OFP_ERR("Error: ODP global init failed.\n");
+	ofp_init_global_param(&app_init_params);
+	app_init_params.if_count = params.if_count;
+	app_init_params.if_names = params.if_names;
+
+	if (ofp_init_global(&app_init_params)) {
+		OFP_ERR("Error: OFP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
-	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
-		OFP_ERR("Error: ODP local init failed.\n");
+
+	instance = ofp_get_odp_instance();
+	if (OFP_ODP_INSTANCE_INVALID == instance) {
+		OFP_ERR("Error: Invalid odp instance.\n");
+		ofp_term_global();
 		exit(EXIT_FAILURE);
 	}
 
@@ -105,19 +130,6 @@ int main(int argc, char *argv[])
 	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
 	printf("cpu mask:           %s\n", cpumaskstr);
 
-	ofp_init_global_param(&app_init_params);
-	app_init_params.if_count = params.if_count;
-	app_init_params.if_names = params.if_names;
-
-	if (ofp_init_global(instance, &app_init_params)) {
-		OFP_ERR("Error: OFP global init failed.\n");
-		exit(EXIT_FAILURE);
-	}
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
-		exit(EXIT_FAILURE);
-	}
-
 	build_classifier(app_init_params.if_count, app_init_params.if_names);
 
 	/* Start CLI */
@@ -137,6 +149,10 @@ int main(int argc, char *argv[])
 	app_processing();
 
 	odph_odpthreads_join(thread_tbl);
+
+	/* Cleanup */
+	if (ofp_term_global() < 0)
+		printf("Error: ofp_term_global failed.\n");
 
 	printf("End Main()\n");
 	return 0;
@@ -303,6 +319,7 @@ static void usage(char *progname)
 		   "\n"
 		   "Optional OPTIONS\n"
 		   "  -c, --count <number> Core count.\n"
+		   "  -f, --cli-file <file> OFP CLI file.\n"
 		   "  -h, --help           Display help and exit.\n"
 		   "\n", NO_PATH(progname), NO_PATH(progname)
 		);
@@ -433,6 +450,8 @@ static void app_processing(void)
 	char buf[1500];
 	int len = sizeof(buf);
 	struct ofp_sockaddr_in addr = {0};
+	uint32_t ip_addr = 0;
+	odp_bool_t *is_running = NULL;
 
 	fd_rcv = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
 				OFP_IPPROTO_UDP);
@@ -442,10 +461,13 @@ static void app_processing(void)
 		return;
 	}
 
+	/* Bind it to the address from first interface */
+	ip_addr = ofp_port_get_ipv4_addr(0, 0, OFP_PORTCONF_IP_TYPE_IP_ADDR);
+
 	addr.sin_len = sizeof(struct ofp_sockaddr_in);
 	addr.sin_family = OFP_AF_INET;
 	addr.sin_port = odp_cpu_to_be_16(TEST_PORT);
-	addr.sin_addr.s_addr = IP4(192, 168, 100, 1);
+	addr.sin_addr.s_addr = ip_addr;
 
 	if (ofp_bind(fd_rcv, (const struct ofp_sockaddr *)&addr,
 		sizeof(struct ofp_sockaddr_in)) == -1) {
@@ -453,15 +475,24 @@ static void app_processing(void)
 		return;
 	}
 
-	do {
-		len = ofp_recv(fd_rcv, buf, len, 0);
+	is_running = ofp_get_processing_state();
+	if (is_running == NULL) {
+		OFP_ERR("ofp_get_processing_state failed");
+		return;
+	}
+
+	while (*is_running) {
+		len = ofp_recv(fd_rcv, buf, len, OFP_MSG_DONTWAIT);
 		if (len == -1) {
+			if (ofp_errno == OFP_EWOULDBLOCK)
+				continue;
+
 			OFP_ERR("Faild to receive data (errno = %d)\n",
 				ofp_errno);
 			break;
 		}
 		OFP_INFO("Data received: length = %d.\n", len);
-	} while (1);
+	}
 
 	if (fd_rcv != -1) {
 		ofp_close(fd_rcv);

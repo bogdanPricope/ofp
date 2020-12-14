@@ -191,19 +191,6 @@ static int
 init_suite(void)
 {
 	ofp_global_param_t params;
-	odp_instance_t instance;
-
-	/* Init ODP before calling anything else */
-	if (odp_init_global(&instance, NULL, NULL)) {
-		OFP_ERR("Error: ODP global init failed.\n");
-		return -1;
-	}
-
-	/* Init this thread */
-	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
-		OFP_ERR("Error: ODP local init failed.\n");
-		return -1;
-	}
 
 	ofp_init_global_param(&params);
 	params.enable_nl_thread = 0;
@@ -213,9 +200,7 @@ init_suite(void)
 	params.pkt_hook[OFP_HOOK_OUT_IPv6] = fastpath_hook_out_IPv6;
 #endif /* INET6 */
 
-	(void) ofp_init_global(instance, &params);
-
-	ofp_init_local();
+	(void)ofp_init_global(&params);
 
 	init_ifnet();
 

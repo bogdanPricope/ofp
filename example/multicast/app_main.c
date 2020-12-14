@@ -36,22 +36,6 @@ ofp_global_param_t app_init_params; /**< global OFP init parms */
 #define NO_PATH(file_name) (strrchr((file_name), '/') ? \
 				strrchr((file_name), '/') + 1 : (file_name))
 
-
-/** local hook
- *
- * @param pkt odp_packet_t
- * @param protocol int
- * @return int
- *
- */
-static enum ofp_return_code fastpath_local_hook(odp_packet_t pkt, void *arg)
-{
-	int protocol = *(int *)arg;
-	(void) pkt;
-	(void) protocol;
-	return OFP_PKT_CONTINUE;
-}
-
 /** main() Application entry point
  *
  * @param argc int
@@ -81,31 +65,37 @@ int main(int argc, char *argv[])
 	/* Parse and store the application arguments */
 	parse_args(argc, argv, &params);
 
-	if (odp_init_global(&instance, NULL, NULL)) {
-		OFP_ERR("Error: ODP global init failed.\n");
+	/* Configure OFP */
+	ofp_init_global_param(&app_init_params);
+	app_init_params.if_count = params.if_count;
+	app_init_params.if_names = params.if_names;
+
+	if (ofp_init_global(&app_init_params)) {
+		OFP_ERR("Error: OFP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
-	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
-		OFP_ERR("Error: ODP local init failed.\n");
+
+	instance = ofp_get_odp_instance();
+	if (OFP_ODP_INSTANCE_INVALID == instance) {
+		OFP_ERR("Error: Invalid odp instance.\n");
+		ofp_term_global();
 		exit(EXIT_FAILURE);
 	}
 
 	/* Print both system and application information */
 	print_info(NO_PATH(argv[0]), &params);
 
-	core_count = odp_cpu_count();
-	num_workers = core_count;
-
-	if (params.core_count)
-		num_workers = params.core_count;
-	if (num_workers > MAX_WORKERS)
-		num_workers = MAX_WORKERS;
-
 	/*
 	 * By default core #0 runs Linux kernel background tasks.
 	 * Start mapping thread from core #1
 	 */
-	ofp_init_global_param(&app_init_params);
+	core_count = odp_cpu_count();
+	num_workers = core_count;
+
+	if (params.core_count && params.core_count < core_count)
+		num_workers = params.core_count;
+	if (num_workers > MAX_WORKERS)
+		num_workers = MAX_WORKERS;
 
 	if (core_count > 1)
 		num_workers--;
@@ -116,14 +106,6 @@ int main(int argc, char *argv[])
 	printf("Num worker threads: %i\n", num_workers);
 	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
 	printf("cpu mask:           %s\n", cpumaskstr);
-
-	app_init_params.if_count = params.if_count;
-	app_init_params.if_names = params.if_names;
-	app_init_params.pkt_hook[OFP_HOOK_LOCAL] = fastpath_local_hook;
-	if (ofp_init_global(instance, &app_init_params)) {
-		OFP_ERR("Error: OFP global init failed.\n");
-		exit(EXIT_FAILURE);
-	}
 
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 	/* Start dataplane dispatcher worker threads */
@@ -144,9 +126,14 @@ int main(int argc, char *argv[])
 	/* multicast test */
 	ofp_multicast_thread(instance, app_init_params.linux_core_id);
 
+	/* Wait for threads to stop */
 	odph_odpthreads_join(thread_tbl);
-	printf("End Main()\n");
 
+	/* Cleanup */
+	if (ofp_term_global() < 0)
+		printf("Error: ofp_term_global failed.\n");
+
+	printf("End Main()\n");
 	return 0;
 }
 

@@ -50,12 +50,18 @@ static int ofp_global_config_lookup_shared_memory(void)
 	return 0;
 }
 
-int ofp_global_param_init_global(ofp_global_param_t *params)
+int ofp_global_param_init_global(ofp_global_param_t *params,
+				 odp_instance_t instance,
+				 odp_bool_t instance_owner)
 {
 	HANDLE_ERROR(ofp_global_config_alloc_shared_memory());
 
 	memset(shm_global, 0, sizeof(*shm_global));
 	shm_global->is_running = 1;
+
+	V_global_odp_instance = instance;
+	V_global_odp_instance_owner = instance_owner;
+
 #ifdef SP
 	V_global_nl_thread_is_running = 0;
 #endif /* SP */
@@ -134,3 +140,12 @@ odp_pool_t ofp_get_packet_pool(void)
 
 	return V_global_packet_pool;
 }
+
+odp_instance_t ofp_get_odp_instance(void)
+{
+	if (!shm_global)
+		return OFP_ODP_INSTANCE_INVALID;
+
+	return V_global_odp_instance;
+}
+

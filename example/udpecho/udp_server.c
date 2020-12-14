@@ -19,6 +19,14 @@
 #define INVALID_SOCKET  -1
 #define SOCKET_ERROR    -1
 
+struct udpecho_s {
+	/*socket descriptor */
+	int sd;
+
+	/* sigevent function argument*/
+	struct ofp_sock_sigval ss;
+} udp_echo_cfg;
+
 static void notify(union ofp_sigval sv)
 {
 	struct ofp_sock_sigval *ss = sv.sival_ptr;
@@ -77,30 +85,29 @@ static void notify(union ofp_sigval sv)
 	ss->pkt = ODP_PACKET_INVALID;
 }
 
-static int udpecho(void *arg)
+int udpecho_config(void *arg)
 {
-	int serv_fd;
+	struct ofp_sigevent ev = {0};
 	struct ofp_sockaddr_in my_addr;
 	uint32_t my_ip_addr;
-	ofp_fd_set read_fd;
 
 	(void)arg;
 
-	OFP_INFO("UDP server thread started");
+	odp_memset(&udp_echo_cfg, 0, sizeof(udp_echo_cfg));
+	udp_echo_cfg.sd = INVALID_SOCKET;
 
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
-		return -1;
-	}
 	sleep(1);
 
-	my_ip_addr = ofp_port_get_ipv4_addr(0, 0, OFP_PORTCONF_IP_TYPE_IP_ADDR);
-
-	if ((serv_fd = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM, OFP_IPPROTO_UDP)) < 0) {
-		OFP_ERR("ofp_socket failed, err='%s'",
-			 ofp_strerror(ofp_errno));
+	/* Create socket */
+	udp_echo_cfg.sd = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
+				     OFP_IPPROTO_UDP);
+	if (udp_echo_cfg.sd < 0) {
+		OFP_ERR("ofp_socket failed, err='%s'", ofp_strerror(ofp_errno));
 		return -1;
 	}
+
+	/* Bind it to the address from first interface, port 2048 */
+	my_ip_addr = ofp_port_get_ipv4_addr(0, 0, OFP_PORTCONF_IP_TYPE_IP_ADDR);
 
 	memset(&my_addr, 0, sizeof(my_addr));
 	my_addr.sin_family = OFP_AF_INET;
@@ -108,48 +115,38 @@ static int udpecho(void *arg)
 	my_addr.sin_addr.s_addr = my_ip_addr;
 	my_addr.sin_len = sizeof(my_addr);
 
-	if (ofp_bind(serv_fd, (struct ofp_sockaddr *)&my_addr,
-		       sizeof(struct ofp_sockaddr)) < 0) {
+	if (ofp_bind(udp_echo_cfg.sd, (struct ofp_sockaddr *)&my_addr,
+		     sizeof(struct ofp_sockaddr)) < 0) {
 		OFP_ERR("ofp_bind failed, err='%s'",
 			 ofp_strerror(ofp_errno));
+		ofp_close(udp_echo_cfg.sd);
 		return -1;
 	}
 
-	struct ofp_sigevent ev;
-	struct ofp_sock_sigval ss;
-	ss.sockfd = serv_fd;
-	ss.event = 0;
-	ss.pkt = ODP_PACKET_INVALID;
-	ev.ofp_sigev_notify = 1;
+	/* configure sigevent */
+	udp_echo_cfg.ss.sockfd = udp_echo_cfg.sd;
+	udp_echo_cfg.ss.event = 0;
+	udp_echo_cfg.ss.pkt = ODP_PACKET_INVALID;
+
+	ev.ofp_sigev_notify = OFP_SIGEV_HOOK;
 	ev.ofp_sigev_notify_function = notify;
-	ev.ofp_sigev_value.sival_ptr = &ss;
-	ofp_socket_sigevent(&ev);
-
-	OFP_FD_ZERO(&read_fd);
-	OFP_FD_SET(serv_fd, &read_fd);
-
-	while (1) {
-		sleep(1);
+	ev.ofp_sigev_value.sival_ptr = &udp_echo_cfg.ss;
+	if (ofp_socket_sigevent(&ev)) {
+		OFP_ERR("ofp_socket_sigevent failed, err='%s'",
+			ofp_strerror(ofp_errno));
+		ofp_close(udp_echo_cfg.sd);
+		return -1;
 	}
 
-	OFP_INFO("UDP server exiting");
 	return 0;
 }
 
-void ofp_start_udpserver_thread(odp_instance_t instance, int core_id)
+int udpecho_cleanup(void)
 {
-	static odph_odpthread_t test_linux_udpserver_pthread;
-	odp_cpumask_t cpumask;
-	odph_odpthread_params_t thr_params;
-
-	odp_cpumask_zero(&cpumask);
-	odp_cpumask_set(&cpumask, core_id);
-
-	thr_params.start = udpecho;
-	thr_params.arg = NULL;
-	thr_params.thr_type = ODP_THREAD_CONTROL;
-	thr_params.instance = instance;
-	odph_odpthreads_create(&test_linux_udpserver_pthread,
-			       &cpumask,
-			       &thr_params);
+	if (udp_echo_cfg.sd != INVALID_SOCKET) {
+		ofp_close(udp_echo_cfg.sd);
+		udp_echo_cfg.sd = INVALID_SOCKET;
+	}
+	return 0;
 }
+

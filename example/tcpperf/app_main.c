@@ -1040,12 +1040,9 @@ int main(int argc, char *argv[])
 
 	ofp_init_global_param(&app_init_params);
 
-	if (ofp_init_global(instance, &app_init_params)) {
+	app_init_params.instance = instance;
+	if (ofp_init_global(&app_init_params)) {
 		OFP_ERR("Error: OFP global init failed\n");
-		exit(EXIT_FAILURE);
-	}
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -1178,9 +1175,6 @@ int main(int argc, char *argv[])
 		free(gbl_args->appl.daddr);
 	if (gbl_args->appl.laddr)
 		free(gbl_args->appl.laddr);
-
-	if (ofp_term_local() < 0)
-		printf("Error: ofp_term_local failed\n");
 
 	if (ofp_term_global() < 0)
 		printf("Error: ofp_term_global failed\n");

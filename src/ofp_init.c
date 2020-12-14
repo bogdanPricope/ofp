@@ -264,6 +264,7 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
 	uint32_t hudp_dflt = 0;
 
 	memset(params, 0, sizeof(*params));
+	params->instance = OFP_ODP_INSTANCE_INVALID;
 	params->pktin_mode = ODP_PKTIN_MODE_SCHED;
 	params->pktout_mode = ODP_PKTIN_MODE_DIRECT;
 	params->sched_sync = ODP_SCHED_SYNC_ATOMIC;
@@ -402,13 +403,16 @@ static void ofp_init_prepare(void)
 	ofp_ipsec_init_prepare(&global_param->ipsec);
 }
 
-static int ofp_init_pre_global(ofp_global_param_t *params)
+static int ofp_init_pre_global(ofp_global_param_t *params,
+			       odp_instance_t instance,
+			       odp_bool_t instance_owner)
 {
 	/*
 	 * Allocate and initialize global config memory first so that it
 	 * is available to later init phases.
 	 */
-	HANDLE_ERROR(ofp_global_param_init_global(params));
+	HANDLE_ERROR(ofp_global_param_init_global(params, instance,
+						  instance_owner));
 
 	/* Initialize shared memory infra before preallocations */
 	HANDLE_ERROR(ofp_shared_memory_init_global());
@@ -481,20 +485,65 @@ static int ofp_init_pre_global(ofp_global_param_t *params)
 	return 0;
 }
 
-int ofp_init_global(odp_instance_t instance, ofp_global_param_t *params)
+enum ofp_init_state {
+	OFP_INIT_STATE_NOT_INIT = 0,
+	OFP_INIT_STATE_ODP_INIT,
+	OFP_INIT_STATE_PRE_INIT_GLOBAL,
+	OFP_INIT_STATE_VXLAN_INIT,
+	OFP_INIT_STATE_INTERFACES,
+	OFP_INIT_STATE_NL_INIT,
+	OFP_INIT_STATE_LOOPBACK_INIT,
+	OFP_INIT_STATE_OFP_INIT_LOCAL
+};
+
+int ofp_init_global(ofp_global_param_t *params)
 {
 	int i;
 	odp_pktio_param_t pktio_param;
 	odp_pktin_queue_param_t pktin_param;
 	const char *err;
+	odp_instance_t instance;
+	odp_bool_t instance_owner = 0;
+	enum ofp_init_state state = OFP_INIT_STATE_NOT_INIT;
+
+	if (!params) {
+		OFP_LOG_NO_CTX_NO_LEVEL("Invalid argument (null).");
+		return -1;
+	}
+
+	instance = params->instance;
+
+	/* Create odp instance  if not provided as argument */
+	if (instance == OFP_ODP_INSTANCE_INVALID) {
+		if (odp_init_global(&instance, NULL, NULL)) {
+			OFP_LOG_NO_CTX_NO_LEVEL("Error: ODP global init "
+						"failed.\n");
+			return -1;
+		}
+		if (odp_init_local(instance, ODP_THREAD_CONTROL) != 0) {
+			OFP_LOG_NO_CTX_NO_LEVEL("Error: ODP local init "
+						"failed.\n");
+			odp_term_global(instance);
+			return -1;
+		}
+		instance_owner = 1;
+	}
+
+	state = OFP_INIT_STATE_PRE_INIT_GLOBAL;
 
 #if ODP_VERSION_API_GENERATION >= 1 && ODP_VERSION_API_MAJOR >= 21
 	odp_schedule_config(NULL);
 #endif
 
-	HANDLE_ERROR(ofp_init_pre_global(params));
+	if (ofp_init_pre_global(params, instance, instance_owner))
+		goto init_error;
 
-	HANDLE_ERROR(ofp_set_vxlan_interface_queue());
+	state = OFP_INIT_STATE_VXLAN_INIT;
+
+	if (ofp_set_vxlan_interface_queue())
+		goto init_error;
+
+	state = OFP_INIT_STATE_INTERFACES;
 
 	/* Create interfaces */
 	odp_pktio_param_init(&pktio_param);
@@ -505,13 +554,20 @@ int ofp_init_global(odp_instance_t instance, ofp_global_param_t *params)
 				   params->sched_sync,
 				   params->sched_group);
 
-	for (i = 0; i < params->if_count; ++i)
-		HANDLE_ERROR(ofp_ifnet_create(instance, params->if_names[i],
-			&pktio_param, &pktin_param, NULL));
+	for (i = 0; i < params->if_count; ++i) {
+		if (ofp_ifnet_create(V_global_odp_instance, params->if_names[i],
+				     &pktio_param, &pktin_param, NULL)) {
+			OFP_LOG_NO_CTX_NO_LEVEL("Error: failed to create "
+					"interface %s.\n", params->if_names[i]);
+			goto init_error;
+		}
+	}
 
 #ifdef SP
 	OFP_INFO("Slow path threads on core %d",
 		 odp_cpumask_first(&V_global_linux_cpumask));
+
+	state = OFP_INIT_STATE_NL_INIT;
 
 	if (params->enable_nl_thread) {
 		odph_odpthread_params_t thr_params;
@@ -520,16 +576,18 @@ int ofp_init_global(odp_instance_t instance, ofp_global_param_t *params)
 		thr_params.start = START_NL_SERVER;
 		thr_params.arg = NULL;
 		thr_params.thr_type = ODP_THREAD_CONTROL;
-		thr_params.instance = instance;
+		thr_params.instance = V_global_odp_instance;
 		if (!odph_odpthreads_create(&V_global_nl_thread,
 					    &V_global_linux_cpumask,
 					    &thr_params)) {
 			OFP_ERR("Failed to start Netlink thread.");
-			return -1;
+			goto init_error;
 		}
 		V_global_nl_thread_is_running = 1;
 	}
 #endif /* SP */
+
+	state = OFP_INIT_STATE_LOOPBACK_INIT;
 
 	if (params->if_loopback) {
 		uint32_t loop_addr = odp_cpu_to_be_32(OFP_INADDR_LOOPBACK);
@@ -537,11 +595,62 @@ int ofp_init_global(odp_instance_t instance, ofp_global_param_t *params)
 		err = ofp_config_interface_up_local(0, 0, loop_addr, 8);
 		if (err != NULL) {
 			OFP_ERR("Failed to create the interface: %s.", err);
-			return -1;
+			state = OFP_INIT_STATE_LOOPBACK_INIT;
+			goto init_error;
 		}
 	}
+
 	odp_schedule_resume();
+
+	state = OFP_INIT_STATE_OFP_INIT_LOCAL;
+
+	if (ofp_init_local() != 0) {
+		OFP_ERR("Failed to thread local settings");
+		goto init_error;
+	}
+
 	return 0;
+
+init_error:
+	switch (state) {
+#if 0
+	case OFP_INIT_STATE_OFP_INIT_LOCAL:
+		ofp_term_local();
+		/* Fallthrough */
+	case OFP_INIT_STATE_LOOPBACK_INIT:
+		ofp_local_interfaces_destroy();
+		/* Fallthrough */
+	case OFP_INIT_STATE_NL_INIT:
+		ofp_stop_processing();
+		/* Fallthrough */
+	case OFP_INIT_STATE_INTERFACES:
+		/* Fallthrough */
+	case OFP_INIT_STATE_VXLAN_INIT:
+		ofp_clean_vxlan_interface_queue();
+		/* Fallthrough */
+	case OFP_INIT_STATE_PRE_INIT_GLOBAL:
+		ofp_term_post_global(SHM_PKT_POOL_NAME);
+
+		/* Terminate shared memory */
+		ofp_shared_memory_term_global();
+		/* Fallthrough */
+	case OFP_INIT_STATE_ODP_INIT:
+		if (instance_owner) {
+			if (odp_term_local() < 0)
+				OFP_LOG_NO_CTX_NO_LEVEL("Error: odp_term_local "
+						"failed\n");
+
+			if (odp_term_global(instance) < 0)
+				OFP_LOG_NO_CTX_NO_LEVEL("Error: odp_term_global"
+						" failed\n");
+		}
+		/* Fallthrough */
+#endif /* 0 */
+	case OFP_INIT_STATE_NOT_INIT:
+	default:
+		OFP_LOG_NO_CTX_NO_LEVEL("OFP: Initialization failed.");
+	}
+	return -1;
 }
 
 
@@ -590,6 +699,13 @@ int ofp_term_global(void)
 	int rc = 0;
 	uint16_t i, j;
 	struct ofp_ifnet *ifnet;
+	odp_instance_t odp_instance = OFP_ODP_INSTANCE_INVALID;
+	odp_bool_t odp_instance_owner = 0;
+
+	CHECK_ERROR(ofp_term_local(), rc);
+
+	odp_instance = V_global_odp_instance;
+	odp_instance_owner = V_global_odp_instance_owner;
 
 	ofp_stop_processing();
 #ifdef CLI
@@ -686,6 +802,16 @@ int ofp_term_global(void)
 
 	/* Terminate shared memory now that all blocks have been freed. */
 	CHECK_ERROR(ofp_shared_memory_term_global(), rc);
+
+	if (odp_instance_owner) {
+		if (odp_term_local() < 0)
+			OFP_LOG_NO_CTX_NO_LEVEL("Error: odp_term_local "
+					"failed\n");
+
+		if (odp_term_global(odp_instance) < 0)
+			OFP_LOG_NO_CTX_NO_LEVEL("Error: odp_term_global "
+					"failed\n");
+	}
 
 	return rc;
 }

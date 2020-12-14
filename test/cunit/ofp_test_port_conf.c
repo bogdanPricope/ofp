@@ -45,7 +45,6 @@ uint8_t link_local[16];
 int sp_status = OFP_SP_DOWN;
 #endif
 
-odp_instance_t instance;
 /*
  * INIT
  */
@@ -55,24 +54,11 @@ init_suite(void)
 	ofp_global_param_t params;
 	struct ofp_ifnet *dev;
 
-	/* Init ODP before calling anything else */
-	if (odp_init_global(&instance, NULL, NULL)) {
-		OFP_ERR("Error: ODP global init failed.\n");
-		return -1;
-	}
-
-	/* Init this thread */
-	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
-		OFP_ERR("Error: ODP local init failed.\n");
-		return -1;
-	}
-
 	ofp_init_global_param(&params);
 	params.enable_nl_thread = 0;
 	params.num_vrf = 3;
-	(void) ofp_init_global(instance, &params);
 
-	ofp_arp_init_local();
+	(void)ofp_init_global(&params);
 
 	dev = ofp_get_ifnet(0, 0);
 	dev->if_mtu = ifmtu;
@@ -86,10 +72,9 @@ static int
 clean_suite(void)
 {
 	ofp_arp_term_local();
-	ofp_term_local();
+
 	ofp_term_global();
-	odp_term_local();
-	odp_term_global(instance);
+
 	return 0;
 }
 

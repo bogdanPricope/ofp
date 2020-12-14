@@ -10,6 +10,7 @@
 
 #include <odp_api.h>
 
-void ofp_start_udpserver_thread(odp_instance_t instance, int core_id);
+int udpecho_config(void *arg);
+int udpecho_cleanup(void);
 
 #endif

@@ -114,71 +114,11 @@ int main(int argc, char *argv[])
 	}
 
 	/*
-	 * Before any ODP API functions can be called, we must first init the ODP
-	 * globals, e.g. availale accelerators or software implementations for
-	 * shared memory, threads, pool, qeueus, sheduler, pktio, timer, crypto
-	 * and classification.
-	 */
-	if (odp_init_global(&instance, NULL, NULL)) {
-		printf("Error: ODP global init failed.\n");
-		return EXIT_FAILURE;
-	}
-
-	/*
-	 * When the gloabel ODP level init has been done, we can now issue a
-	 * local init per thread. This must also be done before any other ODP API
-	 * calls may be made. Local inits are made here for shared memory,
-	 * threads, pktio and scheduler.
-	 */
-	if (odp_init_local(instance, ODP_THREAD_CONTROL) != 0) {
-		printf("Error: ODP local init failed.\n");
-		odp_term_global(instance);
-		return EXIT_FAILURE;
-	}
-
-	/* Print both system and application information */
-	print_info(NO_PATH(argv[0]), &params);
-
-	/*
-	 * Get the number of cores available to ODP, one run-to-completion thread
-	 * will be created per core.
-	 */
-	core_count = odp_cpu_count();
-
-	if (params.core_count)
-		num_workers = params.core_count;
-	else {
-		num_workers = core_count;
-		if (core_count > 1)
-			num_workers--;
-	}
-	if (num_workers > MAX_WORKERS)
-		num_workers = MAX_WORKERS;
-
-	/*
 	 * This example assumes that core #0 runs Linux kernel background tasks.
 	 * By default, cores #1 and beyond will be populated with a OFP
 	 * processing thread each.
 	 */
 	ofp_init_global_param(&app_init_params);
-
-	/*
-	 * Initializes cpumask with CPUs available for worker threads.
-	 * Sets up to 'num' CPUs and returns the count actually set.
-	 * Use zero for all available CPUs.
-	 */
-	num_workers = odp_cpumask_default_worker(&cpumask, num_workers);
-	if (odp_cpumask_to_str(&cpumask, cpumaskstr, sizeof(cpumaskstr)) < 0) {
-		printf("Error: Too small buffer provided to "
-			"odp_cpumask_to_str\n");
-		odp_term_local();
-		odp_term_global(instance);
-		return EXIT_FAILURE;
-	}
-
-	printf("Num worker threads: %i\n", num_workers);
-	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
-	printf("cpu mask:           %s\n", cpumaskstr);
 
 	app_init_params.if_count = params.if_count;
 	app_init_params.if_names = params.if_names;
@@ -217,32 +157,54 @@ int main(int argc, char *argv[])
 		break;
 	}
 
+	/* Exemplification of creating packet processing hooks */
 	app_init_params.pkt_hook[OFP_HOOK_LOCAL] = fastpath_local_hook;
 
 	/*
-	 * Now that ODP has been initalized, we can initialize OFP. This will
-	 * open a pktio instance for each interface supplied as argument by the
-	 * user.
+	 * Initialize OFP. This will also initialize ODP and open a pktio
+	 * instance for each interface supplied as argument.
 	 *
-	 * General configuration will be to pktio and schedluer queues here in
-	 * addition will fast path interface configuration.
 	 */
-	if (ofp_init_global(instance, &app_init_params) != 0) {
+	if (ofp_init_global(&app_init_params) != 0) {
 		printf("Error: OFP global init failed.\n");
-		ofp_term_global();
-		odp_term_local();
-		odp_term_global(instance);
 		return EXIT_FAILURE;
 	}
 
-	if (ofp_init_local() != 0) {
-		printf("Error: OFP local init failed.\n");
-		ofp_term_local();
+	/* Print both system and application information */
+	print_info(NO_PATH(argv[0]), &params);
+
+	/*
+	 * Get the number of available cores: one run-to-completion thread
+	 * will be created per core.
+	 */
+	core_count = odp_cpu_count();
+
+	if (params.core_count) {
+		num_workers = params.core_count;
+	} else {
+		num_workers = core_count;
+		if (core_count > 1)
+			num_workers--;
+	}
+	if (num_workers > MAX_WORKERS)
+		num_workers = MAX_WORKERS;
+
+	/*
+	 * Initializes cpumask with CPUs available for worker threads.
+	 * Sets up to 'num' CPUs and returns the count actually set.
+	 * Use zero for all available CPUs.
+	 */
+	num_workers = odp_cpumask_default_worker(&cpumask, num_workers);
+	if (odp_cpumask_to_str(&cpumask, cpumaskstr, sizeof(cpumaskstr)) < 0) {
+		printf("Error: Too small buffer provided to "
+			"odp_cpumask_to_str\n");
 		ofp_term_global();
-		odp_term_local();
-		odp_term_global(instance);
 		return EXIT_FAILURE;
 	}
+
+	printf("Num worker threads: %i\n", num_workers);
+	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
+	printf("cpu mask:           %s\n", cpumaskstr);
 
 	/*
 	 * Create and launch dataplane dispatcher worker threads to be placed
@@ -255,6 +217,7 @@ int main(int argc, char *argv[])
 	 * If different dispatchers should run, or the same be run with differnt
 	 * input arguments, the cpumask is used to control this.
 	 */
+	instance = ofp_get_odp_instance();
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 	thr_params.start = default_event_dispatcher;
 	thr_params.arg = ofp_eth_vlan_processing;
@@ -269,10 +232,7 @@ int main(int argc, char *argv[])
 			num_workers, ret_val);
 		ofp_stop_processing();
 		odph_odpthreads_join(thread_tbl);
-		ofp_term_local();
 		ofp_term_global();
-		odp_term_local();
-		odp_term_global(instance);
 		return EXIT_FAILURE;
 	}
 
@@ -287,10 +247,7 @@ int main(int argc, char *argv[])
 		OFP_ERR("Error: Failed to init CLI thread");
 		ofp_stop_processing();
 		odph_odpthreads_join(thread_tbl);
-		ofp_term_local();
 		ofp_term_global();
-		odp_term_local();
-		odp_term_global(instance);
 		return EXIT_FAILURE;
 	}
 
@@ -306,10 +263,7 @@ int main(int argc, char *argv[])
 			OFP_ERR("Error: Failed to init performance monitor");
 			ofp_stop_processing();
 			odph_odpthreads_join(thread_tbl);
-			ofp_term_local();
 			ofp_term_global();
-			odp_term_local();
-			odp_term_global(instance);
 			return EXIT_FAILURE;
 		}
 	}
@@ -320,17 +274,8 @@ int main(int argc, char *argv[])
 	 */
 	odph_odpthreads_join(thread_tbl);
 
-	if (ofp_term_local() < 0)
-		printf("Error: ofp_term_local failed\n");
-
 	if (ofp_term_global() < 0)
 		printf("Error: ofp_term_global failed\n");
-
-	if (odp_term_local() < 0)
-		printf("Error: odp_term_local failed\n");
-
-	if (odp_term_global(instance) < 0)
-		printf("Error: odp_term_global failed\n");
 
 	printf("FPM End Main()\n");
 

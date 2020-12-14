@@ -33,6 +33,8 @@
 #pragma GCC visibility push(default)
 #endif
 
+#define OFP_ODP_INSTANCE_INVALID ((odp_instance_t)(uintptr_t)(-1))
+
 /**
  * Checksum offloading configuration options bit field
  *
@@ -75,6 +77,18 @@ typedef struct ofp_chksum_offload_config_t {
  * @see ofp_init_global_param()
  */
 typedef struct ofp_global_param_t {
+	/**
+	 * ODP instance. The default value is OFP_ODP_INSTANCE_INVALID.
+	 * If configured by application, it will be used in subsequent
+	 * API calls. Application has the ownership on the instance and
+	 * has to cleanup the resources (odp_term_global()).
+	 * If not configured by application, OFP will create an ODP
+	 * instance with default settings. OFP has ownership on the
+	 * instance and will cleanup the resources (odp_term_global())
+	 * at ofp_term_global() time.
+	 */
+	odp_instance_t instance;
+
 	/**
 	 * Count of interfaces to be initialized. The default value is
 	 * 0.
@@ -462,10 +476,16 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
 /**
  * OFP global initialization
  *
- * This function must be called once in an ODP control thread before calling any
- * other OFP API functions.
+ * This function must be called only once for an application before
+ * calling any other OFP API functions.
  *
- * @param instance ODP instance
+ * If an ODP instance is provided as argument, it has to be called
+ * from an ODP control thread.
+ * If an ODP instance is not provided as argument, it will create an
+ * ODP instance and will initialize current thread as control thread.
+ *
+ * For convenience, it also calls ofp_init_local().
+ *
  * @param params Structure with parameters for global init of OFP API
  *
  * @retval 0 on success
@@ -473,7 +493,7 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
  *
  * @see ofp_init_local() which is required per thread before use.
  */
-int ofp_init_global(odp_instance_t instance, ofp_global_param_t *params);
+int ofp_init_global(ofp_global_param_t *params);
 
 /**
  * Thread local OFP initialization
@@ -491,11 +511,13 @@ int ofp_init_local(void);
 /**
  * OFP global termination
  *
- * This function must be called only once in an ODP control
+ * This function must be called only once in an OFP control
  * thread before exiting application.
  *
  * Should be called from a thread within the same schedule group specified in
  * the parameters of ofp_init_global().
+ *
+ * For convenience, it also calls ofp_term_local().
  *
  * @retval 0 on success
  * @retval -1 on failure
@@ -558,6 +580,15 @@ odp_bool_t *ofp_get_processing_state(void);
  */
 
 int ofp_get_parameters(ofp_param_t *params);
+
+/**
+ * Get ODP instance
+ *
+ * @retval ODP instance on success
+ * @retval OFP_ODP_INSTANCE_INVALID on error
+ */
+
+odp_instance_t ofp_get_odp_instance(void);
 
 #if __GNUC__ >= 4
 #pragma GCC visibility pop

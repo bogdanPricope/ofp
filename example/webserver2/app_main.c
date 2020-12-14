@@ -15,6 +15,7 @@
 
 #include "ofp.h"
 #include "httpd.h"
+#include "linux_sigaction.h"
 
 #define MAX_WORKERS		32
 #define MAX_CORE_FILE_SIZE	200000000
@@ -62,6 +63,20 @@ ofp_global_param_t app_init_params; /**< global OFP init parms */
 
 #define PKT_BURST_SIZE 16
 
+/**
+ * Signal handler function
+ *
+ * @param signum int
+ * @return void
+ *
+ */
+static void sig_func_stop(int signum)
+{
+	printf("Signal handler (signum = %d) ... exiting.\n", signum);
+
+	ofp_stop_processing();
+}
+
 /** pkt_io_direct_mode_recv() Custom event dispatcher
  *
  * @param arg void*  Worker argument
@@ -77,6 +92,7 @@ static int pkt_io_direct_mode_recv(void *arg)
 	int num_pktin, i;
 	odp_pktin_queue_t pktin[OFP_FP_INTERFACE_MAX];
 	uint8_t *ptr;
+	odp_bool_t *is_running = NULL;
 
 	thr_args = arg;
 	num_pktin = thr_args->num_pktin;
@@ -88,12 +104,19 @@ static int pkt_io_direct_mode_recv(void *arg)
 		OFP_ERR("Error: OFP local init failed.\n");
 		return -1;
 	}
+
+	is_running = ofp_get_processing_state();
+	if (is_running == NULL) {
+		OFP_ERR("ofp_get_processing_state failed");
+		return -1;
+	}
+
 	ptr = (uint8_t *)&pktin[0];
 
 	printf("PKT-IO receive starting on cpu: %i, %i, %x:%x\n", odp_cpu_id(),
 	       num_pktin, ptr[0], ptr[8]);
 
-	while (1) {
+	while (*is_running) {
 		event_cnt = odp_schedule_multi(NULL, ODP_SCHED_NO_WAIT,
 			events, PKT_BURST_SIZE);
 		for (i = 0; i < event_cnt; i++) {
@@ -300,6 +323,12 @@ int main(int argc, char *argv[])
 	/* Setup system resources */
 	resource_cfg();
 
+	/* add handler for Ctr+C */
+	if (ofp_sigactions_set(sig_func_stop)) {
+		printf("Error: failed to set signal actions.\n");
+		return EXIT_FAILURE;
+	}
+
 	/* Parse application arguments */
 	parse_args(argc, argv, &params);
 
@@ -309,35 +338,13 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	/* Initialize ODP*/
-	if (odp_init_global(&instance, NULL, NULL)) {
-		OFP_ERR("Error: ODP global init failed.\n");
-		exit(EXIT_FAILURE);
-	}
-	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
-		OFP_ERR("Error: ODP local init failed.\n");
-		exit(EXIT_FAILURE);
-	}
-
-	/* Print both system and application information */
-	print_info(NO_PATH(argv[0]), &params);
-
 	/*
 	 * By default core #0 runs Slow Path background tasks.
 	 * It is recommanded to start mapping threads from core 1. Else,
 	 * Slow Path processing will be affected by workers processing.
 	 * However, if Slow Path is disabled, core 0 may be used as well.
 	 */
-	if (validate_cores_settings(params.core_start, params.core_count,
-		&first_worker, &num_workers) < 0) {
-		odp_term_local();
-		odp_term_global(instance);
-		exit(EXIT_FAILURE);
-	}
 	linux_sp_core = 0;
-	OFP_INFO("SP core: %d\nWorkers core start: %d\n"
-		"Workers core count: %d\n",
-		linux_sp_core, first_worker, num_workers);
 
 	/* Initialize OFP*/
 	ofp_init_global_param(&app_init_params);
@@ -347,20 +354,38 @@ int main(int argc, char *argv[])
 		app_init_params.if_names = params.if_names;
 	}
 
-	if (ofp_init_global(instance, &app_init_params)) {
+	if (ofp_init_global(&app_init_params)) {
 		OFP_ERR("Error: OFP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
+
+	instance = ofp_get_odp_instance();
+	if (OFP_ODP_INSTANCE_INVALID == instance) {
+		OFP_ERR("Error: Invalid odp instance.\n");
+		ofp_term_global();
 		exit(EXIT_FAILURE);
 	}
+
+	/* Print both system and application information */
+	print_info(NO_PATH(argv[0]), &params);
+
+	/* Validate workers distribution settings. */
+	if (validate_cores_settings(params.core_start, params.core_count,
+				    &first_worker, &num_workers) < 0) {
+		ofp_term_global();
+		exit(EXIT_FAILURE);
+	}
+
+	OFP_INFO("SP core: %d\nWorkers core start: %d\n"
+		"Workers core count: %d\n",
+		linux_sp_core, first_worker, num_workers);
 
 	if (params.mode == EXEC_MODE_DIRECT_RSS) {
 		if (create_interfaces_direct_rss(instance,
 			params.if_count, params.if_names,
 			num_workers, num_workers)) {
 			OFP_ERR("Failed to initialize interfaces.");
+			ofp_term_global();
 			exit(EXIT_FAILURE);
 		}
 
@@ -368,6 +393,7 @@ int main(int argc, char *argv[])
 			workers_arg_direct_rss,
 			params.if_count, params.if_names)) {
 			OFP_ERR("Failed to initialize workers arguments.");
+			ofp_term_global();
 			exit(EXIT_FAILURE);
 		}
 	} else if (params.mode == EXEC_MODE_SCHEDULER_RSS) {
@@ -375,6 +401,7 @@ int main(int argc, char *argv[])
 			params.if_count, params.if_names,
 			num_workers, num_workers)) {
 			OFP_ERR("Failed to initialize interfaces.");
+			ofp_term_global();
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -412,8 +439,11 @@ int main(int argc, char *argv[])
 	}
 
 	odph_odpthreads_join(thread_tbl);
-	printf("End Main()\n");
 
+	if (ofp_term_global() < 0)
+		printf("Error: ofp_term_global failed.\n");
+
+	printf("End Main()\n");
 	return 0;
 }
 
@@ -726,8 +756,8 @@ static void usage(char *progname)
 		   "  -c, --core_count <number> Core count. Default 0: all above core start\n"
 		   "  -s, --core_start <number> Core start. Default 1.\n"
 		   "  -r, --root <web root folder> Webserver root folder.\n"
+		   "\tDefault: " DEFAULT_ROOT_DIRECTORY "\n"
 		   "  -f, --cli-file <file> OFP CLI file.\n"
-			"\tDefault: "DEFAULT_ROOT_DIRECTORY"\n"
 		   "  -l, --laddr <IPv4 address> IPv4 address were webserver binds.\n"
 			"\tDefault: %s\n"
 		   "  -p, --lport <port> Port address were webserver binds.\n"

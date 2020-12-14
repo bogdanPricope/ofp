@@ -73,13 +73,32 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (odp_init_global(&instance, NULL, NULL)) {
-		OFP_ERR("Error: ODP global init failed.\n");
-		exit(EXIT_FAILURE);
+	/*
+	 * This example assumes that core LINUX_CONTROL_CPU runs Linux kernel
+	 * background tasks, ODP/OFP management threads and the control process.
+	 * By default, cores LINUX_CONTROL_CPU + 1 and beyond will be populated
+	 * with a OFP processing workers.
+	 */
+
+	ofp_init_global_param(&app_init_params);
+	app_init_params.linux_core_id = LINUX_CONTROL_CPU;
+	app_init_params.if_count = params.if_count;
+	app_init_params.if_names = params.if_names;
+
+	/*
+	 * Initialize OFP. This will open a pktio instance for each interface
+	 * supplied as argument by the user.
+	 */
+
+	if (ofp_init_global(&app_init_params) != 0) {
+		printf("Error: OFP global init failed.\n");
+		return EXIT_FAILURE;
 	}
 
-	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
-		OFP_ERR("Error: ODP local init failed.\n");
+	instance = ofp_get_odp_instance();
+	if (OFP_ODP_INSTANCE_INVALID == instance) {
+		OFP_ERR("Error: Invalid odp instance.\n");
+		ofp_term_global();
 		exit(EXIT_FAILURE);
 	}
 
@@ -96,21 +115,13 @@ int main(int argc, char *argv[])
 	if (num_workers > MAX_WORKERS)
 		num_workers = MAX_WORKERS;
 
-	/*
-	 * This example assumes that core #0 runs Linux kernel background tasks,
-	 * ODP/OFP management threads and the control process.
-	 * By default, cores #1 and beyond will be populated with a OFP
-	 * processing workers.
-	 */
-
 	odp_cpumask_zero(&cpumask);
 	for (i = 0; i < num_workers; i++)
 		odp_cpumask_set(&cpumask, LINUX_CONTROL_CPU + 1 + i);
 	if (odp_cpumask_to_str(&cpumask, cpumaskstr, sizeof(cpumaskstr)) < 0) {
 		printf("Error: Too small buffer provided to "
 			"odp_cpumask_to_str\n");
-		odp_term_local();
-		odp_term_global(instance);
+		ofp_term_global();
 		return EXIT_FAILURE;
 	}
 
@@ -119,37 +130,6 @@ int main(int argc, char *argv[])
 	printf("Num workers:    %i\n", num_workers);
 	printf("Workers CPU mask:       %s\n", cpumaskstr);
 
-	ofp_init_global_param(&app_init_params);
-
-	app_init_params.linux_core_id = LINUX_CONTROL_CPU;
-	app_init_params.if_count = params.if_count;
-	app_init_params.if_names = params.if_names;
-
-	/*
-	 * Now that ODP has been initialized, we can initialize OFP. This will
-	 * open a pktio instance for each interface supplied as argument by the
-	 * user.
-	 *
-	 * General configuration will be to pktio and schedluer queues here in
-	 * addition will fast path interface configuration.
-	 */
-	if (ofp_init_global(instance, &app_init_params) != 0) {
-		printf("Error: OFP global init failed.\n");
-		ofp_term_global();
-		odp_term_local();
-		odp_term_global(instance);
-		return EXIT_FAILURE;
-	}
-
-	if (ofp_init_local() != 0) {
-		printf("Error: OFP local init failed.\n");
-		ofp_term_local();
-		ofp_term_global();
-		odp_term_local();
-		odp_term_global(instance);
-		return EXIT_FAILURE;
-	}
-
 	memset(proc_tbl, 0, sizeof(proc_tbl));
 	thr_params.thr_type = ODP_THREAD_WORKER;
 	thr_params.instance = instance;
@@ -157,10 +137,7 @@ int main(int argc, char *argv[])
 	ret = odph_linux_process_fork_n(proc_tbl, &cpumask, &thr_params);
 	if (ret == -1) {
 		printf("Error: Failed to start children processes.\n");
-		ofp_term_local();
 		ofp_term_global();
-		odp_term_local();
-		odp_term_global(instance);
 		return EXIT_FAILURE;
 	}
 
@@ -183,18 +160,10 @@ int main(int argc, char *argv[])
 
 	odph_linux_process_wait_n(proc_tbl, num_workers);
 
-	if (ofp_term_local() < 0)
-		printf("Error: ofp_term_local failed\n");
 	if (ofp_term_global() < 0)
 		printf("Error: ofp_term_global failed\n");
 
-	if (odp_term_local() < 0)
-		printf("Error: odp_term_local failed\n");
-
-	if (odp_term_global(instance) < 0)
-		printf("Error: odp_term_global failed\n");
-
-	printf("End.\n");
+	printf("End Main().\n");
 	return 0;
 }
 

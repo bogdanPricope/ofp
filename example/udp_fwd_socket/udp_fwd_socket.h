@@ -9,5 +9,6 @@
 #define _UDP_FWD_H_
 
 int udp_fwd_cfg(int sock_count, char *laddr_txt, char *raddr_txt);
+int udp_fwd_cleanup(void);
 
 #endif /*_UDP_FWD_H_*/

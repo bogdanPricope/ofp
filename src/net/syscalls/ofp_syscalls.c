@@ -508,7 +508,7 @@ int ofp_socket_sigevent(struct ofp_sigevent *ev)
 		return -1;
 	};
 
-	so->so_sigevent = *ev;
+	odp_memcpy(&so->so_sigevent, ev, sizeof(so->so_sigevent));
 	so->so_rcv.sb_socket = so;
 	so->so_snd.sb_socket = so;
 

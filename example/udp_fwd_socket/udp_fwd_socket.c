@@ -20,7 +20,11 @@
 
 #define TEST_LPORT 5001
 #define TEST_RPORT 5000
+
 struct ofp_sockaddr_in *raddr = NULL;
+int *sock_array;
+int sock_array_size;
+
 static void notify(union ofp_sigval sv);
 
 static int create_local_sock(int lport, char *laddr_txt)
@@ -67,24 +71,33 @@ static int create_local_sock(int lport, char *laddr_txt)
 		return -1;
 	}
 
-	return 0;
+	return sd;
 }
 
 int udp_fwd_cfg(int sock_count, char *laddr_txt, char *raddr_txt)
 {
 	int port_idx;
+	int sd = -1;
+
+	sock_array_size = 0;
+	sock_array = (int *)malloc(sock_count * sizeof(int));
+	if (sock_array == NULL) {
+		OFP_ERR("Error: Failed allocate memory\n");
+		return -1;
+	}
 
 	for (port_idx = 0; port_idx < sock_count; port_idx++) {
-		int ret = create_local_sock(TEST_LPORT + port_idx, laddr_txt);
-		if (ret == -1)
+		sd = create_local_sock(TEST_LPORT + port_idx, laddr_txt);
+		if (sd == -1)
 			return -1;
+		sock_array[sock_array_size] = sd;
+		sock_array_size++;
 	}
 
 	/* Allocate remote address - will be used in notification function*/
 	raddr = malloc(sizeof(struct ofp_sockaddr_in));
 	if (raddr == NULL) {
-		OFP_ERR("Error: Failed allocate memory: errno = %s\n",
-			ofp_strerror(ofp_errno));
+		OFP_ERR("Error: Failed allocate memory\n");
 		return -1;
 	}
 	memset(raddr, 0, sizeof(*raddr));
@@ -113,3 +126,26 @@ static void notify(union ofp_sigval sv)
 	/* mark packet as consumed*/
 	ss->pkt = ODP_PACKET_INVALID;
 }
+
+int udp_fwd_cleanup(void)
+{
+	int i;
+
+	if (raddr) {
+		free(raddr);
+		raddr = NULL;
+	}
+
+	if (sock_array_size) {
+		for (i = 0; i < sock_array_size; i++)
+			ofp_close(sock_array[i]);
+	}
+
+	if (sock_array) {
+		free(sock_array);
+		sock_array = NULL;
+	}
+
+	return 0;
+}
+

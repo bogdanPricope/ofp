@@ -342,6 +342,8 @@ static double odp_time_to_sec(odp_time_t t)
 
 int main(int argc, char *argv[])
 {
+	ofp_global_param_t params;
+
 	parse_args(argc, argv);
 
 	if (arg.workers > ODP_THREAD_COUNT_MAX)
@@ -350,14 +352,6 @@ int main(int argc, char *argv[])
 	uint32_t neighbors = 1<<arg.neighbor_bits, routes = 1<<arg.route_bits;
 	addr_mask = (1 << (arg.route_bits + (32 - arg.masklen))) - 1;
 
-	ASSERT(!odp_init_global(&instance, NULL, NULL));
-	ASSERT(!odp_init_local(instance, ODP_THREAD_CONTROL));
-
-	ofp_loglevel_set(arg.loglevel);
-
-	print_info();
-
-	ofp_global_param_t params;
 	ofp_init_global_param(&params);
 	params.enable_nl_thread = 0;
 	params.arp.entries = neighbors + 1;
@@ -365,8 +359,12 @@ int main(int argc, char *argv[])
 	params.mtrie.table8_nodes = routes/2 + (routes>>8) + 4;
 	params.pkt_tx_burst_size = arg.tx_burst;
 	params.num_vlan = arg.vlans;
-	ASSERT(!ofp_init_global(instance, &params));
-	ASSERT(!ofp_init_local());
+	params.loglevel = arg.loglevel;
+	ASSERT(!ofp_init_global(&params));
+
+	print_info();
+
+	instance = ofp_get_odp_instance();
 
 	uint32_t vlan;
 	for (vlan = 0; vlan <= arg.vlans; vlan++)
@@ -482,10 +480,6 @@ int main(int argc, char *argv[])
 
 	ASSERT(!odp_queue_destroy(dummyq));
 
-	ofp_term_local();
 	ofp_term_global();
-	odp_term_local();
-	odp_term_global(instance);
-
 	return 0;
 }

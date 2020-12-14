@@ -332,12 +332,18 @@ ioctl_test(void *arg)
 	fclose(logfile);
 	if (system("cat " logfilename) < 0)
 		OFP_ERR("system failed");
+
+	ofp_stop_processing();
+
+	if (ofp_term_local())
+		OFP_ERR("ofp_term_local failed");
+
 	return 0;
 }
 
 void ofp_start_ioctl_thread(odp_instance_t instance, int core_id)
 {
-	odph_odpthread_t test_linux_pthread;
+	static odph_odpthread_t test_linux_pthread;
 	odp_cpumask_t cpumask;
 	odph_odpthread_params_t thr_params;
 

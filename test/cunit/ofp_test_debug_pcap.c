@@ -58,24 +58,11 @@ static int
 init_suite(void)
 {
 	odp_pool_t pool;
-	odp_instance_t instance;
 	ofp_global_param_t params;
-
-	/* Init ODP before calling anything else */
-	if (odp_init_global(&instance, NULL, NULL)) {
-		OFP_ERR("Error: ODP global init failed.\n");
-		return -1;
-	}
-
-	/* Init this thread */
-	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
-		OFP_ERR("Error: ODP local init failed.\n");
-		return -1;
-	}
 
 	ofp_init_global_param(&params);
 
-	(void)ofp_init_global(instance, &params);
+	(void)ofp_init_global(&params);
 
 	pool = odp_pool_lookup("packet_pool");
 	if (pool == ODP_POOL_INVALID) {
@@ -92,6 +79,8 @@ init_suite(void)
 static int
 clean_suite(void)
 {
+	ofp_term_global();
+
 	return 0;
 }
 

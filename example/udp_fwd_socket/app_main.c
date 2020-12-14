@@ -15,6 +15,7 @@
 
 #include "ofp.h"
 #include "udp_fwd_socket.h"
+#include "linux_sigaction.h"
 
 #define MAX_WORKERS		64
 
@@ -50,6 +51,20 @@ ofp_global_param_t app_init_params; /**< global OFP init parms */
 
 #define PKT_BURST_SIZE 16
 
+/**
+ * Signal handler function
+ *
+ * @param signum int
+ * @return void
+ *
+ */
+static void sig_func_stop(int signum)
+{
+	printf("Signal handler (signum = %d) ... exiting.\n", signum);
+
+	ofp_stop_processing();
+}
+
 static int pkt_io_recv(void *arg)
 {
 	odp_packet_t pkt, pkt_tbl[PKT_BURST_SIZE];
@@ -58,6 +73,7 @@ static int pkt_io_recv(void *arg)
 	int num_pktin, i;
 	odp_pktin_queue_t pktin[OFP_FP_INTERFACE_MAX];
 	uint8_t *ptr;
+	odp_bool_t *is_running = NULL;
 
 	thr_args = arg;
 	num_pktin = thr_args->num_pktin;
@@ -69,12 +85,18 @@ static int pkt_io_recv(void *arg)
 		OFP_ERR("Error: OFP local init failed.\n");
 		return -1;
 	}
-	ptr = (uint8_t *)&pktin[0];
 
+	is_running = ofp_get_processing_state();
+	if (is_running == NULL) {
+		OFP_ERR("ofp_get_processing_state failed");
+		return -1;
+	}
+
+	ptr = (uint8_t *)&pktin[0];
 	printf("PKT-IO receive starting on cpu: %i, %i, %x:%x\n", odp_cpu_id(),
 	       num_pktin, ptr[0], ptr[8]);
 
-	while (1) {
+	while (*is_running) {
 		for (i = 0; i < num_pktin; i++) {
 			pkt_cnt = odp_pktin_recv(pktin[i], pkt_tbl,
 						 PKT_BURST_SIZE);
@@ -99,6 +121,7 @@ static int pkt_io_recv(void *arg)
 static int event_dispatcher(void *arg)
 {
 	odp_event_t ev;
+	odp_bool_t *is_running = NULL;
 
 	(void)arg;
 
@@ -107,7 +130,13 @@ static int event_dispatcher(void *arg)
 		return -1;
 	}
 
-	while (1) {
+	is_running = ofp_get_processing_state();
+	if (is_running == NULL) {
+		OFP_ERR("ofp_get_processing_state failed");
+		return -1;
+	}
+
+	while (*is_running) {
 		ev = odp_schedule(NULL, ODP_SCHED_WAIT);
 
 		if (ev == ODP_EVENT_INVALID)
@@ -149,6 +178,12 @@ int main(int argc, char *argv[])
 	odph_odpthread_params_t thr_params;
 	odp_instance_t instance;
 
+	/* add handler for Ctr+C */
+	if (ofp_sigactions_set(sig_func_stop)) {
+		printf("Error: failed to set signal actions.\n");
+		return EXIT_FAILURE;
+	}
+
 	/* Parse and store the application arguments */
 	parse_args(argc, argv, &params);
 
@@ -158,12 +193,18 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (odp_init_global(&instance, NULL, NULL)) {
-		OFP_ERR("Error: ODP global init failed.\n");
+	/* Initialize OFP */
+	ofp_init_global_param(&app_init_params);
+
+	if (ofp_init_global(&app_init_params)) {
+		OFP_ERR("Error: OFP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
-	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
-		OFP_ERR("Error: ODP local init failed.\n");
+
+	instance = ofp_get_odp_instance();
+	if (OFP_ODP_INSTANCE_INVALID == instance) {
+		OFP_ERR("Error: Invalid odp instance.\n");
+		ofp_term_global();
 		exit(EXIT_FAILURE);
 	}
 
@@ -185,22 +226,12 @@ int main(int argc, char *argv[])
 
 	if (num_workers < 1) {
 		OFP_ERR("ERROR: At least 2 cores required.\n");
+		ofp_term_global();
 		exit(EXIT_FAILURE);
 	}
 
 	printf("Num worker threads: %i\n", num_workers);
 	printf("First worker CPU:   %i\n\n", first_worker);
-
-	ofp_init_global_param(&app_init_params);
-
-	if (ofp_init_global(instance, &app_init_params)) {
-		OFP_ERR("Error: OFP global init failed.\n");
-		exit(EXIT_FAILURE);
-	}
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
-		exit(EXIT_FAILURE);
-	}
 
 	odp_pktio_param_init(&pktio_param);
 	pktio_param.in_mode = ODP_PKTIN_MODE_DIRECT;
@@ -228,6 +259,7 @@ int main(int argc, char *argv[])
 				&pktout_param) < 0) {
 			OFP_ERR("Failed to init interface %s",
 				params.if_names[i]);
+			ofp_term_global();
 			exit(EXIT_FAILURE);
 		}
 
@@ -235,6 +267,7 @@ int main(int argc, char *argv[])
 		if (pktio == ODP_PKTIO_INVALID) {
 			OFP_ERR("Failed locate pktio %s",
 				params.if_names[i]);
+			ofp_term_global();
 			exit(EXIT_FAILURE);
 		}
 
@@ -247,6 +280,7 @@ int main(int argc, char *argv[])
 		if (odp_pktout_queue(pktio, NULL, 0) != tx_queues) {
 			OFP_ERR("Too few pktout queues for %s",
 				params.if_names[i]);
+			ofp_term_global();
 			exit(EXIT_FAILURE);
 		}
 
@@ -287,9 +321,18 @@ int main(int argc, char *argv[])
 		params.cli_file);
 	sleep(1);
 
-	udp_fwd_cfg(params.sock_count, params.laddr, params.raddr);
+	if (udp_fwd_cfg(params.sock_count, params.laddr, params.raddr)) {
+		OFP_ERR("Error: udp_fwd_cleanup failed.");
+		ofp_stop_processing();
+	}
 
 	odph_odpthreads_join(thread_tbl);
+
+	if (udp_fwd_cleanup())
+		printf("Error: udp_fwd_cleanup failed.\n");
+
+	if (ofp_term_global() < 0)
+		printf("Error: ofp_term_global failed.\n");
 
 	printf("End Main()\n");
 	return 0;
@@ -315,16 +358,18 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		{"help", no_argument, NULL, 'h'},		/* return 'h' */
 		{"cli-file", required_argument,
 			NULL, 'f'},/* return 'f' */
-		{"local address", required_argument,
+		{"local-address", required_argument,
 			NULL, 'l'},/* return 'l' */
-		{"remote address", required_argument,
+		{"remote-address", required_argument,
 			NULL, 'r'},/* return 'r' */
-		{"local sockets", required_argument,
+		{"socket-count", required_argument,
 			NULL, 's'},/* return 's' */
 		{NULL, 0, NULL, 0}
 	};
 
 	memset(appl_args, 0, sizeof(*appl_args));
+
+	appl_args->sock_count = 1;
 
 	while (1) {
 		opt = getopt_long(argc, argv, "+c:i:hf:l:r:s:",
@@ -450,6 +495,18 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		exit(EXIT_FAILURE);
 	}
 
+	if (appl_args->laddr == NULL) {
+		printf("Error: Invalid local address (null)\n");
+		usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
+
+	if (appl_args->raddr == NULL) {
+		printf("Error: Invalid remote address (null)\n");
+		usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
+
 	optind = 1;		/* reset 'extern optind' from the getopt lib */
 }
 
@@ -493,17 +550,17 @@ static void usage(char *progname)
 		   "Usage: %s OPTIONS\n"
 		   "  E.g. %s -i eth1,eth2,eth3\n"
 		   "\n"
-		   "ODPFastpath application.\n"
-		   "\n"
 		   "Mandatory OPTIONS:\n"
-		   "  -i, --interface Eth interfaces (comma-separated, no spaces)\n"
-		   "  -l, local address\n"
-		   "  -r, remote address\n"
-		   "  -s, number of local sockets, at least one(default)\n"
+		   "  -i, --interface <interfaces> Interfaces"
+		   " (comma-separated, no spaces)\n"
+		   "  -l, --local-address   Local address\n"
+		   "  -r, --remote-address  Remote address\n"
 		   "\n"
 		   "Optional OPTIONS\n"
-		   "  -c, --count <number> Core count.\n"
-		   "  -h, --help           Display help and exit.\n"
+		   "  -f, --cli-file <file>       OFP CLI file.\n"
+		   "  -c, --count <number>        Core count.\n"
+		   "  -s, --socket-count <number> Number of local sockets. Default: 1\n"
+		   "  -h, --help                  Display help and exit.\n"
 		   "\n", NO_PATH(progname), NO_PATH(progname)
 		);
 }

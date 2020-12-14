@@ -13,8 +13,10 @@
 #include "ofp.h"
 
 #include "udp_server.h"
+#include "linux_sigaction.h"
 
 #define MAX_WORKERS		32
+#define MAX_CORE_FILE_SIZE	200000000
 
 /**
  * Parsed command line application arguments
@@ -38,21 +40,6 @@ ofp_global_param_t app_init_params; /**< global OFP init parms */
 				strrchr((file_name), '/') + 1 : (file_name))
 
 
-/** local hook
- *
- * @param pkt odp_packet_t
- * @param protocol int
- * @return int
- *
- */
-static enum ofp_return_code fastpath_local_hook(odp_packet_t pkt, void *arg)
-{
-	int protocol = *(int *)arg;
-	(void) pkt;
-	(void) protocol;
-	return OFP_PKT_CONTINUE;
-}
-
 /** main() Application entry point
  *
  * @param argc int
@@ -62,6 +49,38 @@ static enum ofp_return_code fastpath_local_hook(odp_packet_t pkt, void *arg)
  */
 #include <sys/time.h>
 #include <sys/resource.h>
+
+/**
+ * resource_cfg() Setup system resources
+ *
+ * @return int 0 on success, -1 on error
+ *
+ */
+static int resource_cfg(void)
+{
+	struct rlimit rlp;
+
+	getrlimit(RLIMIT_CORE, &rlp);
+	printf("RLIMIT_CORE: %ld/%ld\n", rlp.rlim_cur, rlp.rlim_max);
+	rlp.rlim_cur = MAX_CORE_FILE_SIZE;
+	printf("Setting to max: %d\n", setrlimit(RLIMIT_CORE, &rlp));
+
+	return 0;
+}
+
+/**
+ * Signal handler function
+ *
+ * @param signum int
+ * @return void
+ *
+ */
+static void sig_func_stop(int signum)
+{
+	printf("Signal handler (signum = %d) ... exiting.\n", signum);
+
+	ofp_stop_processing();
+}
 
 int main(int argc, char *argv[])
 {
@@ -73,42 +92,50 @@ int main(int argc, char *argv[])
 	odph_odpthread_params_t thr_params;
 	odp_instance_t instance;
 
-	struct rlimit rlp;
-	getrlimit(RLIMIT_CORE, &rlp);
-	printf("RLIMIT_CORE: %ld/%ld\n", rlp.rlim_cur, rlp.rlim_max);
-	rlp.rlim_cur = 200000000;
-	printf("Setting to max: %d\n", setrlimit(RLIMIT_CORE, &rlp));
+	resource_cfg();
+
+	/* add handler for Ctr+C */
+	if (ofp_sigactions_set(sig_func_stop)) {
+		printf("Error: failed to set signal actions.\n");
+		return EXIT_FAILURE;
+	}
 
 	/* Parse and store the application arguments */
 	parse_args(argc, argv, &params);
 
-	if (odp_init_global(&instance, NULL, NULL)) {
-		OFP_ERR("Error: ODP global init failed.\n");
+	/* Initialize OFP */
+	ofp_init_global_param(&app_init_params);
+	app_init_params.if_count = params.if_count;
+	app_init_params.if_names = params.if_names;
+
+	if (ofp_init_global(&app_init_params)) {
+		OFP_ERR("Error: OFP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
-	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
-		OFP_ERR("Error: ODP local init failed.\n");
+
+	instance = ofp_get_odp_instance();
+	if (OFP_ODP_INSTANCE_INVALID == instance) {
+		OFP_ERR("Error: Invalid odp instance.\n");
+		ofp_term_global();
 		exit(EXIT_FAILURE);
 	}
 
 	/* Print both system and application information */
 	print_info(NO_PATH(argv[0]), &params);
 
-	core_count = odp_cpu_count();
-	num_workers = core_count;
-
-	if (params.core_count)
-		num_workers = params.core_count;
-	if (num_workers > MAX_WORKERS)
-		num_workers = MAX_WORKERS;
-
 	/*
 	 * By default core #0 runs Linux kernel background tasks.
 	 * Start mapping thread from core #1
 	 */
-	ofp_init_global_param(&app_init_params);
+	core_count = odp_cpu_count();
+	num_workers = core_count;
 
-	if (core_count > 1)
+	if (params.core_count && params.core_count < core_count)
+		num_workers = params.core_count;
+	if (num_workers > MAX_WORKERS)
+		num_workers = MAX_WORKERS;
+
+	if (core_count > 1 && num_workers == core_count)
 		num_workers--;
 
 	num_workers = odp_cpumask_default_worker(&cpumask, num_workers);
@@ -118,17 +145,9 @@ int main(int argc, char *argv[])
 	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
 	printf("cpu mask:           %s\n", cpumaskstr);
 
-	app_init_params.if_count = params.if_count;
-	app_init_params.if_names = params.if_names;
-	app_init_params.pkt_hook[OFP_HOOK_LOCAL] = fastpath_local_hook;
-	if (ofp_init_global(instance, &app_init_params)) {
-		OFP_ERR("Error: OFP global init failed.\n");
-		exit(EXIT_FAILURE);
-	}
-
 	memset(thread_tbl, 0, sizeof(thread_tbl));
-	/* Start dataplane dispatcher worker threads */
 
+	/* Start dataplane dispatcher worker threads */
 	thr_params.start = default_event_dispatcher;
 	thr_params.arg = ofp_eth_vlan_processing;
 	thr_params.thr_type = ODP_THREAD_WORKER;
@@ -141,12 +160,23 @@ int main(int argc, char *argv[])
 	/* Start CLI */
 	ofp_start_cli_thread(instance, app_init_params.linux_core_id, params.cli_file);
 
-	/* udp echo server */
-	ofp_start_udpserver_thread(instance, app_init_params.linux_core_id);
+	/*configure udp echo */
+	if (udpecho_config(&params)) {
+		OFP_ERR("Error: Failed to configure udpecho.\n");
+		ofp_stop_processing();
+	}
 
+	/* Wait for end of execution */
 	odph_odpthreads_join(thread_tbl);
-	printf("End Main()\n");
 
+	/* Cleanup*/
+	if (udpecho_cleanup())
+		OFP_ERR("Error: Failed to cleanup udpecho.\n");
+
+	if (ofp_term_global() < 0)
+		printf("Error: ofp_term_global failed.\n");
+
+	printf("End Main()\n");
 	return 0;
 }
 
