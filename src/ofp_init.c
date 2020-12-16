@@ -779,6 +779,7 @@ int ofp_term_global(void)
 
 			num_in_queue = odp_pktin_event_queue(ifnet->pktio,
 					in_queue, num_queues);
+
 			for (idx = 0; idx < num_in_queue; idx++)
 				cleanup_pkt_queue(in_queue[idx]);
 
@@ -983,6 +984,9 @@ static void drain_scheduler_for_global_term(void)
 static void cleanup_pkt_queue(odp_queue_t pkt_queue)
 {
 	odp_event_t evt;
+
+	if (odp_queue_type(pkt_queue) == ODP_QUEUE_TYPE_SCHED)
+		return;
 
 	while (1) {
 		evt = odp_queue_deq(pkt_queue);

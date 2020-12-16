@@ -71,13 +71,22 @@ int default_event_dispatcher(void *arg)
 	int event_cnt = 0;
 	ofp_pkt_processing_func pkt_func = (ofp_pkt_processing_func)arg;
 	odp_bool_t *is_running = NULL;
+	uint64_t wait_time = 0;
+	ofp_param_t ofp_params = {0};
+	int rx_burst = 1;
 
 	if (ofp_init_local()) {
 		OFP_ERR("ofp_init_local failed");
 		return -1;
 	}
 
-	int rx_burst = global_param->evt_rx_burst_size;
+	if (ofp_get_parameters(&ofp_params)) {
+		OFP_ERR("ofp_get_parameters failed");
+		ofp_term_local();
+		return -1;
+	}
+
+	rx_burst =  ofp_params.global_param.evt_rx_burst_size;
 	odp_event_t events[rx_burst];
 
 	is_running = ofp_get_processing_state();
@@ -87,10 +96,14 @@ int default_event_dispatcher(void *arg)
 		return -1;
 	}
 
+	wait_time = odp_schedule_wait_time(100 * ODP_TIME_MSEC_IN_NS);
+
 	/* PER CORE DISPATCHER */
 	while (*is_running) {
-		event_cnt = odp_schedule_multi(&in_queue, ODP_SCHED_WAIT,
-					 events, rx_burst);
+		event_cnt = odp_schedule_multi(&in_queue, wait_time,
+					       events, rx_burst);
+		if (!event_cnt)
+			continue;
 		for (event_idx = 0; event_idx < event_cnt; event_idx++) {
 			odp_event_type_t ev_type;
 			odp_event_subtype_t ev_subtype;
