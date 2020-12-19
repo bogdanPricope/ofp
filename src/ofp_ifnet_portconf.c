@@ -94,6 +94,13 @@ static int vlan_iterate_inorder(void *root,
 	return avl_iterate_inorder(root, iterate_fun, iter_arg);
 }
 
+static int vlan_cleanup_inorder(void *root,
+				int (*iterate_fun)(void *key, void *iter_arg),
+				void *iter_arg)
+{
+	return avl_cleanup_inorder(root, iterate_fun, iter_arg);
+}
+
 int vlan_ifnet_insert(void *root, void *elem)
 {
 	return avl_insert((avl_tree *)root, elem);
@@ -1193,7 +1200,7 @@ int ofp_local_interfaces_destroy(void)
 	if (!shm->ofp_ifnet_data[LOCAL_PORTS].vlan_structs)
 		return 0;
 
-	vlan_iterate_inorder(shm->ofp_ifnet_data[LOCAL_PORTS].vlan_structs,
+	vlan_cleanup_inorder(shm->ofp_ifnet_data[LOCAL_PORTS].vlan_structs,
 			     iter_local_iface_destroy, NULL);
 
 	return 0;
@@ -1321,13 +1328,15 @@ const char *ofp_config_interface_down(int port, uint16_t vlan)
 			&key,
 			free_key);
 #ifdef SP
+		cmd[0] = '\0';
 		if (ofp_if_type(data) == OFP_IFT_GRE)
 			snprintf(cmd, sizeof(cmd), "ip tunnel del %s",
 				 ofp_port_vlan_to_ifnet_name(port, vlan));
 		else if (ofp_if_type(data) != OFP_IFT_LOOP)
 			snprintf(cmd, sizeof(cmd), "ip link del %s",
 				 ofp_port_vlan_to_ifnet_name(port, vlan));
-		ret = exec_sys_call_depending_on_vrf(cmd, vrf);
+		if (cmd[0])
+			ret = exec_sys_call_depending_on_vrf(cmd, vrf);
 #endif /*SP*/
 	} else {
 		data = ofp_get_ifnet(port, vlan);

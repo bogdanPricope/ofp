@@ -119,6 +119,10 @@ int avl_iterate_inorder (
   void *        iter_arg
   );
 
+int avl_cleanup_inorder(avl_tree *tree,
+			avl_iter_fun_type iter_fun,
+			void *iter_arg);
+
 int avl_iterate_index_range (
   avl_tree *        tree,
   avl_iter_index_fun_type iter_fun,

@@ -752,6 +752,31 @@ avl_iterate_inorder (avl_tree * tree,
     }
 }
 
+int
+avl_cleanup_inorder(avl_tree *tree,
+		    avl_iter_fun_type iter_fun,
+		    void *iter_arg)
+{
+	avl_node *node = NULL;
+	int result = 0;
+	void *key = NULL;
+
+	while (1) {
+		ofp_brlock_read_lock(&tree->lock_rw);
+		node = avl_get_first(tree);
+		if (node == NULL) {
+			ofp_brlock_read_unlock(&tree->lock_rw);
+			break;
+		}
+		key = node->key;
+		ofp_brlock_read_unlock(&tree->lock_rw);
+
+		if (iter_fun(key, iter_arg))
+			result = -1;
+	}
+	return result;
+}
+
 avl_node *avl_get_first(avl_tree *tree)
 {
     avl_node *node;
