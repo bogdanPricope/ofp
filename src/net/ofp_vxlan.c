@@ -404,7 +404,7 @@ int ofp_clean_vxlan_interface_queue(void)
 	}
 
 	if (odp_queue_destroy(ifnet->loopq_def)) {
-		OFP_ERR("Error: Failed to destroi VXLAN port queue");
+		OFP_ERR("Error: Failed to destroy VXLAN port queue");
 		return -1;
 	}
 

@@ -56,6 +56,7 @@
 static void drain_scheduler(void);
 static void drain_scheduler_for_global_term(void);
 static void cleanup_pkt_queue(odp_queue_t pkt_queue);
+static int cleanup_interface(struct ofp_ifnet *ifnet);
 
 static int ofp_term_post_global(const char *pool_name);
 
@@ -488,12 +489,12 @@ static int ofp_init_pre_global(ofp_global_param_t *params,
 enum ofp_init_state {
 	OFP_INIT_STATE_NOT_INIT = 0,
 	OFP_INIT_STATE_ODP_INIT,
-	OFP_INIT_STATE_PRE_INIT_GLOBAL,
+	OFP_INIT_STATE_PRE_GLOBAL_INIT,
 	OFP_INIT_STATE_VXLAN_INIT,
-	OFP_INIT_STATE_INTERFACES,
+	OFP_INIT_STATE_INTERFACES_INIT,
 	OFP_INIT_STATE_NL_INIT,
 	OFP_INIT_STATE_LOOPBACK_INIT,
-	OFP_INIT_STATE_OFP_INIT_LOCAL
+	OFP_INIT_STATE_OFP_LOCAL_INIT
 };
 
 int ofp_init_global(ofp_global_param_t *params)
@@ -513,6 +514,7 @@ int ofp_init_global(ofp_global_param_t *params)
 
 	instance = params->instance;
 
+	state = OFP_INIT_STATE_ODP_INIT;
 	/* Create odp instance  if not provided as argument */
 	if (instance == OFP_ODP_INSTANCE_INVALID) {
 		if (odp_init_global(&instance, NULL, NULL)) {
@@ -529,22 +531,19 @@ int ofp_init_global(ofp_global_param_t *params)
 		instance_owner = 1;
 	}
 
-	state = OFP_INIT_STATE_PRE_INIT_GLOBAL;
-
 #if ODP_VERSION_API_GENERATION >= 1 && ODP_VERSION_API_MAJOR >= 21
 	odp_schedule_config(NULL);
 #endif
 
+	state = OFP_INIT_STATE_PRE_GLOBAL_INIT;
 	if (ofp_init_pre_global(params, instance, instance_owner))
 		goto init_error;
 
 	state = OFP_INIT_STATE_VXLAN_INIT;
-
 	if (ofp_set_vxlan_interface_queue())
 		goto init_error;
 
-	state = OFP_INIT_STATE_INTERFACES;
-
+	state = OFP_INIT_STATE_INTERFACES_INIT;
 	/* Create interfaces */
 	odp_pktio_param_init(&pktio_param);
 	pktio_param.in_mode = params->pktin_mode;
@@ -568,7 +567,6 @@ int ofp_init_global(ofp_global_param_t *params)
 		 odp_cpumask_first(&V_global_linux_cpumask));
 
 	state = OFP_INIT_STATE_NL_INIT;
-
 	if (params->enable_nl_thread) {
 		odph_odpthread_params_t thr_params;
 
@@ -588,7 +586,6 @@ int ofp_init_global(ofp_global_param_t *params)
 #endif /* SP */
 
 	state = OFP_INIT_STATE_LOOPBACK_INIT;
-
 	if (params->if_loopback) {
 		uint32_t loop_addr = odp_cpu_to_be_32(OFP_INADDR_LOOPBACK);
 
@@ -602,8 +599,7 @@ int ofp_init_global(ofp_global_param_t *params)
 
 	odp_schedule_resume();
 
-	state = OFP_INIT_STATE_OFP_INIT_LOCAL;
-
+	state = OFP_INIT_STATE_OFP_LOCAL_INIT;
 	if (ofp_init_local() != 0) {
 		OFP_ERR("Failed to thread local settings");
 		goto init_error;
@@ -613,22 +609,41 @@ int ofp_init_global(ofp_global_param_t *params)
 
 init_error:
 	switch (state) {
-#if 0
-	case OFP_INIT_STATE_OFP_INIT_LOCAL:
+	case OFP_INIT_STATE_OFP_LOCAL_INIT:
 		ofp_term_local();
 		/* Fallthrough */
 	case OFP_INIT_STATE_LOOPBACK_INIT:
 		ofp_local_interfaces_destroy();
 		/* Fallthrough */
 	case OFP_INIT_STATE_NL_INIT:
+#ifdef SP
 		ofp_stop_processing();
+
+		if (V_global_nl_thread_is_running) {
+			odph_odpthreads_join(&V_global_nl_thread);
+			V_global_nl_thread_is_running = 0;
+		}
+#endif /* SP */
 		/* Fallthrough */
-	case OFP_INIT_STATE_INTERFACES:
+	case OFP_INIT_STATE_INTERFACES_INIT:
+		{
+			struct ofp_ifnet *ifnet = NULL;
+
+			ofp_stop_processing();
+
+			for (i = 0; PHYS_PORT(i); i++) {
+				ifnet = ofp_get_ifnet((uint16_t)i, 0);
+				if (!ifnet)
+					continue;
+
+				cleanup_interface(ifnet);
+			}
+		}
 		/* Fallthrough */
 	case OFP_INIT_STATE_VXLAN_INIT:
 		ofp_clean_vxlan_interface_queue();
 		/* Fallthrough */
-	case OFP_INIT_STATE_PRE_INIT_GLOBAL:
+	case OFP_INIT_STATE_PRE_GLOBAL_INIT:
 		ofp_term_post_global(SHM_PKT_POOL_NAME);
 
 		/* Terminate shared memory */
@@ -645,10 +660,9 @@ init_error:
 						" failed\n");
 		}
 		/* Fallthrough */
-#endif /* 0 */
 	case OFP_INIT_STATE_NOT_INIT:
 	default:
-		OFP_LOG_NO_CTX_NO_LEVEL("OFP: Initialization failed.");
+		state = OFP_INIT_STATE_NOT_INIT;
 	}
 	return -1;
 }
@@ -697,7 +711,7 @@ int ofp_init_local(void)
 int ofp_term_global(void)
 {
 	int rc = 0;
-	uint16_t i, j;
+	uint16_t i;
 	struct ofp_ifnet *ifnet;
 	odp_instance_t odp_instance = OFP_ODP_INSTANCE_INVALID;
 	odp_bool_t odp_instance_owner = 0;
@@ -729,68 +743,11 @@ int ofp_term_global(void)
 			rc = -1;
 			continue;
 		}
-		if (ifnet->if_state == OFP_IFT_STATE_FREE)
+
+		if (cleanup_interface(ifnet)) {
+			rc = -1;
 			continue;
-
-		if (ifnet->pktio == ODP_PKTIO_INVALID)
-			continue;
-
-		OFP_INFO("Cleaning device '%s' addr %s", ifnet->if_name,
-			ofp_print_mac((uint8_t *)ifnet->mac));
-
-		CHECK_ERROR(odp_pktio_stop(ifnet->pktio), rc);
-#ifdef SP
-		odph_odpthreads_join(ifnet->rx_tbl);
-		odph_odpthreads_join(ifnet->tx_tbl);
-		close(ifnet->fd);
-		ifnet->fd = -1;
-#endif /*SP*/
-
-		/* Multicasting. */
-		ofp_igmp_domifdetach(ifnet);
-		ifnet->ii_inet.ii_igmp = NULL;
-
-		if (ifnet->loopq_def != ODP_QUEUE_INVALID) {
-			if (odp_queue_destroy(ifnet->loopq_def) < 0) {
-				OFP_ERR("Failed to destroy loop queue for %s",
-					ifnet->if_name);
-				rc = -1;
-			}
-			ifnet->loopq_def = ODP_QUEUE_INVALID;
 		}
-#ifdef SP
-		if (ifnet->spq_def != ODP_QUEUE_INVALID) {
-			cleanup_pkt_queue(ifnet->spq_def);
-			if (odp_queue_destroy(ifnet->spq_def) < 0) {
-				OFP_ERR("Failed to destroy slow path "
-					"queue for %s", ifnet->if_name);
-				rc = -1;
-			}
-			ifnet->spq_def = ODP_QUEUE_INVALID;
-		}
-#endif /*SP*/
-		for (j = 0; j < OFP_PKTOUT_QUEUE_MAX; j++)
-			ifnet->out_queue_queue[j] = ODP_QUEUE_INVALID;
-
-		if (ifnet->pktio != ODP_PKTIO_INVALID) {
-			int num_queues = odp_pktin_event_queue(ifnet->pktio, NULL, 0);
-			odp_queue_t in_queue[num_queues];
-			int num_in_queue, idx;
-
-			num_in_queue = odp_pktin_event_queue(ifnet->pktio,
-					in_queue, num_queues);
-
-			for (idx = 0; idx < num_in_queue; idx++)
-				cleanup_pkt_queue(in_queue[idx]);
-
-			if (odp_pktio_close(ifnet->pktio) < 0) {
-				OFP_ERR("Failed to destroy pktio for %s",
-					ifnet->if_name);
-				rc = -1;
-			}
-			ifnet->pktio = ODP_PKTIO_INVALID;
-		}
-
 	}
 
 	CHECK_ERROR(ofp_clean_vxlan_interface_queue(), rc);
@@ -955,7 +912,10 @@ static void drain_scheduler(void)
 				break;
 			}
 		case ODP_EVENT_IPSEC_STATUS:
-			ofp_ipsec_status_event(evt, from);
+			if (ofp_ipsec_sad_init_local())
+				odp_event_free(evt);
+			else
+				ofp_ipsec_status_event(evt, from);
 			break;
 		default:
 			odp_event_free(evt);
@@ -996,3 +956,79 @@ static void cleanup_pkt_queue(odp_queue_t pkt_queue)
 			odp_packet_free(odp_packet_from_event(evt));
 	}
 }
+
+static int cleanup_interface(struct ofp_ifnet *ifnet)
+{
+	int rc = 0;
+	uint16_t j = 0;
+
+	if (!ifnet) {
+		OFP_ERR("Error: Invalid argument");
+		return -1;
+	}
+
+	if (ifnet->if_state == OFP_IFT_STATE_FREE)
+		return 0;
+
+	if (ifnet->pktio == ODP_PKTIO_INVALID)
+		return 0;
+
+	OFP_INFO("Cleaning device '%s' addr %s", ifnet->if_name,
+		 ofp_print_mac((uint8_t *)ifnet->mac));
+
+	CHECK_ERROR(odp_pktio_stop(ifnet->pktio), rc);
+#ifdef SP
+	odph_odpthreads_join(ifnet->rx_tbl);
+	odph_odpthreads_join(ifnet->tx_tbl);
+	close(ifnet->fd);
+	ifnet->fd = -1;
+#endif /*SP*/
+
+	/* Multicasting. */
+	ofp_igmp_domifdetach(ifnet);
+	ifnet->ii_inet.ii_igmp = NULL;
+
+	if (ifnet->loopq_def != ODP_QUEUE_INVALID) {
+		if (odp_queue_destroy(ifnet->loopq_def) < 0) {
+			OFP_ERR("Failed to destroy loop queue for %s",
+				ifnet->if_name);
+			rc = -1;
+		}
+		ifnet->loopq_def = ODP_QUEUE_INVALID;
+	}
+#ifdef SP
+	if (ifnet->spq_def != ODP_QUEUE_INVALID) {
+		cleanup_pkt_queue(ifnet->spq_def);
+		if (odp_queue_destroy(ifnet->spq_def) < 0) {
+			OFP_ERR("Failed to destroy slow path "
+				"queue for %s", ifnet->if_name);
+			rc = -1;
+		}
+		ifnet->spq_def = ODP_QUEUE_INVALID;
+	}
+#endif /*SP*/
+	for (j = 0; j < OFP_PKTOUT_QUEUE_MAX; j++)
+		ifnet->out_queue_queue[j] = ODP_QUEUE_INVALID;
+
+	if (ifnet->pktio != ODP_PKTIO_INVALID) {
+		int num_queues = odp_pktin_event_queue(ifnet->pktio, NULL, 0);
+		odp_queue_t in_queue[num_queues];
+		int num_in_queue, idx;
+
+		num_in_queue = odp_pktin_event_queue(ifnet->pktio,
+						     in_queue, num_queues);
+
+		for (idx = 0; idx < num_in_queue; idx++)
+			cleanup_pkt_queue(in_queue[idx]);
+
+		if (odp_pktio_close(ifnet->pktio) < 0) {
+			OFP_ERR("Failed to destroy pktio for %s",
+				ifnet->if_name);
+			rc = -1;
+		}
+		ifnet->pktio = ODP_PKTIO_INVALID;
+	}
+
+	return rc;
+}
+

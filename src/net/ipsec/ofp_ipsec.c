@@ -308,14 +308,21 @@ int ofp_ipsec_init_local(void)
 
 int ofp_ipsec_stop_global(void)
 {
+	if (ofp_ipsec_init_local())
+		return -1;
+
 	(void) ipsec_sp_flush(0, 0);
 	(void) ipsec_sa_flush(0, 0);
+
 	return 0;
 }
 
 int ofp_ipsec_term_global_ok(void)
 {
 	ofp_ipsec_sa_handle sa;
+
+	if (ofp_ipsec_sad_init_local())
+		return -1;
 
 	sa = ofp_ipsec_sa_first();
 	if (sa == OFP_IPSEC_SA_INVALID)
@@ -328,8 +335,12 @@ int ofp_ipsec_term_global(void)
 {
 	ofp_ipsec_spd_term_global();
 	ofp_ipsec_sad_term_global();
-	destroy_ev_queues(ofp_ipsec_shm->in_queue,
-			  ofp_ipsec_shm->out_queue);
+
+	ofp_ipsec_shm = ofp_shared_memory_lookup(SHM_NAME_IPSEC);
+	if (ofp_ipsec_shm) {
+		destroy_ev_queues(ofp_ipsec_shm->in_queue,
+				  ofp_ipsec_shm->out_queue);
+	}
 	ofp_shared_memory_free(SHM_NAME_IPSEC);
 	return 0;
 }

@@ -53,6 +53,10 @@ int ofp_igmp_var_init_global(void)
 
 int ofp_igmp_var_term_global(void)
 {
+	ofp_igmp_shm = ofp_shared_memory_lookup(SHM_NAME_IGMP);
+	if (!ofp_igmp_shm)
+		return 0;
+
 	ofp_igmp_uninit(NULL);
 
 	if (ofp_shared_memory_free(SHM_NAME_IGMP)) {

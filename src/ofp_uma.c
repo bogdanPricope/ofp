@@ -169,6 +169,9 @@ int ofp_uma_term_global(void)
 	uint32_t i;
 	int rc = 0;
 
+	if (ofp_uma_lookup_shared_memory())
+		return -1;
+
 	for (i = 0; i < OFP_NUM_UMA_POOLS; i++)
 		if (shm->pools[i] != ODP_POOL_INVALID)
 			CHECK_ERROR(odp_pool_destroy(shm->pools[i]), rc);

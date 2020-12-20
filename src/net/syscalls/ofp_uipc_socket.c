@@ -314,6 +314,9 @@ int ofp_socket_term_global(void)
 {
 	int rc = 0;
 
+	if (ofp_socket_lookup_shared_memory())
+		return 0;
+
 	CHECK_ERROR(ofp_socket_wakeup_all(), rc);
 
 	ofp_inet_term();

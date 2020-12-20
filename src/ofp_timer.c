@@ -237,6 +237,9 @@ int ofp_timer_stop_global(void)
 {
 	int rc = 0;
 
+	if (ofp_timer_lookup_shared_memory())
+		return -1;
+
 	if (shm->timer_1s != ODP_TIMER_INVALID) {
 		CHECK_ERROR(ofp_timer_cancel(shm->timer_1s), rc);
 		shm->timer_1s = ODP_TIMER_INVALID;
