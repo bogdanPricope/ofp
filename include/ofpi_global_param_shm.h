@@ -38,6 +38,8 @@ struct ofp_global_config_mem {
 extern __thread struct ofp_global_config_mem *shm_global;
 extern __thread ofp_global_param_t *global_param;
 
+#define	V_global_is_running	VNET(shm_global->is_running)
+
 #define	V_global_odp_instance	VNET(shm_global->odp_instance)
 #define	V_global_odp_instance_owner	VNET(shm_global->odp_instance_owner)
 

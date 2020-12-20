@@ -49,6 +49,8 @@ extern __thread struct ofp_socket_mem *shm_socket;
 #define	V_sb_max VNET(shm_socket->sb_max)
 #define	V_sb_efficiency VNET(shm_socket->sb_efficiency)
 
+int ofp_socket_wakeup_all(void);
+
 int ofp_socket_lookup_shared_memory(void);
 void ofp_socket_init_prepare(void);
 int ofp_socket_init_global(odp_pool_t);

@@ -25,6 +25,7 @@
 #include "test_raw_frames.h"
 #include "ofpi.h"
 #include "ofpi_debug.h"
+#include "../../src/dbg/ofp_debug.c"
 #include "../../src/dbg/ofp_debug_print.c"
 
 
@@ -46,7 +47,6 @@ uint8_t pcap_header[24] = {
 };
 
 struct ofp_debug_mem debug_mem = {0};
-__thread struct ofp_debug_mem *shm_debug;
 
 /*
  * INIT

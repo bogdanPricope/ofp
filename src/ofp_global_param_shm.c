@@ -7,6 +7,7 @@
 #include "ofpi_global_param_shm.h"
 #include "ofpi_util.h"
 #include "ofpi_log.h"
+#include "ofpi_socket.h"
 
 #define SHM_NAME_GLOBAL_CONFIG "OfpGlobalConfigShMem"
 
@@ -108,6 +109,8 @@ void ofp_stop_processing(void)
 {
 	if (shm_global)
 		shm_global->is_running = 0;
+
+	ofp_socket_wakeup_all();
 }
 
 odp_bool_t *ofp_get_processing_state(void)

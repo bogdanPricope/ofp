@@ -133,6 +133,7 @@
 #include "ofpi_callout.h"
 #include "ofpi_log.h"
 #include "ofpi_pkt_processing.h"
+#include "ofpi_global_param_shm.h"
 
 #define SHM_NAME_SOCKET "OfpSocketShMem"
 
@@ -311,8 +312,24 @@ int ofp_socket_init_global(odp_pool_t pool)
 
 int ofp_socket_term_global(void)
 {
+	int rc = 0;
+
+	CHECK_ERROR(ofp_socket_wakeup_all(), rc);
+
+	ofp_inet_term();
+
+	CHECK_ERROR(ofp_socket_free_shared_memory(), rc);
+
+	return rc;
+}
+
+int ofp_socket_wakeup_all(void)
+{
 	struct sleeper *p, *next;
 	int rc = 0;
+
+	if (!shm_socket)
+		return -1;
 
 	p = shm_socket->sleep_list;
 	while (p) {
@@ -323,12 +340,7 @@ int ofp_socket_term_global(void)
 		}
 		p->go = 1;
 		p = next;
-
 	}
-
-	ofp_inet_term();
-
-	CHECK_ERROR(ofp_socket_free_shared_memory(), rc);
 
 	return rc;
 }
@@ -2583,6 +2595,9 @@ ofp_msleep(void *channel, odp_rwlock_t *mtx, int priority, const char *wmesg,
 	int ret;
 	(void)mtx;
 	(void)priority;
+
+	if (!V_global_is_running)
+		return 0;
 
 	odp_spinlock_lock(&shm_socket->sleep_lock);
 	if (!shm_socket->free_sleepers) {
