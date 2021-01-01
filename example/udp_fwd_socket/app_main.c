@@ -317,8 +317,7 @@ int main(int argc, char *argv[])
 			       &thr_params);
 
 	/* Start CLI */
-	ofp_start_cli_thread(instance, app_init_params.linux_core_id,
-		params.cli_file);
+	ofp_start_cli_thread(app_init_params.linux_core_id, params.cli_file);
 	sleep(1);
 
 	if (udp_fwd_cfg(params.sock_count, params.laddr, params.raddr)) {

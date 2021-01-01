@@ -5,8 +5,8 @@
  * SPDX-License-Identifier:	BSD-3-Clause
  */
 
-#ifndef __OFP_CLI_H__
-#define __OFP_CLI_H__
+#ifndef __OFP_API_CLI_H__
+#define __OFP_API_CLI_H__
 
 #include <odp_api.h>
 
@@ -19,15 +19,13 @@
  *
  * Called by Application code to start the CLI server if needed.
  *
- * @param instance The ODP instance to use.
  * @param core_id The core on which the CLI server thread is started.
  * @param cli_file Name of the CLI file to process.
  * @retval 0 Success.
  * @retval -1 Failure.
  * @retval OFP_ENOTSUP OFP has been compiled without CLI support.
  */
-int ofp_start_cli_thread(odp_instance_t instance, int core_id,
-			 char *cli_file);
+int ofp_start_cli_thread(int core_id, char *cli_file);
 
 /**
  * Stop CLI server thread.
@@ -123,4 +121,4 @@ int ofp_cli_get_fd(void *handle);
 #pragma GCC visibility pop
 #endif
 
-#endif /* __OFP_CLI_H__ */
+#endif /* __OFP_API_CLI_H__ */

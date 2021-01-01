@@ -9,7 +9,7 @@
 #define _CLI_H_
 
 #include <stdint.h>
-#include "api/ofp_cli.h"
+#include "ofpi_api_cli.h"
 
 #define PASSWORD_LEN 32
 
@@ -28,6 +28,13 @@ struct cli_conn {
 	unsigned char ch1;
 	char          passwd[PASSWORD_LEN + 1];
 };
+
+/* API implementation */
+int ofp_start_cli_thread_imp(int core_id, char *cli_file);
+int ofp_stop_cli_thread_imp(void);
+void ofp_cli_add_command_imp(const char *cmd, const char *help,
+			     ofp_cli_cb_func func);
+int ofp_cli_get_fd_imp(void *handle);
 
 /** utils
  */

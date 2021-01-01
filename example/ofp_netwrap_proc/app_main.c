@@ -190,9 +190,8 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 	 * the management core, i.e. not competing for cpu cycles with the
 	 * worker threads
 	 */
-	if (ofp_start_cli_thread(netwrap_proc_instance,
-		app_init_params.linux_core_id,
-		params.cli_file) < 0) {
+	if (ofp_start_cli_thread(app_init_params.linux_core_id,
+				 params.cli_file) < 0) {
 		OFP_ERR("Error: Failed to init CLI thread");
 		ofp_netwrap_main_dtor();
 		return;

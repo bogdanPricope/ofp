@@ -120,8 +120,7 @@ int main(int argc, char *argv[])
 
 	/* other app code here.*/
 	/* Start CLI */
-	ofp_start_cli_thread(instance, app_init_params.linux_core_id,
-		params.cli_file);
+	ofp_start_cli_thread(app_init_params.linux_core_id, params.cli_file);
 
 	/* multicast test */
 	ofp_multicast_thread(instance, app_init_params.linux_core_id);

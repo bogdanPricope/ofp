@@ -25,7 +25,7 @@
 #include <ofpi.h>
 #include <ofpi_log.h>
 #include <ofp_init.h>
-#include <ofp_cli.h>
+#include <ofp_api_cli.h>
 
 odp_instance_t instance;
 
@@ -73,7 +73,7 @@ test_global_init_cleanup(void)
 	oig.instance = instance;
 	CU_ASSERT_EQUAL(ofp_init_global(&oig), 0);
 
-	ofp_start_cli_thread(instance, oig.linux_core_id, NULL);
+	ofp_start_cli_thread(oig.linux_core_id, NULL);
 
 	CU_ASSERT_EQUAL(ofp_term_global(), 0);
 }
@@ -96,7 +96,7 @@ test_global_init_from_file_cleanup(void)
 
 	oig.instance = instance;
 	CU_ASSERT_EQUAL(ofp_init_global(&oig), 0);
-	ofp_start_cli_thread(instance, oig.linux_core_id, NULL);
+	ofp_start_cli_thread(oig.linux_core_id, NULL);
 
 	CU_ASSERT_EQUAL(ofp_term_global(), 0);
 }

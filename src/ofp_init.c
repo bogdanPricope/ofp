@@ -17,8 +17,6 @@
 #include <unistd.h>
 #include <odp_api.h>
 
-#include "ofp_cli.h"
-
 #include "ofpi.h"
 #include "ofpi_sysctl.h"
 #include "ofpi_util.h"
@@ -42,6 +40,8 @@
 #include "ofpi_vxlan.h"
 #include "ofpi_uma.h"
 #include "ofpi_ipsec.h"
+
+#include "ofpi_cli.h"
 
 #include "ofpi_log.h"
 #include "ofpi_debug.h"

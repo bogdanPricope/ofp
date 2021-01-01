@@ -31,8 +31,6 @@
 #include "ofpi_util.h"
 #include "ofpi_portconf.h"
 
-#ifdef CLI
-
 void ofpcli_ipsec_init(void);
 
 /*
@@ -1214,8 +1212,8 @@ void f_add_alias_command(const char *name)
 	start = add_command(start, &a);
 }
 
-void ofp_cli_add_command(const char *cmd, const char *help,
-			 ofp_cli_cb_func func)
+void ofp_cli_add_command_imp(const char *cmd, const char *help,
+			     ofp_cli_cb_func func)
 {
 	struct cli_command a;
 
@@ -1225,7 +1223,7 @@ void ofp_cli_add_command(const char *cmd, const char *help,
 	start = add_command(start, &a);
 }
 
-int ofp_cli_get_fd(void *handle)
+int ofp_cli_get_fd_imp(void *handle)
 {
 	struct cli_conn *conn = handle;
 	return conn->fd;
@@ -1837,7 +1835,7 @@ static int cli_server(void *arg)
 	return 0;
 }
 
-int ofp_start_cli_thread(odp_instance_t instance, int core_id, char *cli_file)
+int ofp_start_cli_thread_imp(int core_id, char *cli_file)
 {
 	odp_cpumask_t cpumask;
 	struct ofp_global_config_mem *ofp_global_cfg;
@@ -1858,7 +1856,7 @@ int ofp_start_cli_thread(odp_instance_t instance, int core_id, char *cli_file)
 	thr_params.start = cli_server;
 	thr_params.arg = cli_file;
 	thr_params.thr_type = ODP_THREAD_CONTROL;
-	thr_params.instance = instance;
+	thr_params.instance = ofp_global_cfg->odp_instance;
 
 	if (odph_odpthreads_create(&ofp_global_cfg->cli_thread,
 				   &cpumask,
@@ -1872,7 +1870,7 @@ int ofp_start_cli_thread(odp_instance_t instance, int core_id, char *cli_file)
 	return 0;
 }
 
-int ofp_stop_cli_thread(void)
+int ofp_stop_cli_thread_imp(void)
 {
 	struct ofp_global_config_mem *ofp_global_cfg;
 
@@ -1890,23 +1888,5 @@ int ofp_stop_cli_thread(void)
 
 	return 0;
 }
-
-#else
-
-int ofp_start_cli_thread(odp_instance_t instance, int core_id, char *cli_file)
-{
-	(void) instance;
-	(void) core_id;
-	(void) cli_file;
-
-	return OFP_ENOTSUP;
-}
-int ofp_stop_cli_thread(void)
-{
-	return OFP_ENOTSUP;
-}
-
-#endif
-
 
 /*end*/

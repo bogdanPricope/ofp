@@ -25,7 +25,7 @@ ofp_ifnet.c \
 ofp_ifnet_portconf.c \
 ofp_avl.c \
 ofp_log.c \
-cli/ofp_cli.c \
+ofp_api_cli.c \
 ofp_hash.c \
 ofp_init.c \
 ofp_subr_hash.c \
@@ -123,6 +123,7 @@ endif
 
 if OFP_CLI
 __LIB__libofp_la_SOURCES += \
+cli/ofp_cli.c \
 cli/ofp_cli_route.c \
 cli/ofp_cli_debug.c \
 cli/ofp_cli_log.c \

@@ -363,7 +363,7 @@ OFP provides following user application APIs:
 - packet and performance statistics (ofp_stat.h)
 - debugging and packet dumping (ofp_debug.h)
 - logging utilities (ofp_log.h)
-- customizing CLI commands (ofp_cli.h)
+- customizing CLI commands (ofp_api_cli.h)
 - handling Management Information Base entries (ofp_sysctl.h)
 
 In addition API folder contains number of protocol specific header files

@@ -128,8 +128,7 @@ int main(int argc, char *argv[])
 	/* other app code here.*/
 	sleep(2);
 	/* Start CLI */
-	ofp_start_cli_thread(instance,
-		app_init_params.linux_core_id, params.cli_file);
+	ofp_start_cli_thread(app_init_params.linux_core_id, params.cli_file);
 
 	sleep(5);
 

@@ -1101,7 +1101,7 @@ int main(int argc, char *argv[])
 	thr_args.pktin = pktin;
 
 	/* Start CLI */
-	ofp_start_cli_thread(instance, app_init_params.linux_core_id,
+	ofp_start_cli_thread(app_init_params.linux_core_id,
 			     gbl_args->appl.cli_file);
 
 	/** Wait for the stack to create the FP interface. Otherwise ofp_bind()

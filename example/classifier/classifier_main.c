@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
 	build_classifier(app_init_params.if_count, app_init_params.if_names);
 
 	/* Start CLI */
-	ofp_start_cli_thread(instance, app_init_params.linux_core_id, params.cli_file);
+	ofp_start_cli_thread(app_init_params.linux_core_id, params.cli_file);
 	sleep(1);
 
 	memset(thread_tbl, 0, sizeof(thread_tbl));

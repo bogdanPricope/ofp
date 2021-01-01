@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
 		exit(0);
 	}
 
-	if (ofp_start_cli_thread(instance, app_init_params.linux_core_id,
+	if (ofp_start_cli_thread(app_init_params.linux_core_id,
 				 params.cli_file) < 0) {
 		OFP_ERR("Error: Failed to init CLI thread");
 	}

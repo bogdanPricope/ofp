@@ -242,8 +242,8 @@ int main(int argc, char *argv[])
 	 * the management core, i.e. not competing for cpu cycles with the
 	 * worker threads
 	 */
-	if (ofp_start_cli_thread(instance, app_init_params.linux_core_id,
-		params.cli_file) < 0) {
+	if (ofp_start_cli_thread(app_init_params.linux_core_id,
+				 params.cli_file) < 0) {
 		OFP_ERR("Error: Failed to init CLI thread");
 		ofp_stop_processing();
 		odph_odpthreads_join(thread_tbl);
