@@ -26,6 +26,7 @@ ofp_ifnet_portconf.c \
 ofp_avl.c \
 ofp_log.c \
 ofp_api_cli.c \
+ofp_thread_proc.c \
 ofp_hash.c \
 ofp_init.c \
 ofp_subr_hash.c \

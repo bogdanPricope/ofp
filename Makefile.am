@@ -8,6 +8,7 @@ include_HEADERS = \
 		$(top_srcdir)/include/api/ofp_init.h \
 		$(top_srcdir)/include/api/ofp_pkt_processing.h \
 		$(top_srcdir)/include/api/ofp_api_cli.h \
+		$(top_srcdir)/include/api/ofp_thread_proc.h \
 		$(top_srcdir)/include/api/ofp_log.h \
 		$(top_srcdir)/include/api/ofp_timer.h \
 		$(top_srcdir)/include/api/ofp_types.h \
@@ -49,6 +50,7 @@ noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_callout.h\
 		  $(top_srcdir)/include/ofpi_api_cli.h \
 		  $(top_srcdir)/include/ofpi_cli.h \
+		  $(top_srcdir)/include/ofpi_thread_proc.h \
 		  $(top_srcdir)/include/ofpi_config.h \
 		  $(top_srcdir)/include/ofpi_debug.h \
 		  $(top_srcdir)/include/ofpi_domain.h \

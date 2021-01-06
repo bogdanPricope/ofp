@@ -32,7 +32,8 @@ typedef struct {
  * helper funcs
  */
 static int parse_args(int argc, char *argv[], appl_args_t *appl_args);
-static void print_info(char *progname, appl_args_t *appl_args);
+static void print_info(char *progname, appl_args_t *appl_args,
+		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
 static int start_performance(odp_instance_t instance, int core_id);
 
@@ -98,28 +99,28 @@ int main(int argc, char *argv[])
 {
 	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	appl_args_t params;
-	int core_count, num_workers, ret_val;
+	int num_workers, ret_val;
 	odp_cpumask_t cpumask;
-	char cpumaskstr[64];
 	odph_odpthread_params_t thr_params;
 	odp_instance_t instance;
 
-	/* Parse and store the application arguments */
-	if (parse_args(argc, argv, &params) != EXIT_SUCCESS)
-		return EXIT_FAILURE;
-
+	/* add handler for Ctr+C */
 	if (ofp_sigactions_set(ofp_sig_func_stop)) {
 		printf("Error: failed to set signal actions.\n");
 		return EXIT_FAILURE;
 	}
 
+	/* Parse and store the application arguments */
+	if (parse_args(argc, argv, &params) != EXIT_SUCCESS)
+		return EXIT_FAILURE;
+
 	/*
-	 * This example assumes that core #0 runs Linux kernel background tasks.
-	 * By default, cores #1 and beyond will be populated with a OFP
-	 * processing thread each.
+	 * This example assumes that core #0 and #1 runs Linux kernel
+	 * background tasks and control threads.
+	 * By default, cores #2 and beyond will be populated with a OFP
+	 * processing threads each.
 	 */
 	ofp_init_global_param(&app_init_params);
-
 	app_init_params.if_count = params.if_count;
 	app_init_params.if_names = params.if_names;
 
@@ -157,54 +158,33 @@ int main(int argc, char *argv[])
 		break;
 	}
 
-	/* Exemplification of creating packet processing hooks */
+	/* Create a packet processing hooks (example) */
 	app_init_params.pkt_hook[OFP_HOOK_LOCAL] = fastpath_local_hook;
 
 	/*
 	 * Initialize OFP. This will also initialize ODP and open a pktio
 	 * instance for each interface supplied as argument.
-	 *
 	 */
 	if (ofp_init_global(&app_init_params) != 0) {
 		printf("Error: OFP global init failed.\n");
 		return EXIT_FAILURE;
 	}
 
-	/* Print both system and application information */
-	print_info(NO_PATH(argv[0]), &params);
-
 	/*
-	 * Get the number of available cores: one run-to-completion thread
-	 * will be created per core.
+	 * Get the default workers to cores distribution: one
+	 * run-to-completion worker thread or process can be created per core.
 	 */
-	core_count = odp_cpu_count();
-
-	if (params.core_count) {
-		num_workers = params.core_count;
-	} else {
-		num_workers = core_count;
-		if (core_count > 1)
-			num_workers--;
-	}
-	if (num_workers > MAX_WORKERS)
-		num_workers = MAX_WORKERS;
-
-	/*
-	 * Initializes cpumask with CPUs available for worker threads.
-	 * Sets up to 'num' CPUs and returns the count actually set.
-	 * Use zero for all available CPUs.
-	 */
-	num_workers = odp_cpumask_default_worker(&cpumask, num_workers);
-	if (odp_cpumask_to_str(&cpumask, cpumaskstr, sizeof(cpumaskstr)) < 0) {
-		printf("Error: Too small buffer provided to "
-			"odp_cpumask_to_str\n");
+	if (ofp_get_default_worker_cpumask(params.core_count, MAX_WORKERS,
+					   &cpumask)) {
+		OFP_ERR("Error: Failed to get the default workers to cores "
+			"distribution\n");
 		ofp_term_global();
 		return EXIT_FAILURE;
 	}
+	num_workers = odp_cpumask_count(&cpumask);
 
-	printf("Num worker threads: %i\n", num_workers);
-	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
-	printf("cpu mask:           %s\n", cpumaskstr);
+	/* Print both system and application information */
+	print_info(NO_PATH(argv[0]), &params, &cpumask);
 
 	/*
 	 * Create and launch dataplane dispatcher worker threads to be placed
@@ -218,6 +198,7 @@ int main(int argc, char *argv[])
 	 * input arguments, the cpumask is used to control this.
 	 */
 	instance = ofp_get_odp_instance();
+
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 	thr_params.start = default_event_dispatcher;
 	thr_params.arg = ofp_eth_vlan_processing;
@@ -405,9 +386,11 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 /**
  * Print system and application info
  */
-static void print_info(char *progname, appl_args_t *appl_args)
+static void print_info(char *progname, appl_args_t *appl_args,
+		       odp_cpumask_t *cpumask)
 {
 	int i;
+	char cpumaskstr[64];
 
 	printf("\n"
 		   "ODP system info\n"
@@ -430,6 +413,18 @@ static void print_info(char *progname, appl_args_t *appl_args)
 	for (i = 0; i < appl_args->if_count; ++i)
 		printf(" %s", appl_args->if_names[i]);
 	printf("\n\n");
+
+	/* Print worker to core distribution */
+	if (odp_cpumask_to_str(cpumask, cpumaskstr, sizeof(cpumaskstr)) < 0) {
+		printf("Error: Too small buffer provided to "
+			"odp_cpumask_to_str\n");
+		strcpy(cpumaskstr, "Unknown");
+	}
+
+	printf("Num worker threads: %i\n", odp_cpumask_count(cpumask));
+	printf("first CPU:          %i\n", odp_cpumask_first(cpumask));
+	printf("cpu mask:           %s\n", cpumaskstr);
+
 	fflush(NULL);
 }
 

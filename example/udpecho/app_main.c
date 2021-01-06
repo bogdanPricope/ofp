@@ -30,7 +30,8 @@ typedef struct {
 
 /* helper funcs */
 static void parse_args(int argc, char *argv[], appl_args_t *appl_args);
-static void print_info(char *progname, appl_args_t *appl_args);
+static void print_info(char *progname, appl_args_t *appl_args,
+		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
 
 ofp_global_param_t app_init_params; /**< global OFP init parms */
@@ -86,9 +87,8 @@ int main(int argc, char *argv[])
 {
 	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	appl_args_t params;
-	int core_count, num_workers;
+	int num_workers, ret_val;
 	odp_cpumask_t cpumask;
-	char cpumaskstr[64];
 	odph_odpthread_params_t thr_params;
 	odp_instance_t instance;
 
@@ -113,6 +113,23 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	/*
+	 * Get the default workers to cores distribution: one
+	 * run-to-completion worker thread or process can be created per core.
+	 */
+	if (ofp_get_default_worker_cpumask(params.core_count, MAX_WORKERS,
+					   &cpumask)) {
+		OFP_ERR("Error: Failed to get the default workers to cores "
+			"distribution\n");
+		ofp_term_global();
+		return EXIT_FAILURE;
+	}
+	num_workers = odp_cpumask_count(&cpumask);
+
+	/* Print both system and application information */
+	print_info(NO_PATH(argv[0]), &params, &cpumask);
+
+	/* Start dataplane dispatcher worker threads */
 	instance = ofp_get_odp_instance();
 	if (OFP_ODP_INSTANCE_INVALID == instance) {
 		OFP_ERR("Error: Invalid odp instance.\n");
@@ -120,41 +137,23 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	/* Print both system and application information */
-	print_info(NO_PATH(argv[0]), &params);
-
-	/*
-	 * By default core #0 runs Linux kernel background tasks.
-	 * Start mapping thread from core #1
-	 */
-	core_count = odp_cpu_count();
-	num_workers = core_count;
-
-	if (params.core_count && params.core_count < core_count)
-		num_workers = params.core_count;
-	if (num_workers > MAX_WORKERS)
-		num_workers = MAX_WORKERS;
-
-	if (core_count > 1 && num_workers == core_count)
-		num_workers--;
-
-	num_workers = odp_cpumask_default_worker(&cpumask, num_workers);
-	odp_cpumask_to_str(&cpumask, cpumaskstr, sizeof(cpumaskstr));
-
-	printf("Num worker threads: %i\n", num_workers);
-	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
-	printf("cpu mask:           %s\n", cpumaskstr);
-
 	memset(thread_tbl, 0, sizeof(thread_tbl));
-
-	/* Start dataplane dispatcher worker threads */
 	thr_params.start = default_event_dispatcher;
 	thr_params.arg = ofp_eth_vlan_processing;
 	thr_params.thr_type = ODP_THREAD_WORKER;
 	thr_params.instance = instance;
-	odph_odpthreads_create(thread_tbl,
-			       &cpumask,
-			       &thr_params);
+	ret_val = odph_odpthreads_create(thread_tbl,
+					 &cpumask,
+					 &thr_params);
+	if (ret_val != num_workers) {
+		OFP_ERR("Error: Failed to create worker threads, "
+			"expected %d, got %d",
+			num_workers, ret_val);
+		ofp_stop_processing();
+		odph_odpthreads_join(thread_tbl);
+		ofp_term_global();
+		return EXIT_FAILURE;
+	}
 
 	/* other app code here.*/
 	/* Start CLI */
@@ -297,9 +296,11 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 /**
  * Print system and application info
  */
-static void print_info(char *progname, appl_args_t *appl_args)
+static void print_info(char *progname, appl_args_t *appl_args,
+		       odp_cpumask_t *cpumask)
 {
 	int i;
+	char cpumaskstr[64];
 
 	printf("\n"
 		   "ODP system info\n"
@@ -322,6 +323,18 @@ static void print_info(char *progname, appl_args_t *appl_args)
 	for (i = 0; i < appl_args->if_count; ++i)
 		printf(" %s", appl_args->if_names[i]);
 	printf("\n\n");
+
+	/* Print worker to core distribution */
+	if (odp_cpumask_to_str(cpumask, cpumaskstr, sizeof(cpumaskstr)) < 0) {
+		printf("Error: Too small buffer provided to "
+			"odp_cpumask_to_str\n");
+		strcpy(cpumaskstr, "Unknown");
+	}
+
+	printf("Num worker threads: %i\n", odp_cpumask_count(cpumask));
+	printf("first CPU:          %i\n", odp_cpumask_first(cpumask));
+	printf("cpu mask:           %s\n", cpumaskstr);
+
 	fflush(NULL);
 }
 

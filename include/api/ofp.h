@@ -27,6 +27,7 @@ extern "C" {
 #include "ofp_ifnet.h"
 #include "ofp_pkt_processing.h"
 #include "ofp_api_cli.h"
+#include "ofp_thread_proc.h"
 #include "ofp_log.h"
 #include "ofp_timer.h"
 #include "ofp_hook.h"

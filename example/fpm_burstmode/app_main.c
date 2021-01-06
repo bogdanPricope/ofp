@@ -46,7 +46,7 @@ struct worker_arg {
 };
 
 /* helper funcs */
-static void parse_args(int argc, char *argv[], appl_args_t *appl_args);
+static int parse_args(int argc, char *argv[], appl_args_t *appl_args);
 static void print_info(char *progname, appl_args_t *appl_args);
 static void usage(char *progname);
 static int validate_cores_settings(int req_core_start, int req_core_count,
@@ -252,16 +252,13 @@ int main(int argc, char *argv[])
 	}
 
 	/* Parse and store the application arguments */
-	parse_args(argc, argv, &params);
-
-	if (params.if_count > OFP_FP_INTERFACE_MAX) {
-		printf("Error: Invalid number of interfaces: maximum %d\n",
-		       OFP_FP_INTERFACE_MAX);
-		exit(EXIT_FAILURE);
-	}
+	if (parse_args(argc, argv, &params))
+		return EXIT_FAILURE;
 
 	/*
-	 * By default core #0 runs Slow Path background tasks.
+	 * This example creates a custom workers to cores distribution:
+	 * Core #0 runs Slow Path background tasks.
+	 * Cores #core_start and beyond run packet processing tasks.
 	 * It is recommanded to start mapping threads from core 1. Else,
 	 * Slow Path processing will be affected by workers processing.
 	 * However, if Slow Path is disabled, core 0 may be used as well.
@@ -277,16 +274,6 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	instance = ofp_get_odp_instance();
-	if (OFP_ODP_INSTANCE_INVALID == instance) {
-		OFP_ERR("Error: Invalid odp instance.\n");
-		ofp_term_global();
-		exit(EXIT_FAILURE);
-	}
-
-	/* Print both system and application information */
-	print_info(NO_PATH(argv[0]), &params);
-
 	/* Validate workers distribution settings. */
 	if (validate_cores_settings(params.core_start, params.core_count,
 				    &first_worker, &num_workers) < 0) {
@@ -294,9 +281,19 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	/* Print both system and application information */
+	print_info(NO_PATH(argv[0]), &params);
+
 	OFP_INFO("SP core: %d\nWorkers core start: %d\n"
 		"Workers core count: %d\n",
 		linux_sp_core, first_worker, num_workers);
+
+	instance = ofp_get_odp_instance();
+	if (OFP_ODP_INSTANCE_INVALID == instance) {
+		OFP_ERR("Error: Invalid odp instance.\n");
+		ofp_term_global();
+		exit(EXIT_FAILURE);
+	}
 
 	if (configure_interfaces(instance,
 		params.if_count, params.if_names,
@@ -398,7 +395,7 @@ static int validate_cores_settings(int req_core_start, int req_core_count,
  * @param argv[]     argument vector
  * @param appl_args  Store application arguments here
  */
-static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
+static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 {
 	int opt;
 	int long_index;
@@ -438,14 +435,14 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				return -1;
 			}
 			len += 1;	/* add room for '\0' */
 
 			names = malloc(len);
 			if (names == NULL) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				return -1;
 			}
 
 			/* count the number of tokens separated by ',' */
@@ -459,7 +456,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 
 			if (appl_args->if_count == 0) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				return -1;
 			}
 
 			/* allocate storage for the if names */
@@ -485,14 +482,14 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				return -1;
 			}
 			len += 1;	/* add room for '\0' */
 
 			appl_args->cli_file = malloc(len);
 			if (appl_args->cli_file == NULL) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				return -1;
 			}
 
 			strcpy(appl_args->cli_file, optarg);
@@ -505,10 +502,17 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 
 	if (appl_args->if_count == 0) {
 		usage(argv[0]);
-		exit(EXIT_FAILURE);
+		return -1;
+	}
+
+	if (appl_args->if_count > OFP_FP_INTERFACE_MAX) {
+		printf("Error: Invalid number of interfaces: maximum %d\n",
+		       OFP_FP_INTERFACE_MAX);
+		return -1;
 	}
 
 	optind = 1;		/* reset 'extern optind' from the getopt lib */
+	return 0;
 }
 
 /**

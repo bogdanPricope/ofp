@@ -9,12 +9,15 @@
 #include <string.h>
 #include <inttypes.h>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include "ofp.h"
 #include "httpd.h"
 #include "linux_sigaction.h"
 
 #define MAX_WORKERS		32
+#define MAX_CORE_FILE_SIZE	200000000
 
 /**
  * Parsed command line application arguments
@@ -31,7 +34,8 @@ typedef struct {
 
 /* helper funcs */
 static void parse_args(int argc, char *argv[], appl_args_t *appl_args);
-static void print_info(char *progname, appl_args_t *appl_args);
+static void print_info(char *progname, appl_args_t *appl_args,
+		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
 
 ofp_global_param_t app_init_params; /**< global OFP init parms */
@@ -54,6 +58,24 @@ static void sig_func_stop(int signum)
 	ofp_stop_processing();
 }
 
+/**
+ * resource_cfg() Setup system resources
+ *
+ * @return int 0 on success, -1 on error
+ *
+ */
+static int resource_cfg(void)
+{
+	struct rlimit rlp;
+
+	getrlimit(RLIMIT_CORE, &rlp);
+	printf("RLIMIT_CORE: %ld/%ld\n", rlp.rlim_cur, rlp.rlim_max);
+	rlp.rlim_cur = MAX_CORE_FILE_SIZE;
+	printf("Setting to max: %d\n", setrlimit(RLIMIT_CORE, &rlp));
+
+	return 0;
+}
+
 /** main() Application entry point
  *
  * @param argc int
@@ -61,29 +83,18 @@ static void sig_func_stop(int signum)
  * @return int
  *
  */
-#include <sys/time.h>
-#include <sys/resource.h>
-
 int main(int argc, char *argv[])
 {
 	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	odph_odpthread_t webserver_pthread = {0};
 	webserver_arg_t webserver_pthread_arg = {0};
 	appl_args_t params;
-	int core_count, num_workers;
+	int num_workers, new_workers;
 	odp_cpumask_t cpumask;
-	char cpumaskstr[64];
 	odph_odpthread_params_t thr_params;
 	odp_instance_t instance;
 
-	struct rlimit rlp;
-	getrlimit(RLIMIT_CORE, &rlp);
-	printf("RLIMIT_CORE: %ld/%ld\n", rlp.rlim_cur, rlp.rlim_max);
-	rlp.rlim_cur = 200000000;
-	printf("Setting to max: %d\n", setrlimit(RLIMIT_CORE, &rlp));
-
-	/* Parse and store the application arguments */
-	parse_args(argc, argv, &params);
+	resource_cfg();
 
 	/* add handler for Ctr+C */
 	if (ofp_sigactions_set(sig_func_stop)) {
@@ -91,39 +102,39 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	/* Parse and store the application arguments */
+	parse_args(argc, argv, &params);
+
 	/*
-	 * By default core #0 runs Linux kernel background tasks.
-	 * Start mapping thread from core #1
+	 * This example assumes that core #0 and #1 runs Linux kernel
+	 * background tasks and control threads.
+	 * By default, cores #2 and beyond will be populated with a OFP
+	 * processing threads (workers).
 	 */
 	ofp_init_global_param(&app_init_params);
 	app_init_params.if_count = params.if_count;
 	app_init_params.if_names = params.if_names;
 
 	if (ofp_init_global(&app_init_params)) {
-		OFP_ERR("Error: OFP global init failed.\n");
-		exit(EXIT_FAILURE);
+		printf("Error: OFP global init failed.\n");
+		return EXIT_FAILURE;
 	}
 
+	/*
+	 * Get the default workers to cores distribution: one
+	 * run-to-completion worker thread or process can be created per core.
+	 */
+	if (ofp_get_default_worker_cpumask(params.core_count, MAX_WORKERS,
+					   &cpumask)) {
+		OFP_ERR("Error: Failed to get the default workers to cores "
+			"distribution\n");
+		ofp_term_global();
+		return EXIT_FAILURE;
+	}
+	num_workers = odp_cpumask_count(&cpumask);
+
 	/* Print both system and application information */
-	print_info(NO_PATH(argv[0]), &params);
-
-	core_count = odp_cpu_count();
-	num_workers = core_count;
-
-	if (params.core_count && params.core_count < core_count)
-		num_workers = params.core_count;
-	if (num_workers > MAX_WORKERS)
-		num_workers = MAX_WORKERS;
-
-	if (num_workers == core_count && core_count > 1)
-		num_workers--;
-
-	num_workers = odp_cpumask_default_worker(&cpumask, num_workers);
-	odp_cpumask_to_str(&cpumask, cpumaskstr, sizeof(cpumaskstr));
-
-	printf("Num worker threads: %i\n", num_workers);
-	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
-	printf("cpu mask:           %s\n", cpumaskstr);
+	print_info(NO_PATH(argv[0]), &params, &cpumask);
 
 	instance = ofp_get_odp_instance();
 	if (OFP_ODP_INSTANCE_INVALID == instance) {
@@ -138,9 +149,18 @@ int main(int argc, char *argv[])
 	thr_params.arg = ofp_eth_vlan_processing;
 	thr_params.thr_type = ODP_THREAD_WORKER;
 	thr_params.instance = instance;
-	odph_odpthreads_create(thread_tbl,
-			       &cpumask,
-			       &thr_params);
+	new_workers = odph_odpthreads_create(thread_tbl,
+					     &cpumask,
+					     &thr_params);
+	if (num_workers != new_workers) {
+		OFP_ERR("Error: Failed to create worker threads, "
+			"expected %d, got %d",
+			num_workers, new_workers);
+		ofp_stop_processing();
+		odph_odpthreads_join(thread_tbl);
+		ofp_term_global();
+		return EXIT_FAILURE;
+	}
 
 	/* other app code here.*/
 	/* Start CLI */
@@ -311,9 +331,11 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 /**
  * Print system and application info
  */
-static void print_info(char *progname, appl_args_t *appl_args)
+static void print_info(char *progname, appl_args_t *appl_args,
+		       odp_cpumask_t *cpumask)
 {
 	int i;
+	char cpumaskstr[64];
 
 	printf("\n"
 		   "ODP system info\n"
@@ -336,6 +358,18 @@ static void print_info(char *progname, appl_args_t *appl_args)
 	for (i = 0; i < appl_args->if_count; ++i)
 		printf(" %s", appl_args->if_names[i]);
 	printf("\n\n");
+
+	/* Print worker to core distribution */
+	if (odp_cpumask_to_str(cpumask, cpumaskstr, sizeof(cpumaskstr)) < 0) {
+		printf("Error: Too small buffer provided to "
+			"odp_cpumask_to_str\n");
+		strcpy(cpumaskstr, "Unknown");
+	}
+
+	printf("Num worker threads: %i\n", odp_cpumask_count(cpumask));
+	printf("first CPU:          %i\n", odp_cpumask_first(cpumask));
+	printf("cpu mask:           %s\n", cpumaskstr);
+
 	fflush(NULL);
 }
 

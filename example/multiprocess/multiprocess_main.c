@@ -53,6 +53,13 @@ ofp_global_param_t app_init_params; /**< global OFP init parms */
 int udp_test(appl_args_t *arg);
 int tcp_test(appl_args_t *arg);
 
+/** main() Application entry point
+ *
+ * @param argc int
+ * @param argv[] char*
+ * @return int
+ *
+ */
 int main(int argc, char *argv[])
 {
 	odp_instance_t instance;
@@ -66,12 +73,6 @@ int main(int argc, char *argv[])
 
 	/* Parse and store the application arguments */
 	parse_args(argc, argv, &params);
-
-	if (params.if_count > OFP_FP_INTERFACE_MAX) {
-		OFP_ERR("Error: Invalid number of interfaces: maximum %d\n",
-			OFP_FP_INTERFACE_MAX);
-		exit(EXIT_FAILURE);
-	}
 
 	/*
 	 * This example assumes that core LINUX_CONTROL_CPU runs Linux kernel
@@ -93,13 +94,6 @@ int main(int argc, char *argv[])
 	if (ofp_init_global(&app_init_params) != 0) {
 		printf("Error: OFP global init failed.\n");
 		return EXIT_FAILURE;
-	}
-
-	instance = ofp_get_odp_instance();
-	if (OFP_ODP_INSTANCE_INVALID == instance) {
-		OFP_ERR("Error: Invalid odp instance.\n");
-		ofp_term_global();
-		exit(EXIT_FAILURE);
 	}
 
 	/* Print both system and application information */
@@ -129,6 +123,13 @@ int main(int argc, char *argv[])
 	printf("First workers:  %i\n", odp_cpumask_first(&cpumask));
 	printf("Num workers:    %i\n", num_workers);
 	printf("Workers CPU mask:       %s\n", cpumaskstr);
+
+	instance = ofp_get_odp_instance();
+	if (OFP_ODP_INSTANCE_INVALID == instance) {
+		OFP_ERR("Error: Invalid odp instance.\n");
+		ofp_term_global();
+		exit(EXIT_FAILURE);
+	}
 
 	memset(proc_tbl, 0, sizeof(proc_tbl));
 	thr_params.thr_type = ODP_THREAD_WORKER;
@@ -323,6 +324,12 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 
 	if (appl_args->if_count == 0) {
 		usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
+
+	if (appl_args->if_count > OFP_FP_INTERFACE_MAX) {
+		OFP_ERR("Error: Invalid number of interfaces: maximum %d\n",
+			OFP_FP_INTERFACE_MAX);
 		exit(EXIT_FAILURE);
 	}
 
