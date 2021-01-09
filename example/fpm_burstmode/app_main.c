@@ -149,9 +149,8 @@ static int pkt_io_recv(void *_arg)
  * @return int 0 on success, -1 on error
  *
  */
-static int configure_interfaces(odp_instance_t instance,
-	int if_count, char **if_names,
-	int tx_queues, int rx_queues)
+static int configure_interfaces(int if_count, char **if_names,
+				int tx_queues, int rx_queues)
 {
 	odp_pktio_param_t pktio_param;
 	odp_pktin_queue_param_t pktin_param;
@@ -172,10 +171,10 @@ static int configure_interfaces(odp_instance_t instance,
 	pktout_param.num_queues = tx_queues;
 
 	for (i = 0; i < if_count; i++)
-		if (ofp_ifnet_create(instance, if_names[i],
-				&pktio_param,
-				&pktin_param,
-				&pktout_param) < 0) {
+		if (ofp_ifnet_create(if_names[i],
+				     &pktio_param,
+				     &pktin_param,
+				     &pktout_param) < 0) {
 			OFP_ERR("Failed to init interface %s", if_names[i]);
 			return -1;
 		}
@@ -288,28 +287,26 @@ int main(int argc, char *argv[])
 		"Workers core count: %d\n",
 		linux_sp_core, first_worker, num_workers);
 
-	instance = ofp_get_odp_instance();
-	if (OFP_ODP_INSTANCE_INVALID == instance) {
-		OFP_ERR("Error: Invalid odp instance.\n");
-		ofp_term_global();
-		exit(EXIT_FAILURE);
-	}
-
-	if (configure_interfaces(instance,
-		params.if_count, params.if_names,
-		num_workers, num_workers)) {
+	if (configure_interfaces(params.if_count, params.if_names,
+				 num_workers, num_workers)) {
 		OFP_ERR("Error: Failed to configure interfaces.\n");
 		ofp_term_global();
 		exit(EXIT_FAILURE);
 	}
 
 	if (configure_workers_arg(num_workers, workers_arg,
-		params.if_count, params.if_names)) {
+				  params.if_count, params.if_names)) {
 		OFP_ERR("Failed to initialize workers arguments.");
 		ofp_term_global();
 		exit(EXIT_FAILURE);
 	}
 
+	instance = ofp_get_odp_instance();
+	if (OFP_ODP_INSTANCE_INVALID == instance) {
+		OFP_ERR("Error: Invalid odp instance.\n");
+		ofp_term_global();
+		exit(EXIT_FAILURE);
+	}
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 
 	/* Create worker threads */

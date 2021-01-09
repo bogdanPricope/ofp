@@ -1072,7 +1072,7 @@ int main(int argc, char *argv[])
 
 	memset(&thr_args, 0, sizeof(thread_args_t));
 
-	if (ofp_ifnet_create(instance, gbl_args->appl.if_name,
+	if (ofp_ifnet_create(gbl_args->appl.if_name,
 			     &pktio_param, &pktin_param, &pktout_param) < 0) {
 		OFP_ERR("Error: failed to init interface %s",
 			gbl_args->appl.if_name);

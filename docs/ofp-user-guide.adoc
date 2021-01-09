@@ -498,8 +498,7 @@ non-default parameters and create packet IO objects:
   * @return int 0 on success, -1 on error
   *
   */
- static int create_interfaces_direct_rss(odp_instance_t instance,
-         int if_count, char **if_names,
+ static int create_interfaces_direct_rss(int if_count, char **if_names,
          int tx_queues, int rx_queues)
  {
          odp_pktio_param_t pktio_param;
@@ -522,7 +521,7 @@ non-default parameters and create packet IO objects:
          pktout_param.num_queues = tx_queues;
 
          for (i = 0; i < if_count; i++)
-                 if (ofp_ifnet_create(instance, if_names[i],
+                 if (ofp_ifnet_create(if_names[i],
                                  &pktio_param,
                                  &pktin_param,
                                  &pktout_param) < 0) {

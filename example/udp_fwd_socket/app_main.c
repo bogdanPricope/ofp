@@ -201,13 +201,6 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	instance = ofp_get_odp_instance();
-	if (OFP_ODP_INSTANCE_INVALID == instance) {
-		OFP_ERR("Error: Invalid odp instance.\n");
-		ofp_term_global();
-		exit(EXIT_FAILURE);
-	}
-
 	/* Print both system and application information */
 	print_info(NO_PATH(argv[0]), &params);
 
@@ -253,10 +246,10 @@ int main(int argc, char *argv[])
 		int j;
 		odp_pktin_queue_t pktin[num_workers];
 
-		if (ofp_ifnet_create(instance, params.if_names[i],
-				&pktio_param,
-				&pktin_param,
-				&pktout_param) < 0) {
+		if (ofp_ifnet_create(params.if_names[i],
+				     &pktio_param,
+				     &pktin_param,
+				     &pktout_param) < 0) {
 			OFP_ERR("Failed to init interface %s",
 				params.if_names[i]);
 			ofp_term_global();
@@ -288,6 +281,12 @@ int main(int argc, char *argv[])
 			pktio_thr_args[j].pktin[i] = pktin[j];
 	}
 
+	instance = ofp_get_odp_instance();
+	if (OFP_ODP_INSTANCE_INVALID == instance) {
+		OFP_ERR("Error: Invalid odp instance.\n");
+		ofp_term_global();
+		exit(EXIT_FAILURE);
+	}
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 
 	for (i = 0; i < num_workers; ++i) {

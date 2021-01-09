@@ -10,6 +10,7 @@
 #include "ofpi_igmp_var.h"
 #include "ofpi_util.h"
 
+#include "ofpi_global_param_shm.h"
 #include "ofp_errno.h"
 #include "ofpi_log.h"
 
@@ -274,11 +275,10 @@ int ofp_sp_inq_create(struct ofp_ifnet *ifnet)
 }
 #endif /*SP*/
 
-int ofp_ifnet_create(odp_instance_t instance,
-	char *if_name,
-	odp_pktio_param_t *pktio_param,
-	odp_pktin_queue_param_t *pktin_param,
-	odp_pktout_queue_param_t *pktout_param)
+int ofp_ifnet_create(char *if_name,
+		     odp_pktio_param_t *pktio_param,
+		     odp_pktin_queue_param_t *pktin_param,
+		     odp_pktout_queue_param_t *pktout_param)
 {
 	int port;
 	struct ofp_ifnet *ifnet;
@@ -289,7 +289,8 @@ int ofp_ifnet_create(odp_instance_t instance,
 	odph_odpthread_params_t thr_params;
 #endif /* SP */
 
-	(void)instance;
+	if (!shm_global)	/* OFP not initialized */
+		return -1;
 
 	port = ofp_free_port_alloc();
 	ifnet = ofp_get_ifnet((uint16_t)port, 0);
@@ -398,7 +399,7 @@ int ofp_ifnet_create(odp_instance_t instance,
 	thr_params.start = sp_rx_thread;
 	thr_params.arg = ifnet;
 	thr_params.thr_type = ODP_THREAD_CONTROL;
-	thr_params.instance = instance;
+	thr_params.instance = V_global_odp_instance;
 	odph_odpthreads_create(ifnet->rx_tbl,
 			       &V_global_linux_cpumask,
 			       &thr_params);
@@ -407,7 +408,7 @@ int ofp_ifnet_create(odp_instance_t instance,
 	thr_params.start = sp_tx_thread;
 	thr_params.arg = ifnet;
 	thr_params.thr_type = ODP_THREAD_CONTROL;
-	thr_params.instance = instance;
+	thr_params.instance = V_global_odp_instance;
 	odph_odpthreads_create(ifnet->tx_tbl,
 			       &V_global_linux_cpumask,
 			       &thr_params);

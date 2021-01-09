@@ -554,7 +554,7 @@ int ofp_init_global(ofp_global_param_t *params)
 				   params->sched_group);
 
 	for (i = 0; i < params->if_count; ++i) {
-		if (ofp_ifnet_create(V_global_odp_instance, params->if_names[i],
+		if (ofp_ifnet_create(params->if_names[i],
 				     &pktio_param, &pktin_param, NULL)) {
 			OFP_LOG_NO_CTX_NO_LEVEL("Error: failed to create "
 					"interface %s.\n", params->if_names[i]);
