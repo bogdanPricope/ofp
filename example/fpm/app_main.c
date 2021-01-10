@@ -15,8 +15,6 @@
 
 #define MAX_WORKERS		32
 
-
-
 /**
  * Parsed command line application arguments
  */
@@ -36,11 +34,6 @@ static void print_info(char *progname, appl_args_t *appl_args,
 		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
 static int start_performance(odp_instance_t instance, int core_id);
-
- /**
-  * global OFP init parms
-  */
-ofp_global_param_t app_init_params;
 
 /**
  * Get rid of path in filename - only for unix-type paths using '/'
@@ -79,7 +72,6 @@ static void ofp_sig_func_stop(int signum)
 	ofp_stop_processing();
 }
 
-
 /**
  * main() Application entry point
  *
@@ -97,9 +89,10 @@ static void ofp_sig_func_stop(int signum)
  */
 int main(int argc, char *argv[])
 {
+	ofp_global_param_t app_init_params;
 	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	appl_args_t params;
-	int num_workers, ret_val;
+	int num_workers, ret_val, i;
 	odp_cpumask_t cpumask;
 	odph_odpthread_params_t thr_params;
 	odp_instance_t instance;
@@ -122,7 +115,11 @@ int main(int argc, char *argv[])
 	 */
 	ofp_init_global_param(&app_init_params);
 	app_init_params.if_count = params.if_count;
-	app_init_params.if_names = params.if_names;
+	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
+		strncpy(app_init_params.if_names[i], params.if_names[i],
+			OFP_IFNAMSIZ);
+		app_init_params.if_names[i][OFP_IFNAMSIZ - 1] = '\0';
+	}
 
 	if (app_init_params.pktin_mode != ODP_PKTIN_MODE_SCHED) {
 		printf("Warning: Forcing scheduled pktin mode.\n");

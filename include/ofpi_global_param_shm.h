@@ -32,7 +32,7 @@ struct ofp_global_config_mem {
 
 	VNET_DEFINE(enum ofp_log_level_s, loglevel);
 
-	ofp_global_param_t global_param;
+	VNET_DEFINE(ofp_global_param_t, global_param);
 };
 
 extern __thread struct ofp_global_config_mem *shm_global;

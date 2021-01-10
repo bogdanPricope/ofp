@@ -121,9 +121,6 @@ static args_t *gbl_args;
 /** Break workers loop if set to 1 */
 static int exit_threads;
 
-/** Global OFP init parms */
-ofp_global_param_t app_init_params;
-
 /** Get rid of path in filename - only for unix-type paths using '/' */
 #define NO_PATH(file_name) (strrchr((file_name), '/') ? \
 				strrchr((file_name), '/') + 1 : (file_name))
@@ -980,6 +977,7 @@ static void print_info(char *progname, appl_args_t *appl_args)
  */
 int main(int argc, char *argv[])
 {
+	ofp_global_param_t app_init_params;
 	odph_odpthread_t thread_tbl[NUM_WORKERS];
 	odp_shm_t shm;
 	int num_workers, next_worker;

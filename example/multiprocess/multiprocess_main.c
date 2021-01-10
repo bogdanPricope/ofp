@@ -48,8 +48,6 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args);
 static void print_info(char *progname, appl_args_t *appl_args);
 static void usage(char *progname);
 
-ofp_global_param_t app_init_params; /**< global OFP init parms */
-
 int udp_test(appl_args_t *arg);
 int tcp_test(appl_args_t *arg);
 
@@ -62,6 +60,7 @@ int tcp_test(appl_args_t *arg);
  */
 int main(int argc, char *argv[])
 {
+	ofp_global_param_t app_init_params;
 	odp_instance_t instance;
 	appl_args_t params;
 	int num_workers, i;
@@ -84,7 +83,11 @@ int main(int argc, char *argv[])
 	ofp_init_global_param(&app_init_params);
 	app_init_params.linux_core_id = LINUX_CONTROL_CPU;
 	app_init_params.if_count = params.if_count;
-	app_init_params.if_names = params.if_names;
+	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
+		strncpy(app_init_params.if_names[i], params.if_names[i],
+			OFP_IFNAMSIZ);
+		app_init_params.if_names[i][OFP_IFNAMSIZ - 1] = '\0';
+	}
 
 	/*
 	 * Initialize OFP. This will open a pktio instance for each interface

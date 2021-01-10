@@ -36,13 +36,11 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args);
 static void print_info(char *progname, appl_args_t *appl_args,
 		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
-static int build_classifier(int if_count, char **if_names);
+static int build_classifier(int if_count, char if_names[][OFP_IFNAMSIZ]);
 static odp_cos_t build_cos_w_queue(const char *name);
 static odp_cos_t build_cos_set_queue(const char *name, odp_queue_t queue_cos);
 static odp_pmr_t build_udp_prm(odp_cos_t cos_src, odp_cos_t cos_dst);
 static void app_processing(void);
-
-ofp_global_param_t app_init_params; /**< global OFP init parms */
 
 /** Get rid of path in filename - only for unix-type paths using '/' */
 #define NO_PATH(file_name) (strrchr((file_name), '/') ? \
@@ -71,9 +69,10 @@ static void sig_func_stop(int signum)
  */
 int main(int argc, char *argv[])
 {
+	ofp_global_param_t app_init_params;
 	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	appl_args_t params;
-	int num_workers, ret_val;
+	int num_workers, ret_val, i;
 	odp_cpumask_t cpumask;
 	odph_odpthread_params_t thr_params;
 	odp_instance_t instance;
@@ -95,7 +94,11 @@ int main(int argc, char *argv[])
 	 */
 	ofp_init_global_param(&app_init_params);
 	app_init_params.if_count = params.if_count;
-	app_init_params.if_names = params.if_names;
+	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
+		strncpy(app_init_params.if_names[i], params.if_names[i],
+			OFP_IFNAMSIZ);
+		app_init_params.if_names[i][OFP_IFNAMSIZ - 1] = '\0';
+	}
 
 	if (ofp_init_global(&app_init_params)) {
 		OFP_ERR("Error: OFP global init failed.\n");
@@ -352,7 +355,7 @@ static void usage(char *progname)
 		);
 }
 
-int build_classifier(int if_count, char **if_names)
+int build_classifier(int if_count, char if_names[][OFP_IFNAMSIZ])
 {
 	odp_pktio_t pktio;
 	odp_cos_t cos_def;

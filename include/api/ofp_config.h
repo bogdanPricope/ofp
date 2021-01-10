@@ -165,4 +165,7 @@
 /** Maximum size of a file name */
 #define OFP_FILE_NAME_SIZE_MAX 256
 
+/** Maximum size of an interface name */
+#define OFP_IFNAMSIZ  32
+
 #endif

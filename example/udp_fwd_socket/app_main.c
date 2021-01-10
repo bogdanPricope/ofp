@@ -42,9 +42,6 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args);
 static void print_info(char *progname, appl_args_t *appl_args);
 static void usage(char *progname);
 
-
-ofp_global_param_t app_init_params; /**< global OFP init parms */
-
 /** Get rid of path in filename - only for unix-type paths using '/' */
 #define NO_PATH(file_name) (strrchr((file_name), '/') ? \
 				strrchr((file_name), '/') + 1 : (file_name))
@@ -166,6 +163,7 @@ static int event_dispatcher(void *arg)
  */
 int main(int argc, char *argv[])
 {
+	ofp_global_param_t app_init_params;
 	odph_odpthread_t thread_tbl[MAX_WORKERS], dispatcher_thread;
 	appl_args_t params;
 	int num_workers, tx_queues, first_worker, i;

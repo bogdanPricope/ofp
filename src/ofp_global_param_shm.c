@@ -46,7 +46,7 @@ static int ofp_global_config_lookup_shared_memory(void)
 		OFP_ERR("ofp_shared_memory_lookup failed");
 		return -1;
 	}
-	global_param = &shm_global->global_param;
+	global_param = &V_global_param;
 
 	return 0;
 }
@@ -76,7 +76,7 @@ int ofp_global_param_init_global(ofp_global_param_t *params,
 
 	V_global_loglevel = params->loglevel;
 
-	*global_param = *params;
+	V_global_param = *params;
 
 	return 0;
 }

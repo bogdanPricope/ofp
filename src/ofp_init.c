@@ -168,14 +168,13 @@ static void read_conf_file(ofp_global_param_t *params, const char *filename)
 	setting = config_lookup(&conf, "ofp_global_param.if_names");
 
 	if (setting && (length = config_setting_length(setting)) > 0) {
-		params->if_count = 0;
-		params->if_names = malloc(length * sizeof(char *));
-		while (params->if_count < length) {
-			/* These strings are never freed. */
-			params->if_names[params->if_count] =
-				strndup(config_setting_get_string_elem(setting, params->if_count), OFP_IFNAMSIZ);
-			params->if_count++;
+		for (i = 0; i < length && i < OFP_FP_INTERFACE_MAX; i++) {
+			strncpy(params->if_names[i],
+				config_setting_get_string_elem(setting, i),
+				OFP_IFNAMSIZ);
+			params->if_names[i][OFP_IFNAMSIZ - 1] = '\0';
 		}
+		params->if_count = i;
 	}
 
 #define GET_CONF_STR(lt, p)							\

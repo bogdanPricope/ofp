@@ -14,8 +14,6 @@
 #pragma GCC visibility push(default)
 #endif
 
-#define OFP_IFNAMSIZ  32
-
 struct ofp_ifnet;
 
 /* Interfaces: UP/DOWN */

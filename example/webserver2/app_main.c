@@ -55,8 +55,6 @@ static int resource_cfg(void);
 static int validate_cores_settings(int req_core_start, int req_core_count,
 	int *core_start, int *core_count);
 
-ofp_global_param_t app_init_params; /**< global OFP init parms */
-
 /** Get rid of path in filename - only for unix-type paths using '/' */
 #define NO_PATH(file_name) (strrchr((file_name), '/') ? \
 				strrchr((file_name), '/') + 1 : (file_name))
@@ -310,6 +308,7 @@ static int create_interfaces_sched_rss(int if_count, char **if_names,
  */
 int main(int argc, char *argv[])
 {
+	ofp_global_param_t app_init_params;
 	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	appl_args_t params;
 	int num_workers, first_worker, linux_sp_core, i;
@@ -346,7 +345,12 @@ int main(int argc, char *argv[])
 	app_init_params.linux_core_id = linux_sp_core;
 	if (params.mode == EXEC_MODE_SCHEDULER) {
 		app_init_params.if_count = params.if_count;
-		app_init_params.if_names = params.if_names;
+		for (i = 0; i < params.if_count &&
+		     i < OFP_FP_INTERFACE_MAX; i++) {
+			strncpy(app_init_params.if_names[i], params.if_names[i],
+				OFP_IFNAMSIZ);
+			app_init_params.if_names[i][OFP_IFNAMSIZ - 1] = '\0';
+		}
 	}
 
 	if (ofp_init_global(&app_init_params)) {

@@ -90,24 +90,24 @@ typedef struct ofp_global_param_t {
 	odp_instance_t instance;
 
 	/**
-	 * Count of interfaces to be initialized. The default value is
-	 * 0.
-	 */
-	uint16_t if_count;
-
-	/**
 	 * CPU core to which internal OFP control threads are pinned.
 	 * The default value is 0.
 	 */
 	uint16_t linux_core_id;
 
 	/**
+	 * Count of interfaces to be initialized. The default value is
+	 * 0.
+	 */
+	uint16_t if_count;
+
+	/**
 	 * Names of the interfaces to be initialized. The naming
 	 * convention depends on the operating system and the ODP
-	 * implementation. Must point to an array of at least if_count
-	 * zero terminated strings.
+	 * implementation. Must containg 'if_count' zero terminated
+	 * strings.
 	 */
-	char **if_names;
+	char if_names[OFP_FP_INTERFACE_MAX][OFP_IFNAMSIZ];
 
 	/**
 	 * Packet input mode of the interfaces initialized by OFP.

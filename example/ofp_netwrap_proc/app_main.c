@@ -34,11 +34,6 @@ static void print_info(const char *progname, appl_args_t *appl_args,
 		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
 
- /**
-  * global OFP init parms
-  */
-ofp_global_param_t app_init_params;
-
 /**
  * Get rid of path in filename - only for unix-type paths using '/'
  */
@@ -65,8 +60,9 @@ __attribute__((destructor)) static void ofp_netwrap_main_dtor(void);
 
 __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 {
+	ofp_global_param_t app_init_params;
 	appl_args_t params;
-	int ret_val;
+	int ret_val, i;
 	odp_cpumask_t cpumask;
 	odph_odpthread_params_t thr_params;
 
@@ -108,7 +104,11 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 	 */
 	ofp_init_global_param(&app_init_params);
 	app_init_params.if_count = params.if_count;
-	app_init_params.if_names = params.if_names;
+	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
+		strncpy(app_init_params.if_names[i], params.if_names[i],
+			OFP_IFNAMSIZ);
+		app_init_params.if_names[i][OFP_IFNAMSIZ - 1] = '\0';
+	}
 	app_init_params.instance = netwrap_proc_instance;
 
 	if (ofp_init_global(&app_init_params) != 0) {

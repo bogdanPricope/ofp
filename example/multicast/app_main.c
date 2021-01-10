@@ -34,8 +34,6 @@ static void print_info(char *progname, appl_args_t *appl_args,
 		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
 
-ofp_global_param_t app_init_params; /**< global OFP init parms */
-
 /** Get rid of path in filename - only for unix-type paths using '/' */
 #define NO_PATH(file_name) (strrchr((file_name), '/') ? \
 				strrchr((file_name), '/') + 1 : (file_name))
@@ -67,9 +65,10 @@ static int resource_cfg(void)
  */
 int main(int argc, char *argv[])
 {
+	ofp_global_param_t app_init_params;
 	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	appl_args_t params;
-	int num_workers, ret_val;
+	int num_workers, ret_val, i;
 	odp_cpumask_t cpumask;
 	odph_odpthread_params_t thr_params;
 	odp_instance_t instance;
@@ -88,7 +87,11 @@ int main(int argc, char *argv[])
 	/* Configure OFP */
 	ofp_init_global_param(&app_init_params);
 	app_init_params.if_count = params.if_count;
-	app_init_params.if_names = params.if_names;
+	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
+		strncpy(app_init_params.if_names[i], params.if_names[i],
+			OFP_IFNAMSIZ);
+		app_init_params.if_names[i][OFP_IFNAMSIZ - 1] = '\0';
+	}
 
 	if (ofp_init_global(&app_init_params)) {
 		OFP_ERR("Error: OFP global init failed.\n");
