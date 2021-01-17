@@ -98,11 +98,6 @@ static int pkt_io_direct_mode_recv(void *arg)
 	for (i = 0; i < num_pktin; i++)
 		pktin[i] = thr_args->pktin[i];
 
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
-		return -1;
-	}
-
 	is_running = ofp_get_processing_state();
 	if (is_running == NULL) {
 		OFP_ERR("ofp_get_processing_state failed");
@@ -308,14 +303,13 @@ static int create_interfaces_sched_rss(int if_count, char **if_names,
  */
 int main(int argc, char *argv[])
 {
-	ofp_global_param_t app_init_params;
-	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	appl_args_t params;
+	ofp_global_param_t app_init_params;
+	ofp_thread_t thread_tbl[MAX_WORKERS];
+	ofp_thread_param_t thread_param;
 	int num_workers, first_worker, linux_sp_core, i;
 	struct worker_arg workers_arg_direct_rss[MAX_WORKERS];
 	odp_cpumask_t cpu_mask;
-	odph_odpthread_params_t thr_params;
-	odp_instance_t instance;
 
 	/* Setup system resources */
 	resource_cfg();
@@ -398,44 +392,50 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	instance = ofp_get_odp_instance();
-	if (OFP_ODP_INSTANCE_INVALID == instance) {
-		OFP_ERR("Error: Invalid odp instance.\n");
-		ofp_term_global();
-		exit(EXIT_FAILURE);
-	}
-	memset(thread_tbl, 0, sizeof(thread_tbl));
-
 	/* Create worker threads */
+	memset(thread_tbl, 0, sizeof(thread_tbl));
 	for (i = 0; i < num_workers; i++) {
 		if (params.mode == EXEC_MODE_DIRECT_RSS) {
-			thr_params.start = pkt_io_direct_mode_recv;
-			thr_params.arg = &workers_arg_direct_rss[i];
+			thread_param.start = pkt_io_direct_mode_recv;
+			thread_param.arg = &workers_arg_direct_rss[i];
 		} else {
-			thr_params.start = default_event_dispatcher;
-			thr_params.arg = ofp_eth_vlan_processing;
+			thread_param.start = default_event_dispatcher;
+			thread_param.arg = ofp_eth_vlan_processing;
 		}
-		thr_params.thr_type = ODP_THREAD_WORKER;
-		thr_params.instance = instance;
+		thread_param.thr_type = ODP_THREAD_WORKER;
 
 		odp_cpumask_zero(&cpu_mask);
 		odp_cpumask_set(&cpu_mask, first_worker + i);
 
-		odph_odpthreads_create(&thread_tbl[i], &cpu_mask,
-				       &thr_params);
+		if (ofp_thread_create(&thread_tbl[i], 1, &cpu_mask,
+				      &thread_param) != 1)
+			break;
+	}
+
+	if (i < num_workers) {
+		OFP_ERR("Error: Failed to create worker threads, "
+			"expected %d, got %d", num_workers, i);
+		ofp_stop_processing();
+		if (i > 0)
+			ofp_thread_join(thread_tbl, i);
+		ofp_term_global();
+		return EXIT_FAILURE;
 	}
 
 	/* Start CLI */
 	ofp_start_cli_thread(app_init_params.linux_core_id, params.cli_file);
-
 	sleep(2);
+
 	/* webserver */
 	if (setup_webserver(params.root_dir, params.laddr, params.lport)) {
-		OFP_ERR("Error: Failed to setup webserver.\n");
+		OFP_ERR("Error: Failed to setup webserver.");
+		ofp_stop_processing();
+		ofp_thread_join(thread_tbl, num_workers);
+		ofp_term_global();
 		exit(EXIT_FAILURE);
 	}
 
-	odph_odpthreads_join(thread_tbl);
+	ofp_thread_join(thread_tbl, num_workers);
 
 	if (ofp_term_global() < 0)
 		printf("Error: ofp_term_global failed.\n");

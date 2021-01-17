@@ -876,8 +876,6 @@ main(void)
 	nr_of_failed_suites = CU_get_number_of_suites_failed();
 	CU_cleanup_registry();
 
-	ofp_term_local();
-
 	return (nr_of_failed_suites > 0 ?
 		nr_of_failed_suites : nr_of_failed_tests);
 }

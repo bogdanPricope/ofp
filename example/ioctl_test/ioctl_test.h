@@ -9,6 +9,6 @@
 
 #include <odp_api.h>
 
-void ofp_start_ioctl_thread(odp_instance_t instance, int core_id);
+int ofp_start_ioctl_thread(ofp_thread_t *thread_ioctl, int core_id);
 
 #endif

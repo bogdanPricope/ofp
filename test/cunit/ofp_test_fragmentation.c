@@ -113,7 +113,6 @@ init_suite(void)
 static int
 clean_suite(void)
 {
-	ofp_term_local();
 	/*ofp_term_global(); ToDo*/
 	return 0;
 }

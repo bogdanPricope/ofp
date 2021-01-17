@@ -12,8 +12,7 @@ typedef struct {
 	odp_bool_t use_epoll;
 } webserver_arg_t;
 
-void ofp_start_webserver_thread(odp_instance_t instance, int core_id,
-				odph_odpthread_t *webserver_pthread,
-				webserver_arg_t *arg);
+int ofp_start_webserver_thread(ofp_thread_t *webserver_pthread, int core_id,
+			       webserver_arg_t *arg);
 
 #endif

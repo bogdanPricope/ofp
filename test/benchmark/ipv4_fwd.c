@@ -52,7 +52,6 @@ struct ODP_ALIGNED_CACHE tstate_s {
 		}						\
 	} while (0)
 
-odp_instance_t instance;
 struct ofp_ifnet *ifnet;
 odp_queue_t dummyq;
 odp_pool_t pool;
@@ -103,8 +102,6 @@ static inline uint32_t dst_addr(void)
 static int worker(void *p)
 {
 	(void)p;
-
-	ASSERT(!ofp_init_local());
 
 	int res;
 	odp_packet_t burst[arg.batch];
@@ -364,8 +361,6 @@ int main(int argc, char *argv[])
 
 	print_info();
 
-	instance = ofp_get_odp_instance();
-
 	uint32_t vlan;
 	for (vlan = 0; vlan <= arg.vlans; vlan++)
 		ASSERT(!ofp_config_interface_up_v4(C_PORT, vlan, C_VRF, odp_cpu_to_be_32(C_L_ADDR), 24));
@@ -413,21 +408,23 @@ int main(int argc, char *argv[])
 	memset(tstate, 0, sizeof(tstate));
 	odp_spinlock_init(&lock);
 
-	odph_odpthread_t thread_tbl[ODP_THREAD_COUNT_MAX];
+	ofp_thread_t thread_tbl[ODP_THREAD_COUNT_MAX];
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 
 	for (i = 0; i < arg.workers; ++i) {
-		odph_odpthread_params_t thr_params;
-		memset(&thr_params, 0, sizeof(thr_params));
-		thr_params.start = worker;
-		thr_params.thr_type = ODP_THREAD_WORKER;
-		thr_params.instance = instance;
+		ofp_thread_param_t thread_param;
+
+		memset(&thread_param, 0, sizeof(thread_param));
+		thread_param.start = worker;
+		thread_param.arg = NULL;
+		thread_param.thr_type = ODP_THREAD_WORKER;
 
 		odp_cpumask_t cpu_mask;
 		odp_cpumask_zero(&cpu_mask);
 		odp_cpumask_set(&cpu_mask, i);
 
-		ASSERT(odph_odpthreads_create(&thread_tbl[i], &cpu_mask, &thr_params));
+		ASSERT(ofp_thread_create(&thread_tbl[i], 1, &cpu_mask,
+					 &thread_param));
 	}
 
 	sleep(arg.warmup);
@@ -473,7 +470,7 @@ int main(int argc, char *argv[])
 
 	for (i = 0; i < arg.workers; ++i) tstate[i].stop = 1;
 
-	odph_odpthreads_join(thread_tbl);
+	ofp_thread_join(thread_tbl, arg.workers);
 
 	for (i = 0; i < arg.workers; ++i)
 		ASSERT(!odp_queue_destroy(ifnet->out_queue_queue[i]));

@@ -221,10 +221,6 @@ ioctl_test(void *arg)
 	logfile = fopen(logfilename, "w");
 	OFP_INFO("ioctl_test thread started");
 
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
-		return -1;
-	}
 	sleep(2);
 
 	if ((fd = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM, OFP_IPPROTO_UDP)) < 0) {
@@ -335,26 +331,22 @@ ioctl_test(void *arg)
 
 	ofp_stop_processing();
 
-	if (ofp_term_local())
-		OFP_ERR("ofp_term_local failed");
-
 	return 0;
 }
 
-void ofp_start_ioctl_thread(odp_instance_t instance, int core_id)
+int  ofp_start_ioctl_thread(ofp_thread_t *thread_ioctl, int core_id)
 {
-	static odph_odpthread_t test_linux_pthread;
 	odp_cpumask_t cpumask;
-	odph_odpthread_params_t thr_params;
+	ofp_thread_param_t thread_param = {0};
 
 	odp_cpumask_zero(&cpumask);
 	odp_cpumask_set(&cpumask, core_id);
 
-	thr_params.start = ioctl_test;
-	thr_params.arg = NULL;
-	thr_params.thr_type = ODP_THREAD_CONTROL;
-	thr_params.instance = instance;
-	odph_odpthreads_create(&test_linux_pthread,
+	thread_param.start = ioctl_test;
+	thread_param.arg = NULL;
+	thread_param.thr_type = ODP_THREAD_CONTROL;
+
+	return ofp_thread_create(thread_ioctl, 1,
 			       &cpumask,
-			       &thr_params);
+			       &thread_param);
 }

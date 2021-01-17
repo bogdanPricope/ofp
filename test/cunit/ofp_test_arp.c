@@ -18,6 +18,7 @@
 
 #include "ofpi_log.h"
 #include "ofp_route_arp.h"
+#include "ofpi_thread_proc.h"
 
 #include <odp_api.h>
 
@@ -31,13 +32,13 @@
 #define ALLOW_UNUSED_LOCAL(x) false ? (void)x : (void)0
 
 static odp_atomic_u32_t still_running;
-static odph_odpthread_t pp_thread_handle;
+static ofp_thread_t pp_thread_handle;
 int pp_thread(void *arg);
 
 static int init_suite(void)
 {
 	ofp_global_param_t params;
-	odph_odpthread_params_t thr_params;
+	ofp_thread_param_t thread_param;
 
 	ofp_init_global_param(&params);
 	params.enable_nl_thread = 0;
@@ -52,13 +53,14 @@ static int init_suite(void)
 	odp_cpumask_t cpumask;
 	odp_cpumask_zero(&cpumask);
 	odp_cpumask_set(&cpumask, 0x1);
-	thr_params.start = pp_thread;
-	thr_params.arg = NULL;
-	thr_params.thr_type = ODP_THREAD_WORKER;
-	thr_params.instance = ofp_get_odp_instance();
-	odph_odpthreads_create(&pp_thread_handle,
-			       &cpumask,
-			       &thr_params);
+
+	memset(&thread_param, 0, sizeof(thread_param));
+	thread_param.start = pp_thread;
+	thread_param.arg = NULL;
+	thread_param.thr_type = ODP_THREAD_WORKER;
+
+	ofp_thread_create(&pp_thread_handle, 1,
+			  &cpumask, &thread_param);
 
 	return 0;
 }
@@ -67,7 +69,7 @@ static int end_suite(void)
 {
 	odp_atomic_store_u32(&still_running, 0);
 
-	odph_odpthreads_join(&pp_thread_handle);
+	ofp_thread_join(&pp_thread_handle, 1);
 
 	ofp_term_global();
 
@@ -77,10 +79,6 @@ static int end_suite(void)
 int pp_thread(void *arg)
 {
 	ALLOW_UNUSED_LOCAL(arg);
-	if (ofp_init_local()) {
-		OFP_ERR("ofp_init_local failed");
-		return -1;
-	}
 
 	while (odp_atomic_load_u32(&still_running)) {
 		odp_event_t event;
@@ -96,7 +94,7 @@ int pp_thread(void *arg)
 
 		ofp_timer_handle(event);
 	}
-	ofp_term_local();
+
 	return 0;
 }
 
@@ -110,8 +108,6 @@ static void test_arp(void)
 	 * a 64-bit operation is currently being used to copy a MAC address.
 	 */
 	uint8_t mac_result[OFP_ETHER_ADDR_LEN + 2];
-
-	CU_ASSERT(0 == ofp_init_local());
 
 	memset(&mock_ifnet, 0, sizeof(mock_ifnet));
 	CU_ASSERT(0 != inet_aton("1.1.1.1", &ip));

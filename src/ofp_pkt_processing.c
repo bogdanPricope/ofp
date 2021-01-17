@@ -75,14 +75,8 @@ int default_event_dispatcher(void *arg)
 	ofp_param_t ofp_params = {0};
 	int rx_burst = 1;
 
-	if (ofp_init_local()) {
-		OFP_ERR("ofp_init_local failed");
-		return -1;
-	}
-
 	if (ofp_get_parameters(&ofp_params)) {
 		OFP_ERR("ofp_get_parameters failed");
-		ofp_term_local();
 		return -1;
 	}
 
@@ -92,7 +86,6 @@ int default_event_dispatcher(void *arg)
 	is_running = ofp_get_processing_state();
 	if (is_running == NULL) {
 		OFP_ERR("ofp_get_processing_state failed");
-		ofp_term_local();
 		return -1;
 	}
 
@@ -144,9 +137,6 @@ int default_event_dispatcher(void *arg)
 		}
 		ofp_send_pending_pkt();
 	}
-
-	if (ofp_term_local())
-		OFP_ERR("ofp_term_local failed");
 
 	return 0;
 }

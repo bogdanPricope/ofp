@@ -84,11 +84,6 @@ static int pkt_io_recv(void *_arg)
 	for (i = 0; i < num_pktin; i++)
 		pktin[i] = arg->pktin[i];
 
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
-		return -1;
-	}
-
 	is_running = ofp_get_processing_state();
 	if (is_running == NULL) {
 		OFP_ERR("ofp_get_processing_state failed");
@@ -234,14 +229,13 @@ static int configure_workers_arg(int num_workers,
  */
 int main(int argc, char *argv[])
 {
-	ofp_global_param_t app_init_params;
-	odph_odpthread_t thread_tbl[MAX_WORKERS];
-	struct worker_arg workers_arg[MAX_WORKERS];
 	appl_args_t params;
-	int num_workers, first_worker, linux_sp_core, i;
+	ofp_global_param_t app_init_params;
+	ofp_thread_t thread_tbl[MAX_WORKERS];
+	ofp_thread_param_t thread_param;
+	struct worker_arg workers_arg[MAX_WORKERS];
+	int num_workers, first_worker, linux_sp_core, i, ret_val;
 	odp_cpumask_t cpu_mask;
-	odph_odpthread_params_t thr_params;
-	odp_instance_t instance;
 
 	/* add handler for Ctr+C */
 	if (ofp_sigactions_set(sig_func_stop)) {
@@ -300,33 +294,34 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	instance = ofp_get_odp_instance();
-	if (OFP_ODP_INSTANCE_INVALID == instance) {
-		OFP_ERR("Error: Invalid odp instance.\n");
-		ofp_term_global();
-		exit(EXIT_FAILURE);
-	}
-	memset(thread_tbl, 0, sizeof(thread_tbl));
-
 	/* Create worker threads */
+	memset(thread_tbl, 0, sizeof(thread_tbl));
 	for (i = 0; i < num_workers; ++i) {
-		thr_params.start = pkt_io_recv;
-		thr_params.arg = &workers_arg[i];
-		thr_params.thr_type = ODP_THREAD_WORKER;
-		thr_params.instance = instance;
+		thread_param.start = pkt_io_recv;
+		thread_param.arg = &workers_arg[i];
+		thread_param.thr_type = ODP_THREAD_WORKER;
 
 		odp_cpumask_zero(&cpu_mask);
 		odp_cpumask_set(&cpu_mask, first_worker + i);
 
-		odph_odpthreads_create(&thread_tbl[i], &cpu_mask,
-				       &thr_params);
+		ret_val = ofp_thread_create(&thread_tbl[i], 1, &cpu_mask,
+					    &thread_param);
+		if (ret_val != 1) {
+			OFP_ERR("Error: Failed to create worker threads, "
+				"expected %d, got %d",
+				num_workers, i);
+			ofp_stop_processing();
+			ofp_thread_join(thread_tbl, i);
+			ofp_term_global();
+			return EXIT_FAILURE;
+		}
 	}
 
 	/* Start CLI */
 	ofp_start_cli_thread(app_init_params.linux_core_id,
 			     params.cli_file);
 
-	odph_odpthreads_join(thread_tbl);
+	ofp_thread_join(thread_tbl, num_workers);
 
 	if (ofp_term_global() < 0)
 		printf("Error: ofp_term_global failed.\n");

@@ -28,7 +28,6 @@
  * @retval -1 on failure
  *
  * @see ofp_init_global() can init interfaces.
- * @see ofp_init_local() which is required per thread before use.
  */
 #ifndef __OFP_IFNET_H__
 #define __OFP_IFNET_H__

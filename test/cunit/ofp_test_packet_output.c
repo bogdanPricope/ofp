@@ -212,7 +212,6 @@ init_suite(void)
 static int
 clean_suite(void)
 {
-	ofp_term_local();
 	return 0;
 }
 

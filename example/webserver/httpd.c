@@ -431,10 +431,6 @@ static int webserver(void *arg)
 
 	OFP_INFO("HTTP thread started");
 
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
-		return -1;
-	}
 	sleep(1);
 
 	web_arg = *(webserver_arg_t *)arg;
@@ -445,7 +441,6 @@ static int webserver(void *arg)
 	serv_fd = create_server_socket();
 	if (serv_fd == -1) {
 		OFP_ERR("Error: create_server_socket() failed.\n");
-		ofp_term_local();
 		return -1;
 	}
 
@@ -455,25 +450,22 @@ static int webserver(void *arg)
 		ret = webserver_select(serv_fd);
 
 	OFP_INFO("httpd exiting");
-	ofp_term_local();
 	return ret;
 }
 
-void ofp_start_webserver_thread(odp_instance_t instance, int core_id,
-				odph_odpthread_t *webserver_pthread,
-				webserver_arg_t *arg)
+int ofp_start_webserver_thread(ofp_thread_t *webserver_pthread, int core_id,
+			       webserver_arg_t *arg)
 {
 	odp_cpumask_t cpumask;
-	odph_odpthread_params_t thr_params;
+	ofp_thread_param_t thread_param = {0};
 
 	odp_cpumask_zero(&cpumask);
 	odp_cpumask_set(&cpumask, core_id);
 
-	thr_params.start = webserver;
-	thr_params.arg = (void *)arg;
-	thr_params.thr_type = ODP_THREAD_CONTROL;
-	thr_params.instance = instance;
-	odph_odpthreads_create(webserver_pthread,
-			       &cpumask,
-			       &thr_params);
+	thread_param.start = webserver;
+	thread_param.arg = arg;
+	thread_param.thr_type = ODP_THREAD_CONTROL;
+
+	return ofp_thread_create(webserver_pthread, 1,
+			       &cpumask, &thread_param);
 }

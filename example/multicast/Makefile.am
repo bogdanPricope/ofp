@@ -4,6 +4,8 @@ noinst_PROGRAMS = mcast
 
 mcast_LDFLAGS = $(AM_LDFLAGS) -static
 
-dist_mcast_SOURCES = app_main.c mcast.c
+dist_mcast_SOURCES = app_main.c mcast.c \
+		     ../common/linux_sigaction.c
 
-noinst_HEADERS = ${srcdir}/mcast.h
+noinst_HEADERS = ${srcdir}/mcast.h \
+		 ../common/linux_sigaction.h

@@ -78,11 +78,6 @@ static int pkt_io_recv(void *arg)
 	for (i = 0; i < num_pktin; i++)
 		pktin[i] = thr_args->pktin[i];
 
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
-		return -1;
-	}
-
 	is_running = ofp_get_processing_state();
 	if (is_running == NULL) {
 		OFP_ERR("ofp_get_processing_state failed");
@@ -108,7 +103,6 @@ static int pkt_io_recv(void *arg)
 		ofp_send_pending_pkt();
 	}
 
-	/* Never reached */
 	return 0;
 }
 
@@ -121,11 +115,6 @@ static int event_dispatcher(void *arg)
 	odp_bool_t *is_running = NULL;
 
 	(void)arg;
-
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
-		return -1;
-	}
 
 	is_running = ofp_get_processing_state();
 	if (is_running == NULL) {
@@ -150,7 +139,6 @@ static int event_dispatcher(void *arg)
 		odp_buffer_free(odp_buffer_from_event(ev));
 	}
 
-	/* Never reached */
 	return 0;
 }
 
@@ -163,9 +151,10 @@ static int event_dispatcher(void *arg)
  */
 int main(int argc, char *argv[])
 {
-	ofp_global_param_t app_init_params;
-	odph_odpthread_t thread_tbl[MAX_WORKERS], dispatcher_thread;
 	appl_args_t params;
+	ofp_global_param_t app_init_params;
+	ofp_thread_t thread_tbl[MAX_WORKERS], dispatcher_thread;
+	ofp_thread_param_t thread_param;
 	int num_workers, tx_queues, first_worker, i;
 	odp_cpumask_t cpu_mask;
 	struct pktio_thr_arg pktio_thr_args[MAX_WORKERS];
@@ -173,8 +162,6 @@ int main(int argc, char *argv[])
 	odp_pktin_queue_param_t pktin_param;
 	odp_pktout_queue_param_t pktout_param;
 	odp_pktio_t pktio;
-	odph_odpthread_params_t thr_params;
-	odp_instance_t instance;
 
 	/* add handler for Ctr+C */
 	if (ofp_sigactions_set(sig_func_stop)) {
@@ -184,12 +171,6 @@ int main(int argc, char *argv[])
 
 	/* Parse and store the application arguments */
 	parse_args(argc, argv, &params);
-
-	if (params.if_count > OFP_FP_INTERFACE_MAX) {
-		printf("Error: Invalid number of interfaces: maximum %d\n",
-			OFP_FP_INTERFACE_MAX);
-		exit(EXIT_FAILURE);
-	}
 
 	/* Initialize OFP */
 	ofp_init_global_param(&app_init_params);
@@ -279,39 +260,47 @@ int main(int argc, char *argv[])
 			pktio_thr_args[j].pktin[i] = pktin[j];
 	}
 
-	instance = ofp_get_odp_instance();
-	if (OFP_ODP_INSTANCE_INVALID == instance) {
-		OFP_ERR("Error: Invalid odp instance.\n");
-		ofp_term_global();
-		exit(EXIT_FAILURE);
-	}
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 
 	for (i = 0; i < num_workers; ++i) {
 
 		pktio_thr_args[i].num_pktin = params.if_count;
 
-		thr_params.start = pkt_io_recv;
-		thr_params.arg = &pktio_thr_args[i];
-		thr_params.thr_type = ODP_THREAD_WORKER;
-		thr_params.instance = instance;
+		thread_param.start = pkt_io_recv;
+		thread_param.arg = &pktio_thr_args[i];
+		thread_param.thr_type = ODP_THREAD_WORKER;
 
 		odp_cpumask_zero(&cpu_mask);
 		odp_cpumask_set(&cpu_mask, first_worker + i);
 
-		odph_odpthreads_create(&thread_tbl[i], &cpu_mask,
-				       &thr_params);
+		if (ofp_thread_create(&thread_tbl[i], 1,
+				      &cpu_mask, &thread_param) != 1)
+			break;
+	}
+
+	if (i < num_workers) {
+		OFP_ERR("Error: Failed to create worker threads, "
+			"expected %d, got %d", num_workers, i);
+		ofp_stop_processing();
+		if (i > 0)
+			ofp_thread_join(thread_tbl, i);
+		ofp_term_global();
+		return EXIT_FAILURE;
 	}
 
 	odp_cpumask_zero(&cpu_mask);
 	odp_cpumask_set(&cpu_mask, app_init_params.linux_core_id);
-	thr_params.start = event_dispatcher;
-	thr_params.arg = NULL;
-	thr_params.thr_type = ODP_THREAD_WORKER;
-	thr_params.instance = instance;
-	odph_odpthreads_create(&dispatcher_thread,
-			       &cpu_mask,
-			       &thr_params);
+	thread_param.start = event_dispatcher;
+	thread_param.arg = NULL;
+	thread_param.thr_type = ODP_THREAD_WORKER;
+	if (ofp_thread_create(&dispatcher_thread, 1,
+			      &cpu_mask, &thread_param) != 1) {
+		OFP_ERR("Error: Failed to create dispatcherthreads");
+		ofp_stop_processing();
+		ofp_thread_join(thread_tbl, num_workers);
+		ofp_term_global();
+		return EXIT_FAILURE;
+	}
 
 	/* Start CLI */
 	ofp_start_cli_thread(app_init_params.linux_core_id, params.cli_file);
@@ -322,7 +311,8 @@ int main(int argc, char *argv[])
 		ofp_stop_processing();
 	}
 
-	odph_odpthreads_join(thread_tbl);
+	ofp_thread_join(thread_tbl, num_workers);
+	ofp_thread_join(&dispatcher_thread, 1);
 
 	if (udp_fwd_cleanup())
 		printf("Error: udp_fwd_cleanup failed.\n");
@@ -488,6 +478,12 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 
 	if (appl_args->if_count == 0) {
 		usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
+
+	if (appl_args->if_count > OFP_FP_INTERFACE_MAX) {
+		printf("Error: Invalid number of interfaces: maximum %d\n",
+		       OFP_FP_INTERFACE_MAX);
 		exit(EXIT_FAILURE);
 	}
 

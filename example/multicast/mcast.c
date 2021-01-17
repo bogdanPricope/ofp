@@ -15,21 +15,24 @@
 #define IP4(a, b, c, d) (a|(b<<8)|(c<<16)|(d<<24))
 
 static uint32_t myaddr;
-static odph_odpthread_t test_linux_pthread;
 
 static int mcasttest(void *arg)
 {
 	int fd;
 	struct ofp_sockaddr_in my_addr;
 	struct ofp_ip_mreq mreq;
+	odp_bool_t *is_running = NULL;
+
 	(void)arg;
 
 	logprint("Multicast thread started\n");
 
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
+	is_running = ofp_get_processing_state();
+	if (is_running == NULL) {
+		OFP_ERR("ofp_get_processing_state failed");
 		return -1;
 	}
+
 	sleep(1);
 
 	while (myaddr == 0) {
@@ -71,7 +74,7 @@ static int mcasttest(void *arg)
 		perror("setsockopt");
         }
 
-	for (;;) {
+	while (*is_running) {
 		char buf[100];
 		int len = sizeof(buf);
 		struct ofp_sockaddr_in addr = {0};
@@ -132,19 +135,18 @@ static int mcasttest(void *arg)
 	return 0;
 }
 
-void ofp_multicast_thread(odp_instance_t instance, int core_id)
+int ofp_multicast_thread(ofp_thread_t *thread_mcast, int core_id)
 {
 	odp_cpumask_t cpumask;
-	odph_odpthread_params_t thr_params;
+	ofp_thread_param_t thread_param = {0};
 
 	odp_cpumask_zero(&cpumask);
 	odp_cpumask_set(&cpumask, core_id);
 
-	thr_params.start = mcasttest;
-	thr_params.arg = NULL;
-	thr_params.thr_type = ODP_THREAD_CONTROL;
-	thr_params.instance = instance;
-	odph_odpthreads_create(&test_linux_pthread,
-			       &cpumask,
-			       &thr_params);
+	thread_param.start = mcasttest;
+	thread_param.arg = NULL;
+	thread_param.thr_type = ODP_THREAD_CONTROL;
+
+	return ofp_thread_create(thread_mcast, 1,
+			       &cpumask, &thread_param);
 }

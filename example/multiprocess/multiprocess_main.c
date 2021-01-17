@@ -60,15 +60,13 @@ int tcp_test(appl_args_t *arg);
  */
 int main(int argc, char *argv[])
 {
-	ofp_global_param_t app_init_params;
-	odp_instance_t instance;
 	appl_args_t params;
-	int num_workers, i;
-	odp_cpumask_t cpumask;
+	ofp_global_param_t app_init_params;
+	ofp_process_t proc_tbl[MAX_WORKERS];
+	ofp_process_param_t proc_param = {0};
+	int num_workers, i, ret = 0;
+	odp_cpumask_t cpumask_workers;
 	char cpumaskstr[64];
-	odph_linux_thr_params_t thr_params = {0};
-	odph_linux_process_t proc_tbl[MAX_WORKERS];
-	int ret = 0;
 
 	/* Parse and store the application arguments */
 	parse_args(argc, argv, &params);
@@ -112,35 +110,30 @@ int main(int argc, char *argv[])
 	if (num_workers > MAX_WORKERS)
 		num_workers = MAX_WORKERS;
 
-	odp_cpumask_zero(&cpumask);
+	odp_cpumask_zero(&cpumask_workers);
 	for (i = 0; i < num_workers; i++)
-		odp_cpumask_set(&cpumask, LINUX_CONTROL_CPU + 1 + i);
-	if (odp_cpumask_to_str(&cpumask, cpumaskstr, sizeof(cpumaskstr)) < 0) {
+		odp_cpumask_set(&cpumask_workers, LINUX_CONTROL_CPU + 1 + i);
+	if (odp_cpumask_to_str(&cpumask_workers, cpumaskstr,
+			       sizeof(cpumaskstr)) < 0) {
 		printf("Error: Too small buffer provided to "
-			"odp_cpumask_to_str\n");
+		       "odp_cpumask_to_str\n");
 		ofp_term_global();
 		return EXIT_FAILURE;
 	}
 
 	printf("Control CPU:    %i\n", LINUX_CONTROL_CPU);
-	printf("First workers:  %i\n", odp_cpumask_first(&cpumask));
+	printf("First workers:  %i\n", odp_cpumask_first(&cpumask_workers));
 	printf("Num workers:    %i\n", num_workers);
 	printf("Workers CPU mask:       %s\n", cpumaskstr);
 
-	instance = ofp_get_odp_instance();
-	if (OFP_ODP_INSTANCE_INVALID == instance) {
-		OFP_ERR("Error: Invalid odp instance.\n");
-		ofp_term_global();
-		exit(EXIT_FAILURE);
-	}
-
+	/* Start worker processes */
 	memset(proc_tbl, 0, sizeof(proc_tbl));
-	thr_params.thr_type = ODP_THREAD_WORKER;
-	thr_params.instance = instance;
+	proc_param.thr_type = ODP_THREAD_WORKER;
 
-	ret = odph_linux_process_fork_n(proc_tbl, &cpumask, &thr_params);
+	ret = ofp_process_fork_n(proc_tbl, &cpumask_workers, &proc_param);
 	if (ret == -1) {
 		printf("Error: Failed to start children processes.\n");
+		ofp_stop_processing();
 		ofp_term_global();
 		return EXIT_FAILURE;
 	}
@@ -162,7 +155,7 @@ int main(int argc, char *argv[])
 
 	ofp_stop_processing();
 
-	odph_linux_process_wait_n(proc_tbl, num_workers);
+	ofp_process_wait_n(proc_tbl, num_workers);
 
 	if (ofp_term_global() < 0)
 		printf("Error: ofp_term_global failed\n");

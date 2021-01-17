@@ -3,6 +3,6 @@
 
 #include <odp_api.h>
 
-void ofp_multicast_thread(odp_instance_t instance, int core_id);
+int ofp_multicast_thread(ofp_thread_t *thread_mcast, int core_id);
 
 #endif

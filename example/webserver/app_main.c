@@ -83,15 +83,14 @@ static int resource_cfg(void)
  */
 int main(int argc, char *argv[])
 {
-	ofp_global_param_t app_init_params;
-	odph_odpthread_t thread_tbl[MAX_WORKERS];
-	odph_odpthread_t webserver_pthread = {0};
-	webserver_arg_t webserver_pthread_arg = {0};
 	appl_args_t params;
+	ofp_global_param_t app_init_params;
+	ofp_thread_t thread_tbl[MAX_WORKERS];
+	ofp_thread_t webserver_pthread = {0};
+	ofp_thread_param_t thread_param;
+	webserver_arg_t webserver_pthread_arg = {0};
 	int num_workers, new_workers, i;
-	odp_cpumask_t cpumask;
-	odph_odpthread_params_t thr_params;
-	odp_instance_t instance;
+	odp_cpumask_t cpumask_workers;
 
 	resource_cfg();
 
@@ -128,39 +127,32 @@ int main(int argc, char *argv[])
 	 * run-to-completion worker thread or process can be created per core.
 	 */
 	if (ofp_get_default_worker_cpumask(params.core_count, MAX_WORKERS,
-					   &cpumask)) {
+					   &cpumask_workers)) {
 		OFP_ERR("Error: Failed to get the default workers to cores "
 			"distribution\n");
 		ofp_term_global();
 		return EXIT_FAILURE;
 	}
-	num_workers = odp_cpumask_count(&cpumask);
+	num_workers = odp_cpumask_count(&cpumask_workers);
 
 	/* Print both system and application information */
-	print_info(NO_PATH(argv[0]), &params, &cpumask);
-
-	instance = ofp_get_odp_instance();
-	if (OFP_ODP_INSTANCE_INVALID == instance) {
-		OFP_ERR("Error: Invalid Instance.\n");
-		ofp_term_global();
-		exit(EXIT_FAILURE);
-	}
-	memset(thread_tbl, 0, sizeof(thread_tbl));
+	print_info(NO_PATH(argv[0]), &params, &cpumask_workers);
 
 	/* Start dataplane dispatcher worker threads */
-	thr_params.start = default_event_dispatcher;
-	thr_params.arg = ofp_eth_vlan_processing;
-	thr_params.thr_type = ODP_THREAD_WORKER;
-	thr_params.instance = instance;
-	new_workers = odph_odpthreads_create(thread_tbl,
-					     &cpumask,
-					     &thr_params);
+	memset(thread_tbl, 0, sizeof(thread_tbl));
+	thread_param.start = default_event_dispatcher;
+	thread_param.arg = ofp_eth_vlan_processing;
+	thread_param.thr_type = ODP_THREAD_WORKER;
+
+	new_workers = ofp_thread_create(thread_tbl, num_workers,
+					&cpumask_workers, &thread_param);
 	if (num_workers != new_workers) {
 		OFP_ERR("Error: Failed to create worker threads, "
 			"expected %d, got %d",
 			num_workers, new_workers);
 		ofp_stop_processing();
-		odph_odpthreads_join(thread_tbl);
+		if (new_workers != -1)
+			ofp_thread_join(thread_tbl, new_workers);
 		ofp_term_global();
 		return EXIT_FAILURE;
 	}
@@ -173,11 +165,17 @@ int main(int argc, char *argv[])
 	webserver_pthread_arg.root_dir = params.root_dir;
 	webserver_pthread_arg.lport = params.lport;
 	webserver_pthread_arg.use_epoll = params.use_epoll;
-	ofp_start_webserver_thread(instance, app_init_params.linux_core_id,
-				   &webserver_pthread, &webserver_pthread_arg);
+	if (ofp_start_webserver_thread(&webserver_pthread,
+				       app_init_params.linux_core_id,
+				       &webserver_pthread_arg) != 1) {
+		OFP_ERR("Error: Failed to create webserver thread");
+		ofp_thread_join(thread_tbl, num_workers);
+		ofp_term_global();
+		return EXIT_FAILURE;
+	}
 
-	odph_odpthreads_join(thread_tbl);
-	odph_odpthreads_join(&webserver_pthread);
+	ofp_thread_join(thread_tbl, num_workers);
+	ofp_thread_join(&webserver_pthread, 1);
 
 	if (params.root_dir) {
 		free(params.root_dir);

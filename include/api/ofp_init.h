@@ -10,14 +10,12 @@
  *
  * @brief OFP initialization.
  *
- * OFP requires a global level init for the API library and a local init per
- * thread before the other OFP APIs may be called.
+ * OFP requires a global level init for the API library before the
+ * other OFP APIs may be called.
  * - ofp_init_global()
- * - ofp_init_local()
  *
  * For a graceful termination the matching termination APIs exit
  * - ofp_term_global()
- * - ofp_term_local()
  */
 
 #ifndef __OFP_INIT_H__

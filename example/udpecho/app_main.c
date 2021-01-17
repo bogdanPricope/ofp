@@ -83,13 +83,12 @@ static void sig_func_stop(int signum)
 
 int main(int argc, char *argv[])
 {
-	ofp_global_param_t app_init_params;
-	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	appl_args_t params;
+	ofp_global_param_t app_init_params;
+	ofp_thread_t thread_tbl[MAX_WORKERS];
+	ofp_thread_param_t thread_param;
 	int num_workers, ret_val, i;
-	odp_cpumask_t cpumask;
-	odph_odpthread_params_t thr_params;
-	odp_instance_t instance;
+	odp_cpumask_t cpumask_workers;
 
 	resource_cfg();
 
@@ -121,39 +120,32 @@ int main(int argc, char *argv[])
 	 * run-to-completion worker thread or process can be created per core.
 	 */
 	if (ofp_get_default_worker_cpumask(params.core_count, MAX_WORKERS,
-					   &cpumask)) {
+					   &cpumask_workers)) {
 		OFP_ERR("Error: Failed to get the default workers to cores "
 			"distribution\n");
 		ofp_term_global();
 		return EXIT_FAILURE;
 	}
-	num_workers = odp_cpumask_count(&cpumask);
+	num_workers = odp_cpumask_count(&cpumask_workers);
 
 	/* Print both system and application information */
-	print_info(NO_PATH(argv[0]), &params, &cpumask);
+	print_info(NO_PATH(argv[0]), &params, &cpumask_workers);
 
 	/* Start dataplane dispatcher worker threads */
-	instance = ofp_get_odp_instance();
-	if (OFP_ODP_INSTANCE_INVALID == instance) {
-		OFP_ERR("Error: Invalid odp instance.\n");
-		ofp_term_global();
-		exit(EXIT_FAILURE);
-	}
-
 	memset(thread_tbl, 0, sizeof(thread_tbl));
-	thr_params.start = default_event_dispatcher;
-	thr_params.arg = ofp_eth_vlan_processing;
-	thr_params.thr_type = ODP_THREAD_WORKER;
-	thr_params.instance = instance;
-	ret_val = odph_odpthreads_create(thread_tbl,
-					 &cpumask,
-					 &thr_params);
+	thread_param.start = default_event_dispatcher;
+	thread_param.arg = ofp_eth_vlan_processing;
+	thread_param.thr_type = ODP_THREAD_WORKER;
+
+	ret_val = ofp_thread_create(thread_tbl, num_workers,
+				    &cpumask_workers, &thread_param);
 	if (ret_val != num_workers) {
 		OFP_ERR("Error: Failed to create worker threads, "
 			"expected %d, got %d",
 			num_workers, ret_val);
 		ofp_stop_processing();
-		odph_odpthreads_join(thread_tbl);
+		if (ret_val != -1)
+			ofp_thread_join(thread_tbl, ret_val);
 		ofp_term_global();
 		return EXIT_FAILURE;
 	}
@@ -169,7 +161,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Wait for end of execution */
-	odph_odpthreads_join(thread_tbl);
+	ofp_thread_join(thread_tbl, num_workers);
 
 	/* Cleanup*/
 	if (udpecho_cleanup())

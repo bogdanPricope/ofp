@@ -14,8 +14,6 @@
 
 #define MAX_WORKERS		32
 
-
-
 /**
  * Parsed command line application arguments
  */
@@ -52,7 +50,7 @@ enum netwrap_state_enum {
 };
 
 static enum netwrap_state_enum netwrap_state;
-static odph_odpthread_t thread_tbl[MAX_WORKERS];
+static ofp_thread_t thread_tbl[MAX_WORKERS];
 static int num_workers;
 odp_instance_t netwrap_proc_instance;
 
@@ -60,11 +58,11 @@ __attribute__((destructor)) static void ofp_netwrap_main_dtor(void);
 
 __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 {
-	ofp_global_param_t app_init_params;
 	appl_args_t params;
+	ofp_global_param_t app_init_params;
+	ofp_thread_param_t thread_param;
 	int ret_val, i;
-	odp_cpumask_t cpumask;
-	odph_odpthread_params_t thr_params;
+	odp_cpumask_t cpumask_workers;
 
 	memset(&params, 0, sizeof(params));
 	if (parse_env(&params) != EXIT_SUCCESS)
@@ -122,16 +120,16 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 	 * run-to-completion worker thread or process can be created per core.
 	 */
 	if (ofp_get_default_worker_cpumask(params.core_count, MAX_WORKERS,
-					   &cpumask)) {
+					   &cpumask_workers)) {
 		OFP_ERR("Error: Failed to get the default workers to cores "
 			"distribution\n");
 		ofp_netwrap_main_dtor();
 		return;
 	}
-	num_workers = odp_cpumask_count(&cpumask);
+	num_workers = odp_cpumask_count(&cpumask_workers);
 
 	/* Print both system and application information */
-	print_info("ofp_netwrap", &params, &cpumask);
+	print_info("ofp_netwrap", &params, &cpumask_workers);
 
 	netwrap_state = NETWRAP_OFP_INIT_GLOBAL;
 
@@ -147,17 +145,19 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 	 * input arguments, the cpumask is used to control this.
 	 */
 	memset(thread_tbl, 0, sizeof(thread_tbl));
-	thr_params.start = default_event_dispatcher;
-	thr_params.arg = ofp_eth_vlan_processing;
-	thr_params.thr_type = ODP_THREAD_WORKER;
-	thr_params.instance = netwrap_proc_instance;
-	ret_val = odph_odpthreads_create(thread_tbl,
-					 &cpumask,
-					 &thr_params);
+	thread_param.start = default_event_dispatcher;
+	thread_param.arg = ofp_eth_vlan_processing;
+	thread_param.thr_type = ODP_THREAD_WORKER;
+
+	ret_val = ofp_thread_create(thread_tbl, num_workers,
+				    &cpumask_workers, &thread_param);
 	if (ret_val != num_workers) {
 		OFP_ERR("Error: Failed to create worker threads, "
 			"expected %d, got %d",
 			num_workers, ret_val);
+		ofp_stop_processing();
+		if (ret_val != -1)
+			ofp_thread_join(thread_tbl, ret_val);
 		ofp_netwrap_main_dtor();
 		return;
 	}
@@ -193,7 +193,7 @@ static void ofp_netwrap_main_dtor(void)
 	 * Wait here until all worker threads have terminated, then free up all
 	 * resources allocated by odp_init_global().
 	 */
-		odph_odpthreads_join(thread_tbl);
+		ofp_thread_join(thread_tbl, num_workers);
 		/* fall through */
 	case NETWRAP_OFP_INIT_GLOBAL:
 		if (ofp_term_global() < 0)

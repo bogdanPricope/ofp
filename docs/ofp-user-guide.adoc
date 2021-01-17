@@ -439,13 +439,11 @@ parameter structure to default values. The structure contains such global
 parameters as interface count, interface names, packet processing hooks, packet
 input mode etc. These parameters can, if necessary, be updated by the
 application before passing them to the next function to be called,
-ofp_init_global(). Following the global OFP initialization, each thread in turn
-must call ofp_init_local().
+ofp_init_global().
 
 Shutdown is the logical reverse of the initialization procedure when
-ofp_term_local(), ofp_term_global(), odp_term_local() and odp_term_global()
-functions are called by respective threads in order to free ODP/OFP resources
-properly.
+ofp_term_global() function is called by respective threads in order to free
+ODP/OFP resources properly.
 
 ==== Assigning processor cores
 
@@ -455,8 +453,8 @@ default core 0 is used for operating system background tasks (this value is a
 part of OFP initialization parameter structure) so it is recommended to start
 mapping from core 1. odp_cpumask_* functions of ODP API can be used for
 initializing the CPU mask. Defined CPU mask can be later given as a parameter to
-odph_odpthreads_create() ODP helper function which will create and start worker
-threads or processes on the assigned cores.
+ofp_thread_create() or ofp_process_fork_n() functions which will create and
+start worker threads or processes on the assigned cores.
 
 See <<ODP_API>> for more information about ODP API and helper functions.
 
@@ -562,11 +560,11 @@ same input queue.
 
 ==== Starting worker and control threads
 
-OFP application can use ODP helper function odph_odpthreads_create() for
-creating worker and control threads/processes. The function takes two input
-arguments, CPU mask and ODP thread parameter table. CPU mask is used for setting
-CPU affinity for the created threads/processes and can be initialized e.g. with
-odp_cpumask_default_worker() call. ODP thread parameter table should be
+OFP application can use ofp_thread_create() for creating worker and control
+threads/processes. The function takes four input arguments: thread table,
+number of threads to start, CPU mask and OFP thread parameter. CPU mask is used
+for setting CPU affinity for the created threads/processes and can be initialized
+e.g. with odp_cpumask_default_worker() call. OFP thread parameter should be
 populated with following thread specific parameters:
 
 - thread entry point function (e.g. event dispatcher)
@@ -575,9 +573,7 @@ populated with following thread specific parameters:
 
 - ODP thread type (ODP_THREAD_WORKER or (ODP_THREAD_CONTROL)
 
-- ODP instance handle (returned earlier by odp_init_global)
-
-Created threads can be joined with odph_odpthreads_join() helper function.
+Created threads can be joined with ofp_thread_join() function.
 
 ==== Default/user event dispatcher
 
@@ -586,7 +582,7 @@ OFP library implements default event dispatcher function (void
 OFP applications on each dedicated processor core. This function provides basic
 event handling functionality for packet receiving, timer expiration, buffer
 freeing and crypto API completion events. It can be provided as a parameter when
-creating worker threads/processes with odph_odpthreads_create() function.
+creating worker threads/processes with ofp_thread_create() function.
 Default event dispatcher function takes one parameter which is a function to be
 used for processing incoming packets (e.g. ofp_eth_vlan_processing() implemented
 by OFP).

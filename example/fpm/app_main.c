@@ -33,7 +33,7 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args);
 static void print_info(char *progname, appl_args_t *appl_args,
 		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
-static int start_performance(odp_instance_t instance, int core_id);
+static int start_performance(ofp_thread_t *thread_perf, int core_id);
 
 /**
  * Get rid of path in filename - only for unix-type paths using '/'
@@ -89,13 +89,13 @@ static void ofp_sig_func_stop(int signum)
  */
 int main(int argc, char *argv[])
 {
-	ofp_global_param_t app_init_params;
-	odph_odpthread_t thread_tbl[MAX_WORKERS];
 	appl_args_t params;
+	ofp_global_param_t app_init_params;
+	ofp_thread_t thread_tbl[MAX_WORKERS];
+	ofp_thread_param_t thread_param;
 	int num_workers, ret_val, i;
-	odp_cpumask_t cpumask;
-	odph_odpthread_params_t thr_params;
-	odp_instance_t instance;
+	odp_cpumask_t cpumask_workers;
+	ofp_thread_t thread_perf;
 
 	/* add handler for Ctr+C */
 	if (ofp_sigactions_set(ofp_sig_func_stop)) {
@@ -172,16 +172,16 @@ int main(int argc, char *argv[])
 	 * run-to-completion worker thread or process can be created per core.
 	 */
 	if (ofp_get_default_worker_cpumask(params.core_count, MAX_WORKERS,
-					   &cpumask)) {
+					   &cpumask_workers)) {
 		OFP_ERR("Error: Failed to get the default workers to cores "
 			"distribution\n");
 		ofp_term_global();
 		return EXIT_FAILURE;
 	}
-	num_workers = odp_cpumask_count(&cpumask);
+	num_workers = odp_cpumask_count(&cpumask_workers);
 
 	/* Print both system and application information */
-	print_info(NO_PATH(argv[0]), &params, &cpumask);
+	print_info(NO_PATH(argv[0]), &params, &cpumask_workers);
 
 	/*
 	 * Create and launch dataplane dispatcher worker threads to be placed
@@ -194,22 +194,22 @@ int main(int argc, char *argv[])
 	 * If different dispatchers should run, or the same be run with differnt
 	 * input arguments, the cpumask is used to control this.
 	 */
-	instance = ofp_get_odp_instance();
 
 	memset(thread_tbl, 0, sizeof(thread_tbl));
-	thr_params.start = default_event_dispatcher;
-	thr_params.arg = ofp_eth_vlan_processing;
-	thr_params.thr_type = ODP_THREAD_WORKER;
-	thr_params.instance = instance;
-	ret_val = odph_odpthreads_create(thread_tbl,
-					 &cpumask,
-					 &thr_params);
+	thread_param.start = default_event_dispatcher;
+	thread_param.arg = ofp_eth_vlan_processing;
+	thread_param.thr_type = ODP_THREAD_WORKER;
+	ret_val = ofp_thread_create(thread_tbl,
+				    num_workers,
+				    &cpumask_workers,
+				    &thread_param);
 	if (ret_val != num_workers) {
 		OFP_ERR("Error: Failed to create worker threads, "
 			"expected %d, got %d",
 			num_workers, ret_val);
 		ofp_stop_processing();
-		odph_odpthreads_join(thread_tbl);
+		if (ret_val != -1)
+			ofp_thread_join(thread_tbl, ret_val);
 		ofp_term_global();
 		return EXIT_FAILURE;
 	}
@@ -224,23 +224,23 @@ int main(int argc, char *argv[])
 				 params.cli_file) < 0) {
 		OFP_ERR("Error: Failed to init CLI thread");
 		ofp_stop_processing();
-		odph_odpthreads_join(thread_tbl);
+		ofp_thread_join(thread_tbl, num_workers);
 		ofp_term_global();
 		return EXIT_FAILURE;
 	}
 
 	/*
-	 * If we choose to check performance, a performance monitoring client
+	 * If we choose to check performance, a performance monitoring thread
 	 * will be started on the management core. Once every second it will
 	 * read the statistics from the workers from a shared memory region.
 	 * Using this has negligible performance impact (<<0.01%).
 	 */
 	if (params.perf_stat) {
-		if (start_performance(instance,
-			app_init_params.linux_core_id) <= 0) {
+		if (start_performance(&thread_perf,
+				      app_init_params.linux_core_id) <= 0) {
 			OFP_ERR("Error: Failed to init performance monitor");
 			ofp_stop_processing();
-			odph_odpthreads_join(thread_tbl);
+			ofp_thread_join(thread_tbl, num_workers);
 			ofp_term_global();
 			return EXIT_FAILURE;
 		}
@@ -250,7 +250,9 @@ int main(int argc, char *argv[])
 	 * Wait here until all worker threads have terminated, then free up all
 	 * resources allocated by odp_init_global().
 	 */
-	odph_odpthreads_join(thread_tbl);
+	ofp_thread_join(thread_tbl, num_workers);
+	if (params.perf_stat)
+		ofp_thread_join(&thread_perf, 1);
 
 	if (ofp_term_global() < 0)
 		printf("Error: ofp_term_global failed\n");
@@ -449,17 +451,20 @@ static void usage(char *progname)
 
 static int perf_client(void *arg)
 {
+	odp_bool_t *is_running = NULL;
+	struct ofp_perf_stat *ps = NULL;
 	(void) arg;
 
-	if (ofp_init_local()) {
-		OFP_ERR("Error: OFP local init failed.\n");
+	is_running = ofp_get_processing_state();
+	if (is_running == NULL) {
+		OFP_ERR("ofp_get_processing_state failed");
 		return -1;
 	}
 
 	ofp_set_stat_flags(OFP_STAT_COMPUTE_PERF);
 
-	while (1) {
-		struct ofp_perf_stat *ps = ofp_get_perf_statistics();
+	while (*is_running) {
+		ps = ofp_get_perf_statistics();
 		printf ("Mpps:%4.3f\n", ((float)ps->rx_fp_pps)/1000000);
 		usleep(1000000UL);
 	}
@@ -467,20 +472,20 @@ static int perf_client(void *arg)
 	return 0;
 }
 
-static int start_performance(odp_instance_t instance, int core_id)
+static int start_performance(ofp_thread_t *thread_perf, int core_id)
 {
-	odph_odpthread_t cli_linux_pthread;
 	odp_cpumask_t cpumask;
-	odph_odpthread_params_t thr_params;
+	ofp_thread_param_t thread_param = {0};
 
 	odp_cpumask_zero(&cpumask);
 	odp_cpumask_set(&cpumask, core_id);
 
-	thr_params.start = perf_client;
-	thr_params.arg = NULL;
-	thr_params.thr_type = ODP_THREAD_CONTROL;
-	thr_params.instance = instance;
-	return odph_odpthreads_create(&cli_linux_pthread,
-				      &cpumask, &thr_params);
+	thread_param.start = perf_client;
+	thread_param.arg = NULL;
+	thread_param.thr_type = ODP_THREAD_CONTROL;
 
+	return ofp_thread_create(thread_perf,
+					 1,
+					 &cpumask,
+					 &thread_param);
 }
