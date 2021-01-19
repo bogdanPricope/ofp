@@ -70,7 +70,7 @@ static void sig_func_stop(int signum)
 int main(int argc, char *argv[])
 {
 	appl_args_t params;
-	ofp_global_param_t app_init_params;
+	ofp_initialize_param_t app_init_params;
 	ofp_thread_t thread_tbl[MAX_WORKERS];
 	ofp_thread_param_t thread_param;
 	int num_workers, ret_val, i;
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
 	 * By default, cores #2 and beyond will be populated with a OFP
 	 * processing thread each.
 	 */
-	ofp_init_global_param(&app_init_params);
+	ofp_initialize_param(&app_init_params);
 	app_init_params.if_count = params.if_count;
 	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
 		strncpy(app_init_params.if_names[i], params.if_names[i],
@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
 		app_init_params.if_names[i][OFP_IFNAMSIZ - 1] = '\0';
 	}
 
-	if (ofp_init_global(&app_init_params)) {
+	if (ofp_initialize(&app_init_params)) {
 		OFP_ERR("Error: OFP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
 					   &cpumask_workers)) {
 		OFP_ERR("Error: Failed to get the default workers to cores "
 			"distribution\n");
-		ofp_term_global();
+		ofp_terminate();
 		return EXIT_FAILURE;
 	}
 	num_workers = odp_cpumask_count(&cpumask_workers);
@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
 		ofp_stop_processing();
 		if (ret_val != -1)
 			ofp_thread_join(thread_tbl, ret_val);
-		ofp_term_global();
+		ofp_terminate();
 		return EXIT_FAILURE;
 	}
 
@@ -154,8 +154,8 @@ int main(int argc, char *argv[])
 	ofp_thread_join(thread_tbl, num_workers);
 
 	/* Cleanup */
-	if (ofp_term_global() < 0)
-		printf("Error: ofp_term_global failed.\n");
+	if (ofp_terminate() < 0)
+		printf("Error: ofp_terminate failed.\n");
 
 	printf("End Main()\n");
 	return 0;

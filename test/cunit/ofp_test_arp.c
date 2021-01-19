@@ -37,13 +37,13 @@ int pp_thread(void *arg);
 
 static int init_suite(void)
 {
-	ofp_global_param_t params;
+	ofp_initialize_param_t params;
 	ofp_thread_param_t thread_param;
 
-	ofp_init_global_param(&params);
+	ofp_initialize_param(&params);
 	params.enable_nl_thread = 0;
 	params.arp.entry_timeout = ENTRY_TIMEOUT;
-	(void)ofp_init_global(&params);
+	(void)ofp_initialize(&params);
 
 	/*
 	 * Start a packet processing thread to service timer events.
@@ -71,7 +71,7 @@ static int end_suite(void)
 
 	ofp_thread_join(&pp_thread_handle, 1);
 
-	ofp_term_global();
+	ofp_terminate();
 
 	return 0;
 }

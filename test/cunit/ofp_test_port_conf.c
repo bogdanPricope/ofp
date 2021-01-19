@@ -51,14 +51,14 @@ int sp_status = OFP_SP_DOWN;
 static int
 init_suite(void)
 {
-	ofp_global_param_t params;
+	ofp_initialize_param_t params;
 	struct ofp_ifnet *dev;
 
-	ofp_init_global_param(&params);
+	ofp_initialize_param(&params);
 	params.enable_nl_thread = 0;
 	params.num_vrf = 3;
 
-	(void)ofp_init_global(&params);
+	(void)ofp_initialize(&params);
 
 	dev = ofp_get_ifnet(0, 0);
 	dev->if_mtu = ifmtu;
@@ -73,7 +73,7 @@ clean_suite(void)
 {
 	ofp_arp_term_local();
 
-	ofp_term_global();
+	ofp_terminate();
 
 	return 0;
 }

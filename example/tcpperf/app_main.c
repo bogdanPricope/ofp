@@ -931,7 +931,7 @@ static void print_info(char *progname, appl_args_t *appl_args)
  */
 int main(int argc, char *argv[])
 {
-	ofp_global_param_t app_init_params;
+	ofp_initialize_param_t app_init_params;
 	ofp_thread_t thread_tbl[NUM_WORKERS];
 	ofp_thread_param_t thread_param;
 	odp_shm_t shm;
@@ -990,10 +990,10 @@ int main(int argc, char *argv[])
 	printf("Worker threads:  %i\n", num_workers);
 	printf("First worker:    %i\n\n", next_worker);
 
-	ofp_init_global_param(&app_init_params);
+	ofp_initialize_param(&app_init_params);
 
 	app_init_params.instance = instance;
-	if (ofp_init_global(&app_init_params)) {
+	if (ofp_initialize(&app_init_params)) {
 		OFP_ERR("Error: OFP global init failed\n");
 		exit(EXIT_FAILURE);
 	}
@@ -1127,8 +1127,8 @@ int main(int argc, char *argv[])
 	if (gbl_args->appl.laddr)
 		free(gbl_args->appl.laddr);
 
-	if (ofp_term_global() < 0)
-		printf("Error: ofp_term_global failed\n");
+	if (ofp_terminate() < 0)
+		printf("Error: ofp_terminate failed\n");
 
 	if (odp_shm_free(shm))
 		printf("Error: odp_shm_free failed\n");

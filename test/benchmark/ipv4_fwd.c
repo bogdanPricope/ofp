@@ -339,7 +339,7 @@ static double odp_time_to_sec(odp_time_t t)
 
 int main(int argc, char *argv[])
 {
-	ofp_global_param_t params;
+	ofp_initialize_param_t params;
 
 	parse_args(argc, argv);
 
@@ -349,7 +349,7 @@ int main(int argc, char *argv[])
 	uint32_t neighbors = 1<<arg.neighbor_bits, routes = 1<<arg.route_bits;
 	addr_mask = (1 << (arg.route_bits + (32 - arg.masklen))) - 1;
 
-	ofp_init_global_param(&params);
+	ofp_initialize_param(&params);
 	params.enable_nl_thread = 0;
 	params.arp.entries = neighbors + 1;
 	params.mtrie.routes = routes + 2;
@@ -357,7 +357,7 @@ int main(int argc, char *argv[])
 	params.pkt_tx_burst_size = arg.tx_burst;
 	params.num_vlan = arg.vlans;
 	params.loglevel = arg.loglevel;
-	ASSERT(!ofp_init_global(&params));
+	ASSERT(!ofp_initialize(&params));
 
 	print_info();
 
@@ -477,6 +477,6 @@ int main(int argc, char *argv[])
 
 	ASSERT(!odp_queue_destroy(dummyq));
 
-	ofp_term_global();
+	ofp_terminate();
 	return 0;
 }

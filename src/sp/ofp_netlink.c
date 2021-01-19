@@ -53,7 +53,7 @@ int start_netlink_nl_server(void *arg)
 	(void)arg;
 
 	/* Lookup shared memories */
-	if (ofp_init_local()) {
+	if (ofp_init_local_resources()) {
 		OFP_ERR("Error: OFP local init failed.\n");
 		return -1;
 	}
@@ -61,7 +61,7 @@ int start_netlink_nl_server(void *arg)
 	ofp_global_cfg = ofp_get_global_config();
 	if (!ofp_global_cfg) {
 		OFP_ERR("Error: Failed to retrieve global configuration.");
-		ofp_term_local();
+		ofp_term_local_resources();
 		return -1;
 	}
 
@@ -118,7 +118,7 @@ int start_netlink_nl_server(void *arg)
 	odp_rwlock_write_unlock(&V_sp_nl_rwlock);
 
 	OFP_DBG("Netlink server exiting");
-	ofp_term_local();
+	ofp_term_local_resources();
 	return 0;
 }
 

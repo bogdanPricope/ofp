@@ -59,7 +59,7 @@ __attribute__((destructor)) static void ofp_netwrap_main_dtor(void);
 __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 {
 	appl_args_t params;
-	ofp_global_param_t app_init_params;
+	ofp_initialize_param_t app_init_params;
 	ofp_thread_param_t thread_param;
 	int ret_val, i;
 	odp_cpumask_t cpumask_workers;
@@ -100,7 +100,7 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 	 * General configuration will be to pktio and schedluer queues here in
 	 * addition will fast path interface configuration.
 	 */
-	ofp_init_global_param(&app_init_params);
+	ofp_initialize_param(&app_init_params);
 	app_init_params.if_count = params.if_count;
 	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
 		strncpy(app_init_params.if_names[i], params.if_names[i],
@@ -109,7 +109,7 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 	}
 	app_init_params.instance = netwrap_proc_instance;
 
-	if (ofp_init_global(&app_init_params) != 0) {
+	if (ofp_initialize(&app_init_params) != 0) {
 		printf("Error: OFP global init failed.\n");
 		ofp_netwrap_main_dtor();
 		return;
@@ -196,8 +196,8 @@ static void ofp_netwrap_main_dtor(void)
 		ofp_thread_join(thread_tbl, num_workers);
 		/* fall through */
 	case NETWRAP_OFP_INIT_GLOBAL:
-		if (ofp_term_global() < 0)
-			printf("Error: ofp_term_global failed\n");
+		if (ofp_terminate() < 0)
+			printf("Error: ofp_terminate failed\n");
 		/* fall through */
 	case NETWRAP_ODP_INIT_LOCAL:
 		if (odp_term_local() < 0)

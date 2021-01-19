@@ -251,9 +251,9 @@ test_init_ifnet(void)
 static int
 init_suite(void)
 {
-	ofp_global_param_t params;
+	ofp_initialize_param_t params;
 
-	ofp_init_global_param(&params);
+	ofp_initialize_param(&params);
 	params.enable_nl_thread = 0;
 	params.num_vrf = 2;
 	memset(params.pkt_hook, 0, sizeof(params.pkt_hook));
@@ -264,7 +264,7 @@ init_suite(void)
 	params.pkt_hook[OFP_HOOK_FWD_IPv6] = fastpath_ip6_forward_hook;
 	params.pkt_hook[OFP_HOOK_GRE]	    = fastpath_gre_hook;
 
-	(void)ofp_init_global(&params);
+	(void)ofp_initialize(&params);
 
 	return 0;
 }

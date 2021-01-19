@@ -16,7 +16,7 @@
 #include <ofp.h>
 
 int setup_common_vars(void);
-extern ofp_global_param_t ofp_global_params;
+extern ofp_initialize_param_t ofp_global_params;
 extern odp_bool_t netwrap_constructor_called;
 
 #define LIBC_FUNCTION(func) do {			\

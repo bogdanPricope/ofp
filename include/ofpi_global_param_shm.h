@@ -32,11 +32,11 @@ struct ofp_global_config_mem {
 
 	VNET_DEFINE(enum ofp_log_level_s, loglevel);
 
-	VNET_DEFINE(ofp_global_param_t, global_param);
+	VNET_DEFINE(ofp_initialize_param_t, global_param);
 };
 
 extern __thread struct ofp_global_config_mem *shm_global;
-extern __thread ofp_global_param_t *global_param;
+extern __thread ofp_initialize_param_t *global_param;
 
 #define	V_global_is_running	VNET(shm_global->is_running)
 
@@ -58,7 +58,7 @@ extern __thread ofp_global_param_t *global_param;
 
 #define	V_global_param VNET(shm_global->global_param)
 
-int ofp_global_param_init_global(ofp_global_param_t *params,
+int ofp_global_param_init_global(ofp_initialize_param_t *params,
 				 odp_instance_t instance,
 				 odp_bool_t instance_owner);
 int ofp_global_param_term_global(void);

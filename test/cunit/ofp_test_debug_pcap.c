@@ -58,11 +58,11 @@ static int
 init_suite(void)
 {
 	odp_pool_t pool;
-	ofp_global_param_t params;
+	ofp_initialize_param_t params;
 
-	ofp_init_global_param(&params);
+	ofp_initialize_param(&params);
 
-	(void)ofp_init_global(&params);
+	(void)ofp_initialize(&params);
 
 	pool = odp_pool_lookup("packet_pool");
 	if (pool == ODP_POOL_INVALID) {
@@ -79,7 +79,7 @@ init_suite(void)
 static int
 clean_suite(void)
 {
-	ofp_term_global();
+	ofp_terminate();
 
 	return 0;
 }

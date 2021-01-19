@@ -57,9 +57,10 @@ static int cleanup(void)
 	return 0;
 }
 
-void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *filename);
-ofp_global_param_t ofp_global_param;
-extern __thread ofp_global_param_t *global_param;
+void ofp_initialize_param_from_file(ofp_initialize_param_t *params,
+				    const char *filename);
+ofp_initialize_param_t ofp_global_param;
+extern __thread ofp_initialize_param_t *global_param;
 static void prevent_freeing_of(struct ofp_rtl_node *root);
 static void setup(void)
 {
@@ -68,7 +69,7 @@ static void setup(void)
 	tree.vrf = 1;
 	data.port = 313;
 	global_param = &ofp_global_param;
-	ofp_init_global_param_from_file(global_param, "");
+	ofp_initialize_param_from_file(global_param, "");
 }
 
 static void *allocator(const char *name, uint64_t size);

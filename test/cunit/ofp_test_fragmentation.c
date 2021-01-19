@@ -89,12 +89,12 @@ static void init_ifnet(void)
 static int
 init_suite(void)
 {
-	ofp_global_param_t params;
+	ofp_initialize_param_t params;
 
-	ofp_init_global_param(&params);
+	ofp_initialize_param(&params);
 	params.enable_nl_thread = 0;
 
-	(void)ofp_init_global(&params);
+	(void)ofp_initialize(&params);
 
 	init_ifnet();
 
@@ -113,7 +113,7 @@ init_suite(void)
 static int
 clean_suite(void)
 {
-	/*ofp_term_global(); ToDo*/
+	/*ofp_terminate(); ToDo*/
 	return 0;
 }
 

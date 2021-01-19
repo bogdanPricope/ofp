@@ -57,11 +57,11 @@
 
 int main(void)
 {
-	static ofp_global_param_t oig;
+	static ofp_initialize_param_t oig;
 
-	ofp_init_global_param(&oig);
+	ofp_initialize_param(&oig);
 
-	if (ofp_init_global(&oig)) {
+	if (ofp_initialize(&oig)) {
 		OFP_ERR("Error: OFP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}

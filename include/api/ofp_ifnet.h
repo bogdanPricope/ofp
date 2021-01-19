@@ -12,7 +12,7 @@
  * initialization. The coresponding OFP object, ofp_ifnet is created.
  *
  * This function can be used anytime to open ODP interfaces that were not opened
- * during ofp_init_global(). One can specify no interface in ofp_init_global
+ * during ofp_initialize(). One can specify no interface in ofp_initialize()
  * and open one by one using this functionality.
  *
  * @param instance ODP instance
@@ -27,7 +27,7 @@
  * @retval 0 on success
  * @retval -1 on failure
  *
- * @see ofp_init_global() can init interfaces.
+ * @see ofp_initialize() can init interfaces.
  */
 #ifndef __OFP_IFNET_H__
 #define __OFP_IFNET_H__

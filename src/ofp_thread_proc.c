@@ -55,13 +55,13 @@ static int ofp_thread_start(void *arg)
 	ofp_start_thread_arg_t *thread_start_arg =
 		(ofp_start_thread_arg_t *)arg;
 
-	if (ofp_init_local())
+	if (ofp_init_local_resources())
 		return -1;
 
 	ret = thread_start_arg->start(thread_start_arg->arg);
 
-	if (ofp_term_local())
-		OFP_ERR("ofp_term_local failed");
+	if (ofp_term_local_resources())
+		OFP_ERR("ofp_term_local_resources failed");
 
 	free(arg);
 	return ret;
@@ -147,7 +147,7 @@ int ofp_process_fork_n(ofp_process_t *proc_tbl,
 					mask, &thr_params);
 
 	if (ret == 0) { /* child process*/
-		if (ofp_init_local())
+		if (ofp_init_local_resources())
 			exit(EXIT_FAILURE);
 	}
 

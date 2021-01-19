@@ -61,7 +61,7 @@ int tcp_test(appl_args_t *arg);
 int main(int argc, char *argv[])
 {
 	appl_args_t params;
-	ofp_global_param_t app_init_params;
+	ofp_initialize_param_t app_init_params;
 	ofp_process_t proc_tbl[MAX_WORKERS];
 	ofp_process_param_t proc_param = {0};
 	int num_workers, i, ret = 0;
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
 	 * with a OFP processing workers.
 	 */
 
-	ofp_init_global_param(&app_init_params);
+	ofp_initialize_param(&app_init_params);
 	app_init_params.linux_core_id = LINUX_CONTROL_CPU;
 	app_init_params.if_count = params.if_count;
 	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
 	 * supplied as argument by the user.
 	 */
 
-	if (ofp_init_global(&app_init_params) != 0) {
+	if (ofp_initialize(&app_init_params) != 0) {
 		printf("Error: OFP global init failed.\n");
 		return EXIT_FAILURE;
 	}
@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
 			       sizeof(cpumaskstr)) < 0) {
 		printf("Error: Too small buffer provided to "
 		       "odp_cpumask_to_str\n");
-		ofp_term_global();
+		ofp_terminate();
 		return EXIT_FAILURE;
 	}
 
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
 	if (ret == -1) {
 		printf("Error: Failed to start children processes.\n");
 		ofp_stop_processing();
-		ofp_term_global();
+		ofp_terminate();
 		return EXIT_FAILURE;
 	}
 
@@ -157,8 +157,8 @@ int main(int argc, char *argv[])
 
 	ofp_process_wait_n(proc_tbl, num_workers);
 
-	if (ofp_term_global() < 0)
-		printf("Error: ofp_term_global failed\n");
+	if (ofp_terminate() < 0)
+		printf("Error: ofp_terminate failed\n");
 
 	printf("End Main().\n");
 	return 0;

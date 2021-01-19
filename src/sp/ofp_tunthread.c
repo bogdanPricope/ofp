@@ -195,7 +195,7 @@ int sp_rx_thread(void *ifnet_void)
 
 	(void) len;
 
-	if (ofp_init_local()) {
+	if (ofp_init_local_resources()) {
 		OFP_ERR("Error: OFP local init failed.");
 		return -1;
 	}
@@ -203,7 +203,7 @@ int sp_rx_thread(void *ifnet_void)
 	ofp_global_cfg = ofp_get_global_config();
 	if (!ofp_global_cfg) {
 		OFP_ERR("Error: Failed to retrieve global configuration.");
-		ofp_term_local();
+		ofp_term_local_resources();
 		return -1;
 	}
 
@@ -250,7 +250,7 @@ int sp_rx_thread(void *ifnet_void)
 	}
 
 	OFP_DBG("SP RX thread of %s exiting", ifnet->if_name);
-	ofp_term_local();
+	ofp_term_local_resources();
 	return 0;
 }
 
@@ -264,7 +264,7 @@ int sp_tx_thread(void *ifnet_void)
 	struct timeval timeout;
 	fd_set read_fd;
 
-	if (ofp_init_local()) {
+	if (ofp_init_local_resources()) {
 		OFP_ERR("Error: OFP local init failed.\n");
 		return -1;
 	}
@@ -272,7 +272,7 @@ int sp_tx_thread(void *ifnet_void)
 	ofp_global_cfg = ofp_get_global_config();
 	if (!ofp_global_cfg) {
 		OFP_ERR("Error: Failed to retrieve global configuration.");
-		ofp_term_local();
+		ofp_term_local_resources();
 		return -1;
 	}
 
@@ -334,7 +334,7 @@ drop_pkg:
 	}
 
 	OFP_DBG("SP TX thread of %s exiting", ifnet->if_name);
-	ofp_term_local();
+	ofp_term_local_resources();
 	return 0;
 }
 

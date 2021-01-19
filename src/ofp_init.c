@@ -58,7 +58,7 @@ static void drain_scheduler_for_global_term(void);
 static void cleanup_pkt_queue(odp_queue_t pkt_queue);
 static int cleanup_interface(struct ofp_ifnet *ifnet);
 
-static int ofp_term_post_global(const char *pool_name);
+static int ofp_terminate_stack_global(const char *pool_name);
 
 #ifdef OFP_USE_LIBCONFIG
 
@@ -139,7 +139,7 @@ static int lookup(const struct lookup_entry *table, int n, const char *str)
 	return -1;
 }
 
-static void read_conf_file(ofp_global_param_t *params, const char *filename)
+static void read_conf_file(ofp_initialize_param_t *params, const char *filename)
 {
 	config_t conf;
 	config_setting_t *setting;
@@ -258,7 +258,8 @@ done:
 #define read_conf_file(params, filename) ((void)filename)
 #endif
 
-void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *filename)
+void ofp_initialize_param_from_file(ofp_initialize_param_t *params,
+				    const char *filename)
 {
 	uint32_t htcp_dflt = 0;
 	uint32_t hudp_dflt = 0;
@@ -361,9 +362,9 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
 		params->tcp.sackhole_max = 4 * params->tcp.pcb_tcp_max;
 }
 
-void ofp_init_global_param(ofp_global_param_t *params)
+void ofp_initialize_param(ofp_initialize_param_t *params)
 {
-	ofp_init_global_param_from_file(params, NULL);
+	ofp_initialize_param_from_file(params, NULL);
 }
 
 static void ofp_init_prepare(void)
@@ -403,9 +404,9 @@ static void ofp_init_prepare(void)
 	ofp_ipsec_init_prepare(&global_param->ipsec);
 }
 
-static int ofp_init_pre_global(ofp_global_param_t *params,
-			       odp_instance_t instance,
-			       odp_bool_t instance_owner)
+static int ofp_initialize_stack_global(ofp_initialize_param_t *params,
+				       odp_instance_t instance,
+				       odp_bool_t instance_owner)
 {
 	/*
 	 * Allocate and initialize global config memory first so that it
@@ -488,7 +489,7 @@ static int ofp_init_pre_global(ofp_global_param_t *params,
 enum ofp_init_state {
 	OFP_INIT_STATE_NOT_INIT = 0,
 	OFP_INIT_STATE_ODP_INIT,
-	OFP_INIT_STATE_PRE_GLOBAL_INIT,
+	OFP_INIT_STATE_STACK_INIT,
 	OFP_INIT_STATE_VXLAN_INIT,
 	OFP_INIT_STATE_INTERFACES_INIT,
 	OFP_INIT_STATE_NL_INIT,
@@ -496,7 +497,7 @@ enum ofp_init_state {
 	OFP_INIT_STATE_OFP_LOCAL_INIT
 };
 
-int ofp_init_global(ofp_global_param_t *params)
+int ofp_initialize(ofp_initialize_param_t *params)
 {
 	int i;
 	odp_pktio_param_t pktio_param;
@@ -534,8 +535,8 @@ int ofp_init_global(ofp_global_param_t *params)
 	odp_schedule_config(NULL);
 #endif
 
-	state = OFP_INIT_STATE_PRE_GLOBAL_INIT;
-	if (ofp_init_pre_global(params, instance, instance_owner))
+	state = OFP_INIT_STATE_STACK_INIT;
+	if (ofp_initialize_stack_global(params, instance, instance_owner))
 		goto init_error;
 
 	state = OFP_INIT_STATE_VXLAN_INIT;
@@ -599,7 +600,7 @@ int ofp_init_global(ofp_global_param_t *params)
 	odp_schedule_resume();
 
 	state = OFP_INIT_STATE_OFP_LOCAL_INIT;
-	if (ofp_init_local() != 0) {
+	if (ofp_init_local_resources() != 0) {
 		OFP_ERR("Failed to thread local settings");
 		goto init_error;
 	}
@@ -609,7 +610,7 @@ int ofp_init_global(ofp_global_param_t *params)
 init_error:
 	switch (state) {
 	case OFP_INIT_STATE_OFP_LOCAL_INIT:
-		ofp_term_local();
+		ofp_term_local_resources();
 		/* Fallthrough */
 	case OFP_INIT_STATE_LOOPBACK_INIT:
 		ofp_local_interfaces_destroy();
@@ -642,8 +643,8 @@ init_error:
 	case OFP_INIT_STATE_VXLAN_INIT:
 		ofp_clean_vxlan_interface_queue();
 		/* Fallthrough */
-	case OFP_INIT_STATE_PRE_GLOBAL_INIT:
-		ofp_term_post_global(SHM_PKT_POOL_NAME);
+	case OFP_INIT_STATE_STACK_INIT:
+		ofp_terminate_stack_global(SHM_PKT_POOL_NAME);
 
 		/* Terminate shared memory */
 		ofp_shared_memory_term_global();
@@ -667,7 +668,7 @@ init_error:
 }
 
 
-int ofp_init_local(void)
+int ofp_init_local_resources(void)
 {
 	/* This must be done first */
 	HANDLE_ERROR(ofp_shared_memory_init_local());
@@ -707,7 +708,7 @@ int ofp_init_local(void)
 	return 0;
 }
 
-int ofp_term_global(void)
+int ofp_terminate(void)
 {
 	int rc = 0;
 	uint16_t i;
@@ -715,7 +716,7 @@ int ofp_term_global(void)
 	odp_instance_t odp_instance = OFP_ODP_INSTANCE_INVALID;
 	odp_bool_t odp_instance_owner = 0;
 
-	CHECK_ERROR(ofp_term_local(), rc);
+	CHECK_ERROR(ofp_term_local_resources(), rc);
 
 	odp_instance = V_global_odp_instance;
 	odp_instance_owner = V_global_odp_instance_owner;
@@ -752,7 +753,7 @@ int ofp_term_global(void)
 	CHECK_ERROR(ofp_clean_vxlan_interface_queue(), rc);
 	CHECK_ERROR(ofp_local_interfaces_destroy(), rc);
 
-	if (ofp_term_post_global(SHM_PKT_POOL_NAME)) {
+	if (ofp_terminate_stack_global(SHM_PKT_POOL_NAME)) {
 		OFP_ERR("Failed to cleanup resources\n");
 		rc = -1;
 	}
@@ -773,7 +774,7 @@ int ofp_term_global(void)
 	return rc;
 }
 
-int ofp_term_post_global(const char *pool_name)
+int ofp_terminate_stack_global(const char *pool_name)
 {
 	odp_pool_t pool;
 	int rc = 0;
@@ -833,9 +834,9 @@ int ofp_term_post_global(const char *pool_name)
 	CHECK_ERROR(ofp_ipsec_stop_global(), rc);
 
 	/*
-	 * ofp_term_local() has paused scheduling for this thread. Resume
-	 * scheduling temporarily for draining events created during global
-	 * termination.
+	 * ofp_term_local_resources() has paused scheduling for this thread.
+	 * Resume scheduling temporarily for draining events created during
+	 * global termination.
 	 */
 	odp_schedule_resume();
 
@@ -879,7 +880,7 @@ int ofp_term_post_global(const char *pool_name)
 	return rc;
 }
 
-int ofp_term_local(void)
+int ofp_term_local_resources(void)
 {
 	int rc = 0;
 

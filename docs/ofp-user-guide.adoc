@@ -90,8 +90,8 @@ licensed. Configuration file support using libconfig may be enabled or
 disabled using the configure script option --enable-libconfig. By
 default, libconfig is enabled.
 
-See the documentation of the API functions ofp_init_global_param() and
-ofp_init_global_param_from_file() for more information.
+See the documentation of the API functions ofp_initialize_param() and
+ofp_initialize_param_from_file() for more information.
 
 === Starting an example application
 
@@ -434,15 +434,15 @@ thread type, which is either ODP_THREAD_WORKER or ODP_THREAD_CONTROL.
 ==== Initializing OFP
 
 The first OFP API that must be called by an ODP/OFP application is
-ofp_init_global_param(). It initializes the supplied OFP initialization
+ofp_initialize_param(). It initializes the supplied OFP initialization
 parameter structure to default values. The structure contains such global
 parameters as interface count, interface names, packet processing hooks, packet
 input mode etc. These parameters can, if necessary, be updated by the
 application before passing them to the next function to be called,
-ofp_init_global().
+ofp_initialize().
 
 Shutdown is the logical reverse of the initialization procedure when
-ofp_term_global() function is called by respective threads in order to free
+ofp_terminate() function is called by respective threads in order to free
 ODP/OFP resources properly.
 
 ==== Assigning processor cores
@@ -460,14 +460,14 @@ See <<ODP_API>> for more information about ODP API and helper functions.
 
 ==== Allocating packet IO interfaces
 
-ofp_init_global() function creates respective packet IO instances for all the
+ofp_initialize() function creates respective packet IO instances for all the
 interfaces included into OFP initialization parameter structure. Some of the
 properties, such as packet input and output modes, of the packet IO instances
 can be configured through the global initialization parameters passed to
-ofp_init_global().
+ofp_initialize().
 
 If an OFP application needs packet IO configuration that is not possible through
-ofp_init_global() (e.g. enabling multiple input or output queues per interface),
+ofp_initialize() (e.g. enabling multiple input or output queues per interface),
 it must create respective packet IO instances after OFP initialization through
 the ofp_ifnet_create() function. This will require the following steps:
 
@@ -694,7 +694,7 @@ list of available hook handles from include/api/ofp_hook.h:
  };
 
 Hook registration is done during application startup by providing pkt_hook table
-to ofp_init_global() function. Some example applications (e.g. fpm and
+to ofp_initialize() function. Some example applications (e.g. fpm and
 webserver) contain an example of hook registration.
 
 == Using OFP socket interface

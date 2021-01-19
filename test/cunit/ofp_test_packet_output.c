@@ -190,9 +190,9 @@ static enum ofp_return_code fastpath_hook_out_IPv6(odp_packet_t pkt,
 static int
 init_suite(void)
 {
-	ofp_global_param_t params;
+	ofp_initialize_param_t params;
 
-	ofp_init_global_param(&params);
+	ofp_initialize_param(&params);
 	params.enable_nl_thread = 0;
 	memset(params.pkt_hook, 0, sizeof(params.pkt_hook));
 	params.pkt_hook[OFP_HOOK_OUT_IPv4] = fastpath_hook_out_IPv4;
@@ -200,7 +200,7 @@ init_suite(void)
 	params.pkt_hook[OFP_HOOK_OUT_IPv6] = fastpath_hook_out_IPv6;
 #endif /* INET6 */
 
-	(void)ofp_init_global(&params);
+	(void)ofp_initialize(&params);
 
 	init_ifnet();
 

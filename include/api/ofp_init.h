@@ -12,10 +12,10 @@
  *
  * OFP requires a global level init for the API library before the
  * other OFP APIs may be called.
- * - ofp_init_global()
+ * - ofp_initialize()
  *
  * For a graceful termination the matching termination APIs exit
- * - ofp_term_global()
+ * - ofp_terminate()
  */
 
 #ifndef __OFP_INIT_H__
@@ -72,9 +72,9 @@ typedef struct ofp_chksum_offload_config_t {
 /**
  * OFP API initialization data
  *
- * @see ofp_init_global_param()
+ * @see ofp_initialize_param()
  */
-typedef struct ofp_global_param_t {
+typedef struct ofp_initialize_param_t {
 	/**
 	 * ODP instance. The default value is OFP_ODP_INSTANCE_INVALID.
 	 * If configured by application, it will be used in subsequent
@@ -83,7 +83,7 @@ typedef struct ofp_global_param_t {
 	 * If not configured by application, OFP will create an ODP
 	 * instance with default settings. OFP has ownership on the
 	 * instance and will cleanup the resources (odp_term_global())
-	 * at ofp_term_global() time.
+	 * at ofp_terminate() time.
 	 */
 	odp_instance_t instance;
 
@@ -367,7 +367,7 @@ typedef struct ofp_global_param_t {
 		 */
 		char capture_filename[OFP_FILE_NAME_SIZE_MAX];
 	} debug;
-} ofp_global_param_t;
+} ofp_initialize_param_t;
 
 /**
  * OFP parameters
@@ -378,15 +378,15 @@ typedef struct ofp_param_t {
 	/**
 	 * OFP API initialization data
 	 */
-	ofp_global_param_t global_param;
+	ofp_initialize_param_t global_param;
 } ofp_param_t;
 
 /**
- * Initialize ofp_global_param_t to its default values.
+ * Initialize ofp_initialize_param_t to its default values.
  *
  * This function should be called to initialize the supplied parameter
  * structure to default values before setting application specific values
- * and before passing the parameter structure to ofp_init_global().
+ * and before passing the parameter structure to ofp_initialize().
  *
  * Using this function makes the application to some extent forward
  * compatible with future versions of OFP that may add new fields in
@@ -450,29 +450,30 @@ typedef struct ofp_param_t {
  *
  * @param params structure to initialize
  *
- * @see ofp_init_global()
+ * @see ofp_initialize()
  */
-void ofp_init_global_param(ofp_global_param_t *params);
+void ofp_initialize_param(ofp_initialize_param_t *params);
 
 /**
- * Initialize ofp_global_param_t according to a configuration file.
+ * Initialize ofp_initialize_param_t according to a configuration file.
  *
- * This function is similar to ofp_init_global_param(), but allows the
+ * This function is similar to ofp_initialize_param(), but allows the
  * caller to specify the location of the configuration file. Calling
  * this function with filename = NULL has the same effect as calling
- * ofp_init_global_param(). Passing a zero-length string as filename
+ * ofp_initialize_param(). Passing a zero-length string as filename
  * means that no configuration file will be used, not even the default
  * or the file specified by the environment variable.
  *
- * @see ofp_init_global_param()
+ * @see ofp_initialize_param()
  *
  * @param params structure to initialize
  * @param filename name of the configuration file
  */
-void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *filename);
+void ofp_initialize_param_from_file(ofp_initialize_param_t *params,
+				    const char *filename);
 
 /**
- * OFP global initialization
+ * OFP initialization
  *
  * This function must be called only once for an application before
  * calling any other OFP API functions.
@@ -482,62 +483,61 @@ void ofp_init_global_param_from_file(ofp_global_param_t *params, const char *fil
  * If an ODP instance is not provided as argument, it will create an
  * ODP instance and will initialize current thread as control thread.
  *
- * For convenience, it also calls ofp_init_local().
- *
- * @param params Structure with parameters for global init of OFP API
+ * @param params Structure with parameters for OFP initialization.
  *
  * @retval 0 on success
  * @retval -1 on failure
- *
- * @see ofp_init_local() which is required per thread before use.
  */
-int ofp_init_global(ofp_global_param_t *params);
+int ofp_initialize(ofp_initialize_param_t *params);
 
 /**
- * Thread local OFP initialization
- *
- * All threads must call this function before calling any other OFP API
- * functions.
- *
- * @retval 0 on success
- * @retval -1 on failure
- *
- * @see ofp_init_global() which must have been called prior to this.
- */
-int ofp_init_local(void);
-
-/**
- * OFP global termination
+ * OFP termination
  *
  * This function must be called only once in an OFP control
  * thread before exiting application.
  *
  * Should be called from a thread within the same schedule group specified in
- * the parameters of ofp_init_global().
- *
- * For convenience, it also calls ofp_term_local().
+ * the parameters of ofp_initialize().
  *
  * @retval 0 on success
  * @retval -1 on failure
- *
- * @see ofp_term_local() which is required per thread before
- *      use.
  */
-int ofp_term_global(void);
+int ofp_terminate(void);
 
 /**
- * Thread local OFP termination
+ * Thread or process resources initialization
  *
- * All threads must call this function before thread
- * termination.
+ * This API is called by functions like ofp_initialize(),
+ * ofp_thread_create() and ofp_process_fork_n() to initialize thread or
+ * process local resources.
+ *
+ * Application should not call this function unless it uses ODP API
+ * directly to create threads or processes. In that case it must
+ * call it before calling any other OFP API on that thread or process.
  *
  * @retval 0 on success
  * @retval -1 on failure
  *
- * @see ofp_term_global() which may be called after this.
+ * @see ofp_initialize() which must have been called prior to this.
  */
-int ofp_term_local(void);
+int ofp_init_local_resources(void);
 
+/**
+ * Thread or process resources termination
+ *
+ * This API is called by OFP to cleanup local resources before
+ * exiting a thread or process.
+ *
+ * Application should not call this function unless it used ODP API
+ * directly to create threads or processes. In that case it should
+ * call it after last OFP API of the thread was called.
+ *
+ * @retval 0 on success
+ * @retval -1 on failure
+ *
+ * @see ofp_terminate() which may be called after this.
+ */
+int ofp_term_local_resources(void);
 
 /**
  * Stop packet processing

@@ -1722,7 +1722,7 @@ static int cli_server(void *arg)
 
 	OFP_INFO("CLI server started on core %i\n", odp_cpu_id());
 
-	if (ofp_init_local()) {
+	if (ofp_init_local_resources()) {
 		OFP_ERR("Error: OFP local init failed.\n");
 		return -1;
 	}
@@ -1730,7 +1730,7 @@ static int cli_server(void *arg)
 	ofp_global_cfg = ofp_get_global_config();
 	if (!ofp_global_cfg) {
 		OFP_ERR("Error: Failed to retrieve global configuration.");
-		ofp_term_local();
+		ofp_term_local_resources();
 		return -1;
 	}
 
@@ -1741,7 +1741,7 @@ static int cli_server(void *arg)
 	cli_serv_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (cli_serv_fd < 0) {
 		OFP_ERR("cli serv socket\n");
-		ofp_term_local();
+		ofp_term_local_resources();
 		return -1;
 	}
 
@@ -1757,7 +1757,7 @@ static int cli_server(void *arg)
 	if (bind(cli_serv_fd, (struct sockaddr *)&my_addr,
 		 sizeof(struct sockaddr)) < 0) {
 		OFP_ERR("serv bind\n");
-		ofp_term_local();
+		ofp_term_local_resources();
 		return -1;
 	}
 
@@ -1831,7 +1831,7 @@ static int cli_server(void *arg)
 	cli_serv_fd = -1;
 
 	OFP_DBG("CLI server exiting");
-	ofp_term_local();
+	ofp_term_local_resources();
 	return 0;
 }
 

@@ -230,7 +230,7 @@ static int configure_workers_arg(int num_workers,
 int main(int argc, char *argv[])
 {
 	appl_args_t params;
-	ofp_global_param_t app_init_params;
+	ofp_initialize_param_t app_init_params;
 	ofp_thread_t thread_tbl[MAX_WORKERS];
 	ofp_thread_param_t thread_param;
 	struct worker_arg workers_arg[MAX_WORKERS];
@@ -258,10 +258,10 @@ int main(int argc, char *argv[])
 	linux_sp_core = 0;
 
 	/* Initialize OFP*/
-	ofp_init_global_param(&app_init_params);
+	ofp_initialize_param(&app_init_params);
 	app_init_params.linux_core_id = linux_sp_core;
 
-	if (ofp_init_global(&app_init_params)) {
+	if (ofp_initialize(&app_init_params)) {
 		OFP_ERR("Error: OFP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -269,7 +269,7 @@ int main(int argc, char *argv[])
 	/* Validate workers distribution settings. */
 	if (validate_cores_settings(params.core_start, params.core_count,
 				    &first_worker, &num_workers) < 0) {
-		ofp_term_global();
+		ofp_terminate();
 		exit(EXIT_FAILURE);
 	}
 
@@ -283,14 +283,14 @@ int main(int argc, char *argv[])
 	if (configure_interfaces(params.if_count, params.if_names,
 				 num_workers, num_workers)) {
 		OFP_ERR("Error: Failed to configure interfaces.\n");
-		ofp_term_global();
+		ofp_terminate();
 		exit(EXIT_FAILURE);
 	}
 
 	if (configure_workers_arg(num_workers, workers_arg,
 				  params.if_count, params.if_names)) {
 		OFP_ERR("Failed to initialize workers arguments.");
-		ofp_term_global();
+		ofp_terminate();
 		exit(EXIT_FAILURE);
 	}
 
@@ -312,7 +312,7 @@ int main(int argc, char *argv[])
 				num_workers, i);
 			ofp_stop_processing();
 			ofp_thread_join(thread_tbl, i);
-			ofp_term_global();
+			ofp_terminate();
 			return EXIT_FAILURE;
 		}
 	}
@@ -323,8 +323,8 @@ int main(int argc, char *argv[])
 
 	ofp_thread_join(thread_tbl, num_workers);
 
-	if (ofp_term_global() < 0)
-		printf("Error: ofp_term_global failed.\n");
+	if (ofp_terminate() < 0)
+		printf("Error: ofp_terminate failed.\n");
 
 	printf("End Main()\n");
 	return 0;

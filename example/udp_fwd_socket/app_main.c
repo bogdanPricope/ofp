@@ -152,7 +152,7 @@ static int event_dispatcher(void *arg)
 int main(int argc, char *argv[])
 {
 	appl_args_t params;
-	ofp_global_param_t app_init_params;
+	ofp_initialize_param_t app_init_params;
 	ofp_thread_t thread_tbl[MAX_WORKERS], dispatcher_thread;
 	ofp_thread_param_t thread_param;
 	int num_workers, tx_queues, first_worker, i;
@@ -173,9 +173,9 @@ int main(int argc, char *argv[])
 	parse_args(argc, argv, &params);
 
 	/* Initialize OFP */
-	ofp_init_global_param(&app_init_params);
+	ofp_initialize_param(&app_init_params);
 
-	if (ofp_init_global(&app_init_params)) {
+	if (ofp_initialize(&app_init_params)) {
 		OFP_ERR("Error: OFP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -198,7 +198,7 @@ int main(int argc, char *argv[])
 
 	if (num_workers < 1) {
 		OFP_ERR("ERROR: At least 2 cores required.\n");
-		ofp_term_global();
+		ofp_terminate();
 		exit(EXIT_FAILURE);
 	}
 
@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
 				     &pktout_param) < 0) {
 			OFP_ERR("Failed to init interface %s",
 				params.if_names[i]);
-			ofp_term_global();
+			ofp_terminate();
 			exit(EXIT_FAILURE);
 		}
 
@@ -239,7 +239,7 @@ int main(int argc, char *argv[])
 		if (pktio == ODP_PKTIO_INVALID) {
 			OFP_ERR("Failed locate pktio %s",
 				params.if_names[i]);
-			ofp_term_global();
+			ofp_terminate();
 			exit(EXIT_FAILURE);
 		}
 
@@ -252,7 +252,7 @@ int main(int argc, char *argv[])
 		if (odp_pktout_queue(pktio, NULL, 0) != tx_queues) {
 			OFP_ERR("Too few pktout queues for %s",
 				params.if_names[i]);
-			ofp_term_global();
+			ofp_terminate();
 			exit(EXIT_FAILURE);
 		}
 
@@ -284,7 +284,7 @@ int main(int argc, char *argv[])
 		ofp_stop_processing();
 		if (i > 0)
 			ofp_thread_join(thread_tbl, i);
-		ofp_term_global();
+		ofp_terminate();
 		return EXIT_FAILURE;
 	}
 
@@ -298,7 +298,7 @@ int main(int argc, char *argv[])
 		OFP_ERR("Error: Failed to create dispatcherthreads");
 		ofp_stop_processing();
 		ofp_thread_join(thread_tbl, num_workers);
-		ofp_term_global();
+		ofp_terminate();
 		return EXIT_FAILURE;
 	}
 
@@ -317,8 +317,8 @@ int main(int argc, char *argv[])
 	if (udp_fwd_cleanup())
 		printf("Error: udp_fwd_cleanup failed.\n");
 
-	if (ofp_term_global() < 0)
-		printf("Error: ofp_term_global failed.\n");
+	if (ofp_terminate() < 0)
+		printf("Error: ofp_terminate failed.\n");
 
 	printf("End Main()\n");
 	return 0;

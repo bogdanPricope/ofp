@@ -34,7 +34,7 @@ void *shm;
 int (*pru_attach)(struct socket *so, int proto, struct thread *td);
 int sleeper_called;
 uint32_t sleeper_timeout;
-ofp_global_param_t oig = {0};
+ofp_initialize_param_t oig = {0};
 
 static int pru_attach_stub(struct socket *so, int proto, struct thread *td);
 static int init(void)

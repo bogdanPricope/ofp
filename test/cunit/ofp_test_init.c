@@ -67,21 +67,21 @@ clean_suite(void)
 static void
 test_global_init_cleanup(void)
 {
-	static ofp_global_param_t oig;
+	static ofp_initialize_param_t oig;
 
-	ofp_init_global_param(&oig);
+	ofp_initialize_param(&oig);
 	oig.instance = instance;
-	CU_ASSERT_EQUAL(ofp_init_global(&oig), 0);
+	CU_ASSERT_EQUAL(ofp_initialize(&oig), 0);
 
 	ofp_start_cli_thread(oig.linux_core_id, NULL);
 
-	CU_ASSERT_EQUAL(ofp_term_global(), 0);
+	CU_ASSERT_EQUAL(ofp_terminate(), 0);
 }
 
 static void
 test_global_init_from_file_cleanup(void)
 {
-	static ofp_global_param_t oig;
+	static ofp_initialize_param_t oig;
 	int test_value = 1234;
 
 	const char *filename = "test-ofp.conf";
@@ -90,15 +90,15 @@ test_global_init_from_file_cleanup(void)
 	fprintf(f, "ofp_global_param: { arp: { entry_timeout = %d } }\n", test_value);
 	fclose(f);
 
-	ofp_init_global_param_from_file(&oig, filename);
+	ofp_initialize_param_from_file(&oig, filename);
 
 	CU_ASSERT_EQUAL(oig.arp.entry_timeout, test_value);
 
 	oig.instance = instance;
-	CU_ASSERT_EQUAL(ofp_init_global(&oig), 0);
+	CU_ASSERT_EQUAL(ofp_initialize(&oig), 0);
 	ofp_start_cli_thread(oig.linux_core_id, NULL);
 
-	CU_ASSERT_EQUAL(ofp_term_global(), 0);
+	CU_ASSERT_EQUAL(ofp_terminate(), 0);
 }
 
 /*

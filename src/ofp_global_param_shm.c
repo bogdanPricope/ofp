@@ -12,7 +12,7 @@
 #define SHM_NAME_GLOBAL_CONFIG "OfpGlobalConfigShMem"
 
 __thread struct ofp_global_config_mem *shm_global;
-__thread ofp_global_param_t *global_param;
+__thread ofp_initialize_param_t *global_param;
 
 static int ofp_global_config_alloc_shared_memory(void)
 {
@@ -51,7 +51,7 @@ static int ofp_global_config_lookup_shared_memory(void)
 	return 0;
 }
 
-int ofp_global_param_init_global(ofp_global_param_t *params,
+int ofp_global_param_init_global(ofp_initialize_param_t *params,
 				 odp_instance_t instance,
 				 odp_bool_t instance_owner)
 {

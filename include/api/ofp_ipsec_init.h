@@ -59,7 +59,7 @@ struct ofp_ipsec_param {
 	 * If the queue is schedulable and ordered, OFP will make use of its
 	 * ordered lock with index 0 (see sched.lock_count queue parameter).
 	 *
-	 * Ownership of the queue transfers to OFP at ofp_init_global().
+	 * Ownership of the queue transfers to OFP at ofp_initialize().
 	 *
 	 * Default value is ODP_QUEUE_INVALID.
 	 */
