@@ -14,11 +14,17 @@
 #include <sys/resource.h>
 
 #include "ofp.h"
-#include "httpd.h"
 #include "linux_sigaction.h"
+#include "linux_resources.h"
+#include "httpd.h"
 
 #define MAX_WORKERS		32
-#define MAX_CORE_FILE_SIZE	200000000
+
+#define PKT_BURST_SIZE 16
+
+/** Get rid of path in filename - only for unix-type paths using '/' */
+#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
+				strrchr((file_name), '/') + 1 : (file_name))
 
 enum execution_mode {
 	EXEC_MODE_SCHEDULER = 0,
@@ -51,29 +57,8 @@ struct worker_arg {
 static int parse_args(int argc, char *argv[], appl_args_t *appl_args);
 static void print_info(char *progname, appl_args_t *appl_args);
 static void usage(char *progname);
-static int resource_cfg(void);
 static int validate_cores_settings(int req_core_start, int req_core_count,
 	int *core_start, int *core_count);
-
-/** Get rid of path in filename - only for unix-type paths using '/' */
-#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
-				strrchr((file_name), '/') + 1 : (file_name))
-
-#define PKT_BURST_SIZE 16
-
-/**
- * Signal handler function
- *
- * @param signum int
- * @return void
- *
- */
-static void sig_func_stop(int signum)
-{
-	printf("Signal handler (signum = %d) ... exiting.\n", signum);
-
-	ofp_stop_processing();
-}
 
 /** pkt_io_direct_mode_recv() Custom event dispatcher
  *
@@ -312,10 +297,10 @@ int main(int argc, char *argv[])
 	odp_cpumask_t cpu_mask;
 
 	/* Setup system resources */
-	resource_cfg();
+	ofpexpl_resources_set();
 
 	/* add handler for Ctr+C */
-	if (ofp_sigactions_set(sig_func_stop)) {
+	if (ofpexpl_sigaction_set(ofpexpl_sigfunction_stop)) {
 		printf("Error: failed to set signal actions.\n");
 		return EXIT_FAILURE;
 	}
@@ -441,24 +426,6 @@ int main(int argc, char *argv[])
 		printf("Error: ofp_terminate failed.\n");
 
 	printf("End Main()\n");
-	return 0;
-}
-
-/**
- * resource_cfg() Setup system resources
- *
- * @return int 0 on success, -1 on error
- *
- */
-static int resource_cfg(void)
-{
-	struct rlimit rlp;
-
-	getrlimit(RLIMIT_CORE, &rlp);
-	printf("RLIMIT_CORE: %ld/%ld\n", rlp.rlim_cur, rlp.rlim_max);
-	rlp.rlim_cur = MAX_CORE_FILE_SIZE;
-	printf("Setting to max: %d\n", setrlimit(RLIMIT_CORE, &rlp));
-
 	return 0;
 }
 

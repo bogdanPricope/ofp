@@ -13,20 +13,11 @@
 #include "linux_sigaction.h"
 
 #define MAX_WORKERS		64
+#define PKT_BURST_SIZE 16
 
-/**
- * Signal handler function
- *
- * @param signum int
- * @return void
- *
- */
-static void sig_func_stop(int signum)
-{
-	printf("Signal handler (signum = %d) ... exiting.\n", signum);
-
-	ofp_stop_processing();
-}
+/** Get rid of path in filename - only for unix-type paths using '/' */
+#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
+				strrchr((file_name), '/') + 1 : (file_name))
 
 /**
  * Parsed command line application arguments
@@ -51,13 +42,6 @@ static void print_info(char *progname, appl_args_t *appl_args);
 static void usage(char *progname);
 static int validate_cores_settings(int req_core_start, int req_core_count,
 	int *core_start, int *core_count);
-
-/** Get rid of path in filename - only for unix-type paths using '/' */
-#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
-				strrchr((file_name), '/') + 1 : (file_name))
-
-
-#define PKT_BURST_SIZE 16
 
 /** pkt_io_recv() Custom event dispatcher
  *
@@ -238,7 +222,7 @@ int main(int argc, char *argv[])
 	odp_cpumask_t cpu_mask;
 
 	/* add handler for Ctr+C */
-	if (ofp_sigactions_set(sig_func_stop)) {
+	if (ofpexpl_sigaction_set(ofpexpl_sigfunction_stop)) {
 		printf("Error: failed to set signal actions.\n");
 		return EXIT_FAILURE;
 	}

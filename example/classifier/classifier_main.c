@@ -21,6 +21,10 @@
 #define MAX_WORKERS		32
 #define TEST_PORT 54321
 
+/** Get rid of path in filename - only for unix-type paths using '/' */
+#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
+				strrchr((file_name), '/') + 1 : (file_name))
+
 /**
  * Parsed command line application arguments
  */
@@ -42,24 +46,6 @@ static odp_cos_t build_cos_set_queue(const char *name, odp_queue_t queue_cos);
 static odp_pmr_t build_udp_prm(odp_cos_t cos_src, odp_cos_t cos_dst);
 static void app_processing(void);
 
-/** Get rid of path in filename - only for unix-type paths using '/' */
-#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
-				strrchr((file_name), '/') + 1 : (file_name))
-
-/**
- * Signal handler function
- *
- * @param signum int
- * @return void
- *
- */
-static void sig_func_stop(int signum)
-{
-	printf("Signal handler (signum = %d) ... exiting.\n", signum);
-
-	ofp_stop_processing();
-}
-
 /** main() Application entry point
  *
  * @param argc int
@@ -77,7 +63,7 @@ int main(int argc, char *argv[])
 	odp_cpumask_t cpumask_workers;
 
 	/* add handler for Ctr+C */
-	if (ofp_sigactions_set(sig_func_stop)) {
+	if (ofpexpl_sigaction_set(ofpexpl_sigfunction_stop)) {
 		printf("Error: failed to set signal actions.\n");
 		return EXIT_FAILURE;
 	}

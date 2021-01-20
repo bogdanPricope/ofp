@@ -8,7 +8,8 @@
 #ifndef __OFP_EXAMPLE_SIGACTION__
 #define __OFP_EXAMPLE_SIGACTION__
 
-int ofp_sigactions_set(void (*sig_func)(int));
+int ofpexpl_sigaction_set(void (*sig_func)(int));
+
+void ofpexpl_sigfunction_stop(int signum);
 
 #endif /* __OFP_EXAMPLE_SIGACTION__ */
-

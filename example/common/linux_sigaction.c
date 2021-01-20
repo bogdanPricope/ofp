@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <signal.h>
+#include "ofp.h"
 #include "linux_sigaction.h"
 
 static int linux_sigaction(int signum, void (*sig_func)(int))
@@ -32,7 +33,7 @@ static int linux_sigaction(int signum, void (*sig_func)(int))
 	return 0;
 }
 
-int ofp_sigactions_set(void (*sig_func)(int))
+int ofpexpl_sigaction_set(void (*sig_func)(int))
 {
 	if (linux_sigaction(SIGINT, sig_func)) {
 		printf("Error: ODP sighandler setup failed: SIGINT.\n");
@@ -50,4 +51,11 @@ int ofp_sigactions_set(void (*sig_func)(int))
 	}
 
 	return 0;
+}
+
+void ofpexpl_sigfunction_stop(int signum)
+{
+	printf("Signal handler (signum = %d) ... exiting.\n", signum);
+
+	ofp_stop_processing();
 }

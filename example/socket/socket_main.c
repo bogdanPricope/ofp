@@ -29,6 +29,10 @@
 
 #define MAX_WORKERS		32
 
+/** Get rid of path in filename - only for unix-type paths using '/' */
+#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
+				strrchr((file_name), '/') + 1 : (file_name))
+
 /**
  * Parsed command line application arguments
  */
@@ -39,23 +43,11 @@ typedef struct {
 	char *cli_file;
 } appl_args_t;
 
-
 /* helper funcs */
 static void parse_args(int argc, char *argv[], appl_args_t *appl_args);
 static void print_info(char *progname, appl_args_t *appl_args,
 		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
-
-/*static int null_function(int fd)
-{
-	(void)fd;
-
-	return 0;
-}*/
-
-/** Get rid of path in filename - only for unix-type paths using '/' */
-#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
-				strrchr((file_name), '/') + 1 : (file_name))
 
 /** main() Application entry point
  *

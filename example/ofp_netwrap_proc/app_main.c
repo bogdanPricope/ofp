@@ -14,6 +14,15 @@
 
 #define MAX_WORKERS		32
 
+#define ENV_ARG "OFP_NETWRAP_ENV"
+#define ENV_ARG_TKN_NUMBER_MAX 101
+
+/**
+ * Get rid of path in filename - only for unix-type paths using '/'
+ */
+#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
+				strrchr((file_name), '/') + 1 : (file_name))
+
 /**
  * Parsed command line application arguments
  */
@@ -24,23 +33,6 @@ typedef struct {
 	char *cli_file;
 } appl_args_t;
 
-/**
- * helper funcs
- */
-static int parse_env(appl_args_t *appl_args);
-static void print_info(const char *progname, appl_args_t *appl_args,
-		       odp_cpumask_t *cpumask);
-static void usage(char *progname);
-
-/**
- * Get rid of path in filename - only for unix-type paths using '/'
- */
-#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
-				strrchr((file_name), '/') + 1 : (file_name))
-
-#define ENV_ARG "OFP_NETWRAP_ENV"
-#define ENV_ARG_TKN_NUMBER_MAX 101
-
 enum netwrap_state_enum {
 	NETWRAP_UNINT = 0,
 	NETWRAP_ODP_INIT_GLOBAL,
@@ -48,6 +40,14 @@ enum netwrap_state_enum {
 	NETWRAP_OFP_INIT_GLOBAL,
 	NETWRAP_WORKERS_STARTED
 };
+
+/**
+ * helper funcs
+ */
+static int parse_env(appl_args_t *appl_args);
+static void print_info(const char *progname, appl_args_t *appl_args,
+		       odp_cpumask_t *cpumask);
+static void usage(char *progname);
 
 static enum netwrap_state_enum netwrap_state;
 static ofp_thread_t thread_tbl[MAX_WORKERS];

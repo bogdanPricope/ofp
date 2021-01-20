@@ -56,6 +56,10 @@
 #define PKT_LEN_L  1280
 #define PKT_LEN_XL 1518
 
+/** Get rid of path in filename - only for unix-type paths using '/' */
+#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
+				strrchr((file_name), '/') + 1 : (file_name))
+
 /**
  * Application modes
  */
@@ -120,10 +124,6 @@ static args_t *gbl_args;
 
 /** Break workers loop if set to 1 */
 static int exit_threads;
-
-/** Get rid of path in filename - only for unix-type paths using '/' */
-#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
-				strrchr((file_name), '/') + 1 : (file_name))
 
 /**
  * Signal handler for SIGINT

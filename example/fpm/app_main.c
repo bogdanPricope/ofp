@@ -16,6 +16,12 @@
 #define MAX_WORKERS		32
 
 /**
+ * Get rid of path in filename - only for unix-type paths using '/'
+ */
+#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
+				strrchr((file_name), '/') + 1 : (file_name))
+
+/**
  * Parsed command line application arguments
  */
 typedef struct {
@@ -34,43 +40,7 @@ static void print_info(char *progname, appl_args_t *appl_args,
 		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
 static int start_performance(ofp_thread_t *thread_perf, int core_id);
-
-/**
- * Get rid of path in filename - only for unix-type paths using '/'
- */
-#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
-				strrchr((file_name), '/') + 1 : (file_name))
-
-
-/**
- * local hook
- *
- * @param pkt odp_packet_t
- * @param protocol int
- * @return int
- *
- */
-static enum ofp_return_code fastpath_local_hook(odp_packet_t pkt, void *arg)
-{
-	int protocol = *(int *)arg;
-	(void) pkt;
-	(void) protocol;
-	return OFP_PKT_CONTINUE;
-}
-
-/**
- * Signal handler function
- *
- * @param signum int
- * @return void
- *
- */
-static void ofp_sig_func_stop(int signum)
-{
-	printf("Signal handler (signum = %d) ... exiting.\n", signum);
-
-	ofp_stop_processing();
-}
+static enum ofp_return_code fastpath_local_hook(odp_packet_t pkt, void *arg);
 
 /**
  * main() Application entry point
@@ -98,7 +68,7 @@ int main(int argc, char *argv[])
 	ofp_thread_t thread_perf;
 
 	/* add handler for Ctr+C */
-	if (ofp_sigactions_set(ofp_sig_func_stop)) {
+	if (ofpexpl_sigaction_set(ofpexpl_sigfunction_stop)) {
 		printf("Error: failed to set signal actions.\n");
 		return EXIT_FAILURE;
 	}
@@ -488,4 +458,22 @@ static int start_performance(ofp_thread_t *thread_perf, int core_id)
 					 1,
 					 &cpumask,
 					 &thread_param);
+}
+
+/**
+ * local hook
+ *
+ * @param pkt odp_packet_t
+ * @param protocol int
+ * @return int
+ *
+ */
+static enum ofp_return_code fastpath_local_hook(odp_packet_t pkt, void *arg)
+{
+	int protocol = *(int *)arg;
+
+	(void)pkt;
+	(void)protocol;
+
+	return OFP_PKT_CONTINUE;
 }

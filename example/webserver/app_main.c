@@ -13,11 +13,15 @@
 #include <sys/resource.h>
 
 #include "ofp.h"
-#include "httpd.h"
 #include "linux_sigaction.h"
+#include "linux_resources.h"
+#include "httpd.h"
 
 #define MAX_WORKERS		32
-#define MAX_CORE_FILE_SIZE	200000000
+
+/** Get rid of path in filename - only for unix-type paths using '/' */
+#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
+				strrchr((file_name), '/') + 1 : (file_name))
 
 /**
  * Parsed command line application arguments
@@ -38,42 +42,6 @@ static void print_info(char *progname, appl_args_t *appl_args,
 		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
 
-/** Get rid of path in filename - only for unix-type paths using '/' */
-#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
-				strrchr((file_name), '/') + 1 : (file_name))
-
-/**
- * Signal handler function
- *
- * @param signum int
- * @return void
- *
- */
-static void sig_func_stop(int signum)
-{
-	printf("Signal handler (signum = %d) ... exiting.\n", signum);
-
-	ofp_stop_processing();
-}
-
-/**
- * resource_cfg() Setup system resources
- *
- * @return int 0 on success, -1 on error
- *
- */
-static int resource_cfg(void)
-{
-	struct rlimit rlp;
-
-	getrlimit(RLIMIT_CORE, &rlp);
-	printf("RLIMIT_CORE: %ld/%ld\n", rlp.rlim_cur, rlp.rlim_max);
-	rlp.rlim_cur = MAX_CORE_FILE_SIZE;
-	printf("Setting to max: %d\n", setrlimit(RLIMIT_CORE, &rlp));
-
-	return 0;
-}
-
 /** main() Application entry point
  *
  * @param argc int
@@ -92,10 +60,10 @@ int main(int argc, char *argv[])
 	int num_workers, new_workers, i;
 	odp_cpumask_t cpumask_workers;
 
-	resource_cfg();
+	ofpexpl_resources_set();
 
 	/* add handler for Ctr+C */
-	if (ofp_sigactions_set(sig_func_stop)) {
+	if (ofpexpl_sigaction_set(ofpexpl_sigfunction_stop)) {
 		printf("Error: failed to set signal actions.\n");
 		return EXIT_FAILURE;
 	}

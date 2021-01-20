@@ -19,6 +19,12 @@
 
 #define MAX_WORKERS		64
 
+#define PKT_BURST_SIZE 16
+
+/** Get rid of path in filename - only for unix-type paths using '/' */
+#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
+				strrchr((file_name), '/') + 1 : (file_name))
+
 /**
  * Parsed command line application arguments
  */
@@ -41,26 +47,6 @@ struct pktio_thr_arg {
 static void parse_args(int argc, char *argv[], appl_args_t *appl_args);
 static void print_info(char *progname, appl_args_t *appl_args);
 static void usage(char *progname);
-
-/** Get rid of path in filename - only for unix-type paths using '/' */
-#define NO_PATH(file_name) (strrchr((file_name), '/') ? \
-				strrchr((file_name), '/') + 1 : (file_name))
-
-#define PKT_BURST_SIZE 16
-
-/**
- * Signal handler function
- *
- * @param signum int
- * @return void
- *
- */
-static void sig_func_stop(int signum)
-{
-	printf("Signal handler (signum = %d) ... exiting.\n", signum);
-
-	ofp_stop_processing();
-}
 
 static int pkt_io_recv(void *arg)
 {
@@ -164,7 +150,7 @@ int main(int argc, char *argv[])
 	odp_pktio_t pktio;
 
 	/* add handler for Ctr+C */
-	if (ofp_sigactions_set(sig_func_stop)) {
+	if (ofpexpl_sigaction_set(ofpexpl_sigfunction_stop)) {
 		printf("Error: failed to set signal actions.\n");
 		return EXIT_FAILURE;
 	}
