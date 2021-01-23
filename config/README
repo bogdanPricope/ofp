@@ -1,0 +1,308 @@
+OFP configuration file
+===============================================================================
+The configuration file can be used by ofp_initialize_param() or
+ofp_initialize_param_from_file() to configure OFP initialization parameters
+(ofp_initialize_param_t).
+ofp_initialize() uses this type of argument to initialize OFP.
+
+ofp_initialize_param()
+===============================================================================
+This function initializes an ofp_initialize_param_t argument with the default
+values and override them with the values read from the configuration file.
+
+The configuration file name is taken from OFP_CONF_FILE environment variable, if
+set. If the environment variable is not set, then $(sysconfdir)/ofp.conf, normally
+/usr/local/etc/ofp.conf, is used.
+
+If file is not found, the default values are returned.
+
+ofp_initialize_param_from_file()
+===============================================================================
+Same as ofp_initialize_param() but it takes the configuration file name
+as argument. If set to NULL, it has the same behaviour as
+ofp_initialize_param().
+
+
+OFP configuration file format
+===============================================================================
+
+Note: The file uses libconfig format. See
+http://www.hyperrealm.com/libconfig/libconfig_manual.html#Configuration-File-Grammar
+
+ofp_global_param: {
+    if_names = [ string, string, ... ]
+
+    linux_core_id = integer
+
+    pktin_mode = "direct" | "sched" | "queue" | "disabled"
+    pktout_mode = "direct" | "queue" | "tm" | "disabled"
+    sched_sync = "parallel" | "atomic" | ordered"
+    sched_group = "all | "worker" | "control"
+
+    enable_nl_thread = boolean
+
+    arp: {
+        entries = integer
+        hash_bits = integer
+        entry_timeout = integer
+        saved_pkt_timeout = integer
+        check_interface = boolean
+    }
+
+    evt_rx_burst_size = integer
+    pkt_tx_burst_size = integer
+
+    pkt_pool: {
+        nb_pkts = integer
+        buffer_size = integer
+    }
+
+    num_vlan = integer
+
+    mtrie: {
+        routes = integer
+        table8_nodes = integer
+    }
+
+    num_vrf = integer
+
+    chksum_offload: {
+        ipv4_rx_ena = true
+        udp_rx_ena = true
+        tcp_rx_ena = true
+        ipv4_tx_ena = true
+        udp_tx_ena = true
+        tcp_tx_ena = true
+    }
+
+    ipsec: {
+        max_num_sp = integer
+        max_num_sa = integer
+        max_inbound_spi = integer
+        inbound_op_mode = "sync" | "async" | "inline" | "disabled"
+        outbound_op_mode = "sync" | "async" | "inline" | "disabled"
+    }
+
+	socket: {
+		num_max = integer
+		sd_offset = integer
+	}
+
+	tcp: {
+		pcb_tcp_max = integer
+		pcb_hashtbl_size = integer
+		pcbport_hashtbl_size = integer
+		syncache_hashtbl_size = integer
+		sackhole_max = integer
+	}
+
+	udp: {
+		pcb_udp_max = integer
+		pcb_hashtbl_size = integer
+		pcbport_hashtbl_size = integer
+	}
+
+	if_loopback = boolean
+
+	loglevel = "disabled" | "error" | "warning" | "info" | "debug"
+
+	debug: {
+		flags = integer (hex)
+		print_filename = string
+		capture_ports = integer (hex)
+		capture_filename = string
+	}
+}
+
+Description:
+if_names: Names of the interfaces to be initialized.
+	Default value: empty list
+	Example: ["0"]
+
+linux_core_id: CPU core to which internal OFP control threads are pinned.
+	Default value is 0.
+
+pktin_mode: Packet input mode of the interfaces initialized by OFP.
+	Default value is ODP_PKTIN_MODE_SCHED.
+
+pktout_mode: Packet output mode of the interfaces initialized by OFP
+	Default value is ODP_PKTOUT_MODE_DIRECT.
+
+sched_sync: Scheduler synchronization method of the pktin queues of the
+	interfaces initialized by OFP in the scheduled mode.
+	Ignored when pktin_mode is not ODP_PKTIN_MODE_SCHED.
+	Default value is ODP_SCHED_SYNC_ATOMIC.
+
+sched_group: ODP event scheduling group for all scheduled event queues
+	(pktio queues, timer queues and other queues) created in
+	OFP initialization. The default value is ODP_SCHED_GROUP_ALL.
+
+enable_nl_thread: Create netlink listener thread. If slow path is enabled,
+	then default is TRUE, otherwise default is FALSE.
+
+arp.entries: Maximum number of ARP entries.
+	Default value is OFP_ARP_ENTRIES.
+
+arp.hash_bits: ARP hash bits.
+	Default value is OFP_ARP_HASH_BITS.
+
+arp.entry_timeout: Entry timeout in seconds.
+	Default value is OFP_ARP_ENTRY_TIMEOUT.
+
+arp.saved_pkt_timeout: Timeout (in seconds) for a packet waiting for ARP
+	to complete. Default is OFP_ARP_SAVED_PKT_TIMEOUT.
+
+arp.check_interface: Reply to an ARP request only if the target address of the
+	request is an address of the receiving interface.
+	Ignore the request otherwise.
+	If not set, reply to an ARP request for any local IP
+	address regardless of the receiving interface.
+
+	See net.ipv4.conf.all.arp_ignore sysctl in Linux.
+
+	Default value is 0.
+
+evt_rx_burst_size: Maximum number of events received at once with the default
+	event dispatched (default_event_dispatcher()).
+	Default value is OFP_EVT_RX_BURST_SIZE.
+
+pkt_tx_burst_size: Number of packets sent at once (>= 1).
+	Default value is OFP_PKT_TX_BURST_SIZE.
+
+pkt_pool.nb_pkts: Packet pool size.
+	Default value is SHM_PKT_POOL_NB_PKTS
+
+pkt_pool.buffer_size: Packet pool buffer size.
+	Default value is SHM_PKT_POOL_BUFFER_SIZE
+
+num_vlan: Maximum number of VLANs.
+	Default value is OFP_NUM_VLAN.
+
+mtrie.routes: Number of routes.
+	Default value is OFP_ROUTES.
+
+mtrie.table8_nodes: Number of 8 bit mtrie nodes.
+	Default value is OFP_MTRIE_TABLE8_NODES.
+
+num_vrf: Maximum number of VRFs.
+	Default value is OFP_NUM_VRF.
+	VRF IDs used in interfaces and routes must be less than
+	this value.
+
+chksum_offload.ipv4_rx_ena: Enable IPv4 header checksum validation offload.
+	0: Disable offloading.
+	1: Enable offloading.
+	Default value is OFP_CHKSUM_OFFLOAD_IPV4_RX.
+
+chksum_offload.udp_rx_ena: Enable UDP checksum validation offload
+	0: Disable offloading.
+	1: Enable offloading.
+	Default value is OFP_CHKSUM_OFFLOAD_UDP_RX.
+
+chksum_offload.tcp_rx_ena: Enable TCP checksum validation offload
+	0: Disable offloading.
+	1: Enable offloading.
+	Default value is OFP_CHKSUM_OFFLOAD_TCP_RX.
+
+chksum_offload.ipv4_tx_ena: Enable IPv4 header checksum insertion offload
+	0: Disable offloading.
+	1: Enable offloading.
+	Default value is OFP_CHKSUM_OFFLOAD_IPV4_TX.
+
+chksum_offload.udp_tx_ena: Enable UDP checksum insertion offload
+	0: Disable offloading.
+	1: Enable offloading.
+	Default value is OFP_CHKSUM_OFFLOAD_UDP_TX.
+
+chksum_offload.tcp_tx_ena: Enable TCP checksum insertion offload
+	0: Disable offloading.
+	1: Enable offloading.
+	Default value is OFP_CHKSUM_OFFLOAD_TCP_TX.
+
+ipsec.max_num_sp: Maximum number of security policies that can exist at a time.
+	Default value is OFP_IPSEC_MAX_NUM_SP.
+
+ipsec.max_num_sa: Maximum number of SAs that can exist at a time.
+	Default value is OFP_IPSEC_MAX_NUM_SA.
+
+ipsec.max_inbound_spi: Maximum inbound SPI value that may be used.
+	Default value is OFP_IPSEC_MAX_INBOUND_SPI.
+
+ipsec.inbound_op_mode: Inbound operation mode.
+	Default value is ODP_IPSEC_OP_MODE_SYNC.
+
+ipsec.outbound_op_mode: Outbound operation mode.
+	Default value is ODP_IPSEC_OP_MODE_SYNC.
+
+socket.num_max: Maximum number of sockets that can exist at a time.
+	Default value is OFP_NUM_SOCKETS_MAX.
+
+socket.sd_offset: Socket descriptor offset.
+	Socket descriptors are returned in interval [sd_offset,
+	sd_offset + num_max -1]
+	Default value is OFP_SOCK_NUM_OFFSET.
+
+tcp.pcb_tcp_max: Maximum number of TCP PCBs.
+	Default value is OFP_NUM_PCB_TCP_MAX.
+
+tcp.pcb_hashtbl_size: Size of TCP PCB hash.
+	Must be a power of 2.
+	Default value is computed based on tcp.pcb_tcp_max value.
+
+tcp.pcbport_hashtbl_size: Size of pcbport hash.
+	Must be a power of 2.
+	Default value is computed based on tcp.pcb_tcp_max value.
+
+tcp.syncache_hashtbl_size: Size of syncache hash.
+	Must be a power of 2.
+	Default value is computed based on tcp.pcb_tcp_max value.
+
+tcp.sackhole_max: Maximum number of SACK holes.
+	Default value is 4 * tcp.pcb_tcp_max
+
+udp.pcb_udp_max: Maximum number of UDP PCBs.
+	Default value is OFP_NUM_PCB_UDP_MAX.
+
+udp.pcb_hashtbl_size: Size of pcb hash.
+	Must be a power of 2.
+	Default value is computed based on udp.pcb_udp_max
+
+udp.pcbport_hashtbl_size: Size of pcbport hash.
+	Must be a power of 2.
+	Default value is computed based on udp.pcb_udp_max
+
+if_loopback: Create the default loopback interface lo0, 127.0.0.1/8.
+	Default value is 0 (do not create)
+
+loglevel: Log level
+	Default value is OFP_LOG_DEBUG if OFP_DEBUG is define.
+	Else is OFP_LOG_INFO.
+
+debug.flags: Bitmask options for printing traffic on file (and console) in
+	text format and capturing traffic on file in pcap format.
+	bit 0: print packets from ODP to FP.
+		Use OFP_DEBUG_PRINT_RECV_NIC to set this flag.
+	bit 1: print packets from FP to ODP.
+		Use OFP_DEBUG_PRINT_SEND_NIC to set this flag.
+	bit 2: print packets from FP to SP.
+		Use OFP_DEBUG_PRINT_RECV_KNI to set this flag.
+	bit 3: print packets from SP to ODP.
+		Use OFP_DEBUG_PRINT_SEND_KNI to set this flag.
+	bit 4: print packets to console.
+		Use OFP_DEBUG_PRINT_CONSOLE to set this flag.
+	bit 6: capture packets to pcap file.
+		Use OFP_DEBUG_CAPTURE to set this flag.
+	Default value is 0.
+	Example: 0x2f
+
+debug.print_filename: Name of the file where the packets are printed (text format)
+	Default value is empty - value of DEFAULT_DEBUG_TXT_FILE_NAME is used.
+	Example: "/tmp/pkt.txt"
+
+debug.capture_ports: Bitmask of the ports for which the packets are captures
+	Default value is 0 if bit 6 of debug.flags has is not set or 0x1 otherwise.
+	Example: 0x1
+
+debug.capture_filename: Name of the file where the packets are captured (pcap format)
+	Default value is empty - value of DEFAULT_DEBUG_PCAP_FILE_NAME is used.
+	Example: "/tmp/pkt.pcap"

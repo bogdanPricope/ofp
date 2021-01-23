@@ -189,8 +189,9 @@ typedef struct ofp_initialize_param_t {
 	} arp;
 
 	/**
-	 * Maximum number of events received at once. Default is
-	 * OFP_EVT_RX_BURST_SIZE.
+	 * Maximum number of events received at once with the default
+	 * event dispatched (default_event_dispatcher()).
+	 * Default is OFP_EVT_RX_BURST_SIZE.
 	 */
 	int evt_rx_burst_size;
 
@@ -352,7 +353,7 @@ typedef struct ofp_initialize_param_t {
 
 		/**
 		 * Name of the file where the packets are printed (text format)
-		 * Default value is givern by DEFAULT_DEBUG_TXT_FILE_NAME macro.
+		 * Default value is given by DEFAULT_DEBUG_TXT_FILE_NAME macro.
 		 */
 		char print_filename[OFP_FILE_NAME_SIZE_MAX];
 
@@ -398,55 +399,7 @@ typedef struct ofp_param_t {
  * file is read from $(sysconfdir)/ofp.conf, normally
  * /usr/local/etc/ofp.conf.
  *
- * The file uses libconfig format. See
- * http://www.hyperrealm.com/libconfig/libconfig_manual.html#Configuration-File-Grammar
- *
- * <pre>
- * ofp_global_param: {
- *     if_names = [ string, string, ... ]
- *     linux_core_id = integer
- *     pktin_mode = "direct" | "sched" | "queue" | "disabled"
- *     pktout_mode = "direct" | "queue" | "tm" | "disabled"
- *     sched_sync = "parallel" | "atomic" | ordered"
- *     sched_group = "all | "worker" | "control"
- *     enable_nl_thread = boolean
- *     arp: {
- *         entries = integer
- *         hash_bits = integer
- *         entry_timeout = integer
- *         saved_pkt_timeout = integer
- *         check_interface = boolean
- *     }
- *     evt_rx_burst_size = integer
- *     pkt_tx_burst_size = integer
- *     pcb_tcp_max = integer
- *     pkt_pool: {
- *         nb_pkts = integer
- *         buffer_size = integer
- *     }
- *     num_vlan = integer
- *     mtrie: {
- *         routes = integer
- *         table8_nodes = integer
- *     }
- *     num_vrf = integer
- *     chksum_offload: {
- *         ipv4_rx_ena = true
- *         udp_rx_ena = true
- *         tcp_rx_ena = true
- *         ipv4_tx_ena = true
- *         udp_tx_ena = true
- *         tcp_tx_ena = true
- *     }
- *     ipsec: {
- *         max_num_sp = integer
- *         max_num_sa = integer
- *         max_inbound_spi = integer
- *         inbound_op_mode = "sync" | "async" | "inline" | "disabled"
- *         outbound_op_mode = "sync" | "async" | "inline" | "disabled"
- *     }
- * }
- * </pre>
+ * See conf/README file for the configuration file detailed description.
  *
  * @param params structure to initialize
  *
