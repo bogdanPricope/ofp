@@ -488,17 +488,16 @@ ofp_udp_pkt_sendto(int sockfd, odp_packet_t pkt,
 	return 0;
 }
 
-int ofp_socket_sigevent(struct ofp_sigevent *ev)
+int ofp_socket_sigevent(int sockfd, struct ofp_sigevent *ev)
 {
-	struct ofp_sock_sigval *ss = ev->ofp_sigev_value.sival_ptr;
-	struct socket *so = ofp_get_sock_by_fd(ss->sockfd);
+	struct socket *so = ofp_get_sock_by_fd(sockfd);
 
 	if (!so) {
 		ofp_errno = OFP_EBADF;
 		return -1;
 	}
 
-	switch (ev->ofp_sigev_notify) {
+	switch (ev->sigev_notify) {
 	case OFP_SIGEV_NONE:
 		return 0;
 	case OFP_SIGEV_HOOK:

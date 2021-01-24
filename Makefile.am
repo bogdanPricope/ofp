@@ -13,6 +13,7 @@ include_HEADERS = \
 		$(top_srcdir)/include/api/ofp_timer.h \
 		$(top_srcdir)/include/api/ofp_types.h \
 		$(top_srcdir)/include/api/ofp_socket_types.h \
+		$(top_srcdir)/include/api/ofp_socket_sigevent.h \
 		$(top_srcdir)/include/api/ofp_socket.h \
 		$(top_srcdir)/include/api/ofp_in.h \
 		$(top_srcdir)/include/api/ofp_in6.h \

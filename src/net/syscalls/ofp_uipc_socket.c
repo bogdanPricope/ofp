@@ -2881,19 +2881,17 @@ ofp_send_sock_event(struct socket *head, struct socket *so, int event)
 {
 	struct ofp_sigevent *ev = &head->so_sigevent;
 
-	if (ev->ofp_sigev_notify) {
-		union ofp_sigval sv;
+	if (ev->sigev_notify) {
 		struct ofp_sock_sigval ss;
 
-		sv.sival_ptr = (void *)&ss;
-
+		ss.sigev_value = ev->sigev_value;
 		ss.event = event;
 		ss.sockfd = head->so_number;
 		ss.sockfd2 = so->so_number;
 
 		so->so_state |= SS_EVENT;
 		head->so_state |= SS_EVENT;
-		ev->ofp_sigev_notify_function(sv);
+		ev->sigev_notify_func((union ofp_sigval *)&ss);
 		so->so_state &= ~SS_EVENT;
 		head->so_state &= ~SS_EVENT;
 	}

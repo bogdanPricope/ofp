@@ -41,22 +41,17 @@ int recv_send_udp_local_ip(int fd)
 	return 0;
 }
 
-static void notify_udp_ipv4(union ofp_sigval sv);
+static void notify_udp_ipv4(union ofp_sigval *sv);
 int socket_sigevent_udp4(int fd)
 {
-	struct ofp_sigevent ev;
-	struct ofp_sock_sigval ss;
+	struct ofp_sigevent ev = {0};
 	struct ofp_sockaddr_in dest_addr = {0};
 	const char *buf = "sigevent_test";
 
-	ss.sockfd = fd;
-	ss.event = OFP_EVENT_INVALID;
-	ss.pkt = ODP_PACKET_INVALID;
-
-	ev.ofp_sigev_notify = OFP_SIGEV_HOOK;
-	ev.ofp_sigev_notify_function = notify_udp_ipv4;
-	ev.ofp_sigev_value.sival_ptr = &ss;
-	ofp_socket_sigevent(&ev);
+	ev.sigev_notify = OFP_SIGEV_HOOK;
+	ev.sigev_notify_func = notify_udp_ipv4;
+	ev.sigev_value.sival_ptr = NULL;
+	ofp_socket_sigevent(fd, &ev);
 
 	dest_addr.sin_len = sizeof(struct ofp_sockaddr_in);
 	dest_addr.sin_family = OFP_AF_INET;
@@ -73,7 +68,7 @@ int socket_sigevent_udp4(int fd)
 	return 0;
 }
 
-static void notify_udp_ipv4(union ofp_sigval sv)
+static void notify_udp_ipv4(union ofp_sigval *sv)
 {
 	struct ofp_sockaddr_in addr = {0};
 	ofp_socklen_t addr_len = sizeof(addr);
@@ -82,7 +77,7 @@ static void notify_udp_ipv4(union ofp_sigval sv)
 	struct ofp_sock_sigval *ss;
 	int i;
 
-	ss = (struct ofp_sock_sigval *)sv.sival_ptr;
+	ss = (struct ofp_sock_sigval *)sv;
 
 	data = ofp_udp_packet_parse(ss->pkt, &data_len,
 		(struct ofp_sockaddr *)&addr,
@@ -145,22 +140,17 @@ int recv_send_udp6_local_ip(int fd)
 	return 0;
 }
 
-static void notify_udp_ipv6(union ofp_sigval sv);
+static void notify_udp_ipv6(union ofp_sigval *sv);
 int socket_sigevent_udp6(int fd)
 {
 	struct ofp_sigevent ev;
-	struct ofp_sock_sigval ss;
 	struct ofp_sockaddr_in6 dest_addr = {0};
 	const char *buf = "sigevent_test";
 
-	ss.sockfd = fd;
-	ss.event = OFP_EVENT_INVALID;
-	ss.pkt = ODP_PACKET_INVALID;
-
-	ev.ofp_sigev_notify = OFP_SIGEV_HOOK;
-	ev.ofp_sigev_notify_function = notify_udp_ipv6;
-	ev.ofp_sigev_value.sival_ptr = &ss;
-	ofp_socket_sigevent(&ev);
+	ev.sigev_notify = OFP_SIGEV_HOOK;
+	ev.sigev_notify_func = notify_udp_ipv6;
+	ev.sigev_value.sival_ptr = NULL;
+	ofp_socket_sigevent(fd, &ev);
 
 	dest_addr.sin6_len = sizeof(struct ofp_sockaddr_in6);
 	dest_addr.sin6_family = OFP_AF_INET6;
@@ -178,7 +168,7 @@ int socket_sigevent_udp6(int fd)
 	return 0;
 }
 
-static void notify_udp_ipv6(union ofp_sigval sv)
+static void notify_udp_ipv6(union ofp_sigval *sv)
 {
 	struct ofp_sockaddr_in6 addr = {0};
 	ofp_socklen_t addr_len = sizeof(addr);
@@ -187,7 +177,7 @@ static void notify_udp_ipv6(union ofp_sigval sv)
 	struct ofp_sock_sigval *ss;
 	int i;
 
-	ss = (struct ofp_sock_sigval *)sv.sival_ptr;
+	ss = (struct ofp_sock_sigval *)sv;
 
 	data = ofp_udp_packet_parse(ss->pkt, &data_len,
 		(struct ofp_sockaddr *)&addr,
@@ -290,11 +280,10 @@ int connect_recv_send_tcp6_local_ip(int fd)
 }
 #endif /*INET6*/
 
-static void notify_tcp_rcv(union ofp_sigval sv);
+static void notify_tcp_rcv(union ofp_sigval *sv);
 int socket_sigevent_tcp_rcv(int fd)
 {
-	struct ofp_sigevent ev;
-	struct ofp_sock_sigval ss;
+	struct ofp_sigevent ev = {0};
 	const char *buf = "socket_test";
 	int len = 0;
 	int fd_accept = -1;
@@ -306,14 +295,10 @@ int socket_sigevent_tcp_rcv(int fd)
 		return -1;
 	}
 
-	ss.sockfd = fd_accept;
-	ss.event = OFP_EVENT_INVALID;
-	ss.pkt = ODP_PACKET_INVALID;
-
-	ev.ofp_sigev_notify = OFP_SIGEV_HOOK;
-	ev.ofp_sigev_notify_function = notify_tcp_rcv;
-	ev.ofp_sigev_value.sival_ptr = &ss;
-	if (ofp_socket_sigevent(&ev) == -1) {
+	ev.sigev_notify = OFP_SIGEV_HOOK;
+	ev.sigev_notify_func = notify_tcp_rcv;
+	ev.sigev_value.sival_ptr = NULL;
+	if (ofp_socket_sigevent(fd_accept, &ev) == -1) {
 		OFP_ERR("Faild to set sigevent(errno = %d)\n", ofp_errno);
 		return -1;
 	}
@@ -329,14 +314,14 @@ int socket_sigevent_tcp_rcv(int fd)
 	return 0;
 }
 
-static void notify_tcp_rcv(union ofp_sigval sv)
+static void notify_tcp_rcv(union ofp_sigval *sv)
 {
 	struct ofp_sock_sigval *ss;
 	uint8_t *data = NULL;
 	int data_len = 0;
 	int i;
 
-	ss = (struct ofp_sock_sigval *)sv.sival_ptr;
+	ss = (struct ofp_sock_sigval *)sv;
 	data = odp_packet_data(ss->pkt);
 	data_len = odp_packet_len(ss->pkt);
 
@@ -400,21 +385,16 @@ int connect_tcp6_delayed_local_ip(int fd)
 }
 #endif /* INET6 */
 
-static void notify_tcp_accept(union ofp_sigval sv);
+static void notify_tcp_accept(union ofp_sigval *sv);
 int socket_sigevent_tcp_accept(int fd)
 {
 	struct ofp_sigevent ev;
-	struct ofp_sock_sigval ss;
 	int fd_accept = -1;
 
-	ss.sockfd = fd;
-	ss.event = OFP_EVENT_INVALID;
-	ss.pkt = ODP_PACKET_INVALID;
-
-	ev.ofp_sigev_notify = OFP_SIGEV_HOOK;
-	ev.ofp_sigev_notify_function = notify_tcp_accept;
-	ev.ofp_sigev_value.sival_ptr = &ss;
-	if (ofp_socket_sigevent(&ev) == -1) {
+	ev.sigev_notify = OFP_SIGEV_HOOK;
+	ev.sigev_notify_func = notify_tcp_accept;
+	ev.sigev_value.sival_ptr = NULL;
+	if (ofp_socket_sigevent(fd, &ev) == -1) {
 		OFP_ERR("Faild to set sigevent(errno = %d)\n", ofp_errno);
 		return -1;
 	}
@@ -435,11 +415,11 @@ int socket_sigevent_tcp_accept(int fd)
 	return 0;
 }
 
-static void notify_tcp_accept(union ofp_sigval sv)
+static void notify_tcp_accept(union ofp_sigval *sv)
 {
 	struct ofp_sock_sigval *ss;
 
-	ss = (struct ofp_sock_sigval *)sv.sival_ptr;
+	ss = (struct ofp_sock_sigval *)sv;
 	OFP_INFO("TCP Connection received on socket %d: %d created.\n",
 		ss->sockfd,
 		ss->sockfd2);

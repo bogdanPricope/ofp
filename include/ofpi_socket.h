@@ -11,6 +11,7 @@
 
 #include "odp_api.h"
 #include "api/ofp_socket.h"
+#include "api/ofp_socket_sigevent.h"
 #include "ofpi_queue.h"
 #include "ofpi_vnet.h"
 

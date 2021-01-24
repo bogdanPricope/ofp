@@ -22,14 +22,11 @@
 struct udpecho_s {
 	/*socket descriptor */
 	int sd;
-
-	/* sigevent function argument*/
-	struct ofp_sock_sigval ss;
 } udp_echo_cfg;
 
-static void notify(union ofp_sigval sv)
+static void notify(union ofp_sigval *sv)
 {
-	struct ofp_sock_sigval *ss = sv.sival_ptr;
+	struct ofp_sock_sigval *ss = (struct ofp_sock_sigval *)sv;
 	int s = ss->sockfd;
 	int event = ss->event;
 	odp_packet_t pkt = ss->pkt;
@@ -124,14 +121,11 @@ int udpecho_config(void *arg)
 	}
 
 	/* configure sigevent */
-	udp_echo_cfg.ss.sockfd = udp_echo_cfg.sd;
-	udp_echo_cfg.ss.event = 0;
-	udp_echo_cfg.ss.pkt = ODP_PACKET_INVALID;
+	ev.sigev_notify = OFP_SIGEV_HOOK;
+	ev.sigev_notify_func = notify;
+	ev.sigev_value.sival_ptr = NULL;
 
-	ev.ofp_sigev_notify = OFP_SIGEV_HOOK;
-	ev.ofp_sigev_notify_function = notify;
-	ev.ofp_sigev_value.sival_ptr = &udp_echo_cfg.ss;
-	if (ofp_socket_sigevent(&ev)) {
+	if (ofp_socket_sigevent(udp_echo_cfg.sd, &ev)) {
 		OFP_ERR("ofp_socket_sigevent failed, err='%s'",
 			ofp_strerror(ofp_errno));
 		ofp_close(udp_echo_cfg.sd);

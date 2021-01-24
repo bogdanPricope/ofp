@@ -37,6 +37,7 @@ extern "C" {
 #include "ofp_debug.h"
 #include "ofp_stat.h"
 #include "ofp_socket_types.h"
+#include "ofp_socket_sigevent.h"
 #include "ofp_socket.h"
 #include "ofp_in.h"
 #include "ofp_in6.h"

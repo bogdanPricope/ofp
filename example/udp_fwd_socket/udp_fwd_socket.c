@@ -25,14 +25,13 @@ struct ofp_sockaddr_in *raddr = NULL;
 int *sock_array;
 int sock_array_size;
 
-static void notify(union ofp_sigval sv);
+static void notify(union ofp_sigval *sv);
 
 static int create_local_sock(int lport, char *laddr_txt)
 {
 	int sd;
 	struct ofp_sockaddr_in laddr = {0};
 	struct ofp_sigevent ev;
-	struct ofp_sock_sigval ss;
 
 	/* Create socket*/
 	if ((sd = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM, OFP_IPPROTO_UDP))
@@ -58,13 +57,11 @@ static int create_local_sock(int lport, char *laddr_txt)
 	}
 
 	/* Register callback on socket*/
-	ss.sockfd = sd;
-	ss.event = OFP_EVENT_INVALID;
-	ss.pkt = ODP_PACKET_INVALID;
-	ev.ofp_sigev_notify = OFP_SIGEV_HOOK;
-	ev.ofp_sigev_notify_function = notify;
-	ev.ofp_sigev_value.sival_ptr = &ss;
-	if (ofp_socket_sigevent(&ev) == -1) {
+	ev.sigev_notify = OFP_SIGEV_HOOK;
+	ev.sigev_notify_func = notify;
+	ev.sigev_value.sival_ptr = NULL;
+
+	if (ofp_socket_sigevent(sd, &ev) == -1) {
 		OFP_ERR("Error: Failed configure socket callback: errno = %s\n",
 			ofp_strerror(ofp_errno));
 		ofp_close(sd);
@@ -111,9 +108,9 @@ int udp_fwd_cfg(int sock_count, char *laddr_txt, char *raddr_txt)
 
 
 
-static void notify(union ofp_sigval sv)
+static void notify(union ofp_sigval *sv)
 {
-	struct ofp_sock_sigval *ss = sv.sival_ptr;
+	struct ofp_sock_sigval *ss = (struct ofp_sock_sigval *)sv;
 	int s = ss->sockfd;
 	if (ss->event != OFP_EVENT_RECV)
 		return;

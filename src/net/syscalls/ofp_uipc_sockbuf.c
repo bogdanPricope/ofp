@@ -71,18 +71,16 @@ int packet_accepted_as_event(struct socket *so, odp_packet_t pkt)
 
 	ev = &so->so_sigevent;
 
-	if (ev->ofp_sigev_notify) {
-		union ofp_sigval sv;
+	if (ev->sigev_notify) {
 		struct ofp_sock_sigval ss;
 
-		sv.sival_ptr = (void *)&ss;
-
+		ss.sigev_value = ev->sigev_value;
 		ss.pkt = pkt;
 		ss.event = OFP_EVENT_RECV;
 		ss.sockfd = so->so_number;
 
 		so->so_state |= SS_EVENT;
-		ev->ofp_sigev_notify_function(sv);
+		ev->sigev_notify_func((union ofp_sigval *)&ss);
 		so->so_state &= ~SS_EVENT;
 
 		if (ss.pkt == ODP_PACKET_INVALID)

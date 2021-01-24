@@ -394,44 +394,7 @@ struct ofp_sf_hdtr {
 #define	OFP_SF_MNOWAIT	0x00000002
 #define	OFP_SF_SYNC		0x00000004
 
-/* Events */
-#define OFP_EVENT_INVALID	0
-#define OFP_EVENT_ACCEPT	1
-#define OFP_EVENT_RECV	2
-#define OFP_EVENT_SEND		3
-
-struct ofp_sock_sigval {
-	int		sockfd;
-	int		sockfd2;
-	int		event;
-	odp_packet_t	pkt;
-};
-
-union ofp_sigval {          /* Data passed with notification */
-	int     sival_int;         /* Integer value */
-	void   *sival_ptr;         /* Pointer value */
-};
-
-#define OFP_SIGEV_NONE 0
-#define OFP_SIGEV_HOOK 1
-#define OFP_SIGEV_SIGNAL 2
-#define OFP_SIGEV_THREAD 3
-
-struct ofp_sigevent {
-	int          ofp_sigev_notify; /* Notification method */
-	int          ofp_sigev_signo;  /* Notification signal */
-	union ofp_sigval ofp_sigev_value;  /* Data passed with
-					    notification */
-	void       (*ofp_sigev_notify_function) (union ofp_sigval);
-	/* Function used for thread
-	   notification (SIGEV_THREAD) */
-	void        *ofp_sigev_notify_attr;
-	/* Attributes for notification thread
-	   (SIGEV_THREAD) */
-	ofp_pid_t        ofp_sigev_notify_thread_id;
-	/* ID of thread to signal (SIGEV_THREAD_ID) */
-};
-
+/* select */
 struct ofp_timeval {
 	uint32_t tv_sec;     /* seconds */
 	uint32_t tv_usec;    /* microseconds */
@@ -471,7 +434,6 @@ int	ofp_getsockopt(int, int, int, void *, ofp_socklen_t *);
 
 int	ofp_ioctl(int, int, ...);
 
-int	ofp_socket_sigevent(struct ofp_sigevent *);
 void	*ofp_udp_packet_parse(odp_packet_t, int *,
 				struct ofp_sockaddr *,
 				ofp_socklen_t *);

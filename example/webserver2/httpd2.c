@@ -141,9 +141,9 @@ static int analyze_http(char *http, int s)
 	return 0;
 }
 
-static void notify(union ofp_sigval sv)
+static void notify(union ofp_sigval *sv)
 {
-	struct ofp_sock_sigval *ss = sv.sival_ptr;
+	struct ofp_sock_sigval *ss = (struct ofp_sock_sigval *)sv;
 	int s = ss->sockfd;
 	int event = ss->event;
 	odp_packet_t pkt = ss->pkt;
@@ -153,17 +153,18 @@ static void notify(union ofp_sigval sv)
 	if (event == OFP_EVENT_ACCEPT) {
 		struct ofp_sockaddr_in caller;
 		ofp_socklen_t alen = sizeof(caller);
+		int newfd = 0;
+
 		/*
 		 * ss->sockfd is the original listened socket.
 		 * ss->sockfd2 is the new socket that is returned by accept.
 		 * We don't need the returned socket, but accept
 		 * must be called to set the data structures.
 		 */
-		int new = ofp_accept(ss->sockfd,
-				       (struct ofp_sockaddr *)&caller,
-				       &alen);
-		(void)new;
-		/* new == ss->sockfd2 */
+		newfd = ofp_accept(ss->sockfd,
+				   (struct ofp_sockaddr *)&caller, &alen);
+		(void)newfd;
+		/* newfd == ss->sockfd2 */
 		return;
 	}
 
@@ -208,6 +209,7 @@ int setup_webserver(char *root_dir, char *laddr, uint16_t lport)
 {
 	int serv_fd;
 	struct ofp_sockaddr_in my_addr;
+	struct ofp_sigevent ev;
 
 	OFP_INFO("Setup webserver....");
 
@@ -251,16 +253,12 @@ int setup_webserver(char *root_dir, char *laddr, uint16_t lport)
 
 	ofp_listen(serv_fd, DEFAULT_BACKLOG);
 
-	struct ofp_sigevent ev;
-	struct ofp_sock_sigval ss;
+	odp_memset(&ev, 0, sizeof(ev));
+	ev.sigev_notify = OFP_SIGEV_HOOK;
+	ev.sigev_notify_func = notify;
+	ev.sigev_value.sival_ptr = NULL;
 
-	ss.sockfd = serv_fd;
-	ss.event = 0;
-	ss.pkt = ODP_PACKET_INVALID;
-	ev.ofp_sigev_notify = 1;
-	ev.ofp_sigev_notify_function = notify;
-	ev.ofp_sigev_value.sival_ptr = &ss;
-	ofp_socket_sigevent(&ev);
+	ofp_socket_sigevent(serv_fd, &ev);
 
 	return 0;
 }
