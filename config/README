@@ -112,6 +112,10 @@ ofp_global_param: {
 		capture_ports = integer (hex)
 		capture_filename = string
 	}
+
+	cli: {
+		enable_shutdown_cmd = boolean
+	}
 }
 
 Description:
@@ -306,3 +310,11 @@ debug.capture_ports: Bitmask of the ports for which the packets are captures
 debug.capture_filename: Name of the file where the packets are captured (pcap format)
 	Default value is empty - value of DEFAULT_DEBUG_PCAP_FILE_NAME is used.
 	Example: "/tmp/pkt.pcap"
+
+cli.enable_shutdown_cmd: Enable execution of shutdown command. If set to true,
+	the command will stop the execution of OFP internal threads and also
+	user created OFP control and worker threads or processes (if were
+	constructed to inspect the processing state of OFP (see
+	ofp_get_processing_state()). If set to false, the shutdown cli command will
+	report an error and operation will not take place.
+	Default value is true.

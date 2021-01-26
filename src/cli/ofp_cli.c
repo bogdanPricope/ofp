@@ -493,8 +493,8 @@ static void f_help(struct cli_conn *conn, const char *s)
 	ofp_sendf(conn->fd, "Display help information for CLI commands:\r\n"
 		"  help <command>\r\n"
 		"    command: alias, address, arp, debug, exit, ifconfig, ");
-	ofp_sendf(conn->fd, "ipsec, loglevel, netstat, route, show, stat, ");
-	ofp_sendf(conn->fd, "sysctl\r\n\r\n");
+	ofp_sendf(conn->fd, "ipsec, loglevel, netstat, route, show, shutdown,");
+	ofp_sendf(conn->fd, " stat, sysctl\r\n\r\n");
 	sendcrlf(conn);
 }
 
@@ -513,7 +513,7 @@ static void f_help_show(struct cli_conn *conn, const char *s)
 	ofp_sendf(conn->fd, "Display current status:\r\n"
 		"  show <command>\r\n"
 		"    command: alias, address, arp, debug, ifconfig, ipsec, ");
-	ofp_sendf(conn->fd, "loglevel, netstat, route, stat sysctl\r\n\r\n");
+	ofp_sendf(conn->fd, "loglevel, netstat, route, stat, sysctl\r\n\r\n");
 	sendcrlf(conn);
 }
 
@@ -782,6 +782,11 @@ struct cli_command commands[] = {
 		"help sysctl",
 		NULL,
 		f_help_sysctl
+	},
+	{
+		"help shutdown",
+		NULL,
+		f_help_shutdown
 	},
 	{
 		"arp",
@@ -1058,6 +1063,16 @@ struct cli_command commands[] = {
 		"netstat help",
 		NULL,
 		f_help_netstat
+	},
+	{
+		"shutdown",
+		"Shutdown ofp",
+		f_shutdown
+	},
+	{
+		"shutdown help",
+		NULL,
+		f_help_shutdown
 	},
 	{ NULL, NULL, NULL }
 };

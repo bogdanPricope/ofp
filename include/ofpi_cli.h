@@ -115,4 +115,7 @@ void f_netstat_all(struct cli_conn *conn, const char *s);
 void f_netstat_tcp(struct cli_conn *conn, const char *s);
 void f_netstat_udp(struct cli_conn *conn, const char *s);
 
+void f_shutdown(struct cli_conn *conn, const char *s);
+void f_help_shutdown(struct cli_conn *conn, const char *s);
+
 #endif

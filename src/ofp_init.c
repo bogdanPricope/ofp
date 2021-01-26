@@ -250,6 +250,8 @@ static void read_conf_file(ofp_initialize_param_t *params, const char *filename)
 	GET_CONF_STRING(debug.print_filename);
 	GET_CONF_INT(int, debug.capture_ports);
 	GET_CONF_STRING(debug.capture_filename);
+
+	GET_CONF_INT(bool, cli.enable_shutdown_cmd);
 done:
 	config_destroy(&conf);
 }
@@ -318,6 +320,8 @@ void ofp_initialize_param_from_file(ofp_initialize_param_t *params,
 	params->debug.print_filename[0] = 0;
 	params->debug.capture_ports = 0;
 	params->debug.capture_filename[0] = 0;
+
+	params->cli.enable_shutdown_cmd = 1;
 
 	read_conf_file(params, filename);
 

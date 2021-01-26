@@ -368,6 +368,23 @@ typedef struct ofp_initialize_param_t {
 		 */
 		char capture_filename[OFP_FILE_NAME_SIZE_MAX];
 	} debug;
+
+	/**
+	 * CLI parameters
+	*/
+	struct cli_s {
+		/**
+		 * Enable execution of shutdown command.
+		 * If set to true, the command will stop the execution of OFP
+		 * internal threads and also user created OFP control and
+		 * worker threads or processes (if were constructed to inspect
+		 * the processing state of OFP (see ofp_get_processing_state()).
+		 * If set to false, the shutdown cli command will report an
+		 * error and operation will not take place.
+		 * Default value is true.
+		*/
+		odp_bool_t enable_shutdown_cmd;
+	} cli;
 } ofp_initialize_param_t;
 
 /**
