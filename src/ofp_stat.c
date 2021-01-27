@@ -126,11 +126,16 @@ void ofp_stat_init_prepare(void)
 
 int ofp_stat_init_global(void)
 {
+	unsigned int i;
+
 	HANDLE_ERROR(ofp_stat_alloc_shared_memory());
 
 	memset(shm_stat, 0, sizeof(*shm_stat));
 
 	shm_stat->stat_flags = 0;
+
+	for (i = 0; i < ODP_THREAD_COUNT_MAX; i++)
+		shm_stat->ofp_packet_statistics.per_thr[i].cpu_id = -1;
 
 	return 0;
 }

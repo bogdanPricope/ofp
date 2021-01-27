@@ -22,6 +22,12 @@ int ofp_stat_term_global(void);
 		st->per_thr[odp_thread_id()]._s += _n;	\
 } while (0)
 
+#define OFP_SET_PACKET_STAT(_s, _n) do {				\
+	struct ofp_packet_stat *st = ofp_get_packet_statistics(); \
+	if (st)							\
+		st->per_thr[odp_thread_id()]._s = _n;	\
+} while (0)
+
 #define _UPDATE_LATENCY(_thr, _current_cycle, _n) do {\
 	if (odp_time_to_ns(st->per_thr[_thr].last_input_cycles)) \
 		st->per_thr[_thr].input_latency[\

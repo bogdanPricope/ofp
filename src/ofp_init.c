@@ -709,6 +709,8 @@ int ofp_init_local_resources(void)
 	HANDLE_ERROR(ofp_send_pkt_out_init_local());
 	HANDLE_ERROR(ofp_ipsec_init_local());
 
+	OFP_SET_PACKET_STAT(cpu_id, odp_cpu_id());
+
 	return 0;
 }
 

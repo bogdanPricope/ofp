@@ -42,14 +42,15 @@ static void print_thread_stat(struct cli_conn *conn,
 {
 	int next_thr;
 
-	ofp_sendf(conn->fd, " Thread        ODP_to_FP        FP_to_ODP"
+	ofp_sendf(conn->fd, " Thread   Core        ODP_to_FP        FP_to_ODP"
 		"     FP_to_SP    SP_to_ODP      Tx_frag   Rx_IP_frag"
 		"   Rx_IP_reas\r\n\r\n");
 	next_thr = odp_thrmask_first(&thrmask);
 	while (next_thr >= 0) {
-		ofp_sendf(conn->fd, "%7u %16llu %16llu %12llu %12llu"
+		ofp_sendf(conn->fd, "%7u %6d %16llu %16llu %12llu %12llu"
 			" %12llu %12llu %12llu\r\n",
 			next_thr,
+			st->per_thr[next_thr].cpu_id,
 			st->per_thr[next_thr].rx_fp,
 			st->per_thr[next_thr].tx_fp,
 			st->per_thr[next_thr].rx_sp,
