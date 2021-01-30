@@ -53,7 +53,7 @@ int start_netlink_nl_server(void *arg)
 	(void)arg;
 
 	/* Lookup shared memories */
-	if (ofp_init_local_resources()) {
+	if (ofp_init_local_resources("netlink")) {
 		OFP_ERR("Error: OFP local init failed.\n");
 		return -1;
 	}

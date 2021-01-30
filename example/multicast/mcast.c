@@ -143,6 +143,7 @@ int ofp_multicast_thread(ofp_thread_t *thread_mcast, int core_id)
 	odp_cpumask_zero(&cpumask);
 	odp_cpumask_set(&cpumask, core_id);
 
+	ofp_thread_param_init(&thread_param);
 	thread_param.start = mcasttest;
 	thread_param.arg = NULL;
 	thread_param.thr_type = ODP_THREAD_CONTROL;

@@ -281,6 +281,7 @@ int main(int argc, char *argv[])
 	/* Create worker threads */
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 	for (i = 0; i < num_workers; ++i) {
+		ofp_thread_param_init(&thread_param);
 		thread_param.start = pkt_io_recv;
 		thread_param.arg = &workers_arg[i];
 		thread_param.thr_type = ODP_THREAD_WORKER;

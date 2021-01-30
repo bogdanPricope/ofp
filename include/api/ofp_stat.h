@@ -27,7 +27,6 @@ struct ofp_packet_stat {
 		uint64_t rx_ip_reass;
 		uint64_t input_latency[OFP_LATENCY_SLICES];
 		odp_time_t last_input_cycles;
-		int cpu_id;
 	} per_thr[ODP_THREAD_COUNT_MAX];
 };
 

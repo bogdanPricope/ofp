@@ -252,6 +252,7 @@ int main(int argc, char *argv[])
 
 		pktio_thr_args[i].num_pktin = params.if_count;
 
+		ofp_thread_param_init(&thread_param);
 		thread_param.start = pkt_io_recv;
 		thread_param.arg = &pktio_thr_args[i];
 		thread_param.thr_type = ODP_THREAD_WORKER;
@@ -276,6 +277,7 @@ int main(int argc, char *argv[])
 
 	odp_cpumask_zero(&cpu_mask);
 	odp_cpumask_set(&cpu_mask, app_init_params.linux_core_id);
+	ofp_thread_param_init(&thread_param);
 	thread_param.start = event_dispatcher;
 	thread_param.arg = NULL;
 	thread_param.thr_type = ODP_THREAD_WORKER;

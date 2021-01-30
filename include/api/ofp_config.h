@@ -168,4 +168,7 @@
 /** Maximum size of an interface name */
 #define OFP_IFNAMSIZ  32
 
+/** Maximum size of the thread or process description */
+#define OFP_THREAD_DESCR_SIZE_MAX  8
+
 #endif

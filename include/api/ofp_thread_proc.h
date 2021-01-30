@@ -20,6 +20,7 @@ typedef struct {
 	int (*start)(void *start_arg);  /**< Thread entry point function */
 	void *arg;                      /**< Argument for the function */
 	odp_thread_type_t thr_type;     /**< ODP thread type */
+	const char *description;        /**< Thread description */
 } ofp_thread_param_t;
 
 typedef odph_thread_t ofp_thread_t;
@@ -27,6 +28,7 @@ typedef odph_thread_t ofp_thread_t;
 /* OFP process */
 typedef struct {
 	odp_thread_type_t thr_type; /**< ODP thread type */
+	const char *description;    /**< Process description */
 } ofp_process_param_t;
 
 typedef odph_linux_process_t ofp_process_t;
@@ -55,6 +57,14 @@ typedef odph_linux_process_t ofp_process_t;
 
 int ofp_get_default_worker_cpumask(int req_num, int req_num_max,
 				   odp_cpumask_t *cpumask);
+
+/**
+ * Initialize a ofp_thread_param_t argument with the default values.
+ *
+ * @param param    Argument to initialize.
+ **/
+
+void ofp_thread_param_init(ofp_thread_param_t *param);
 
 /**
  * Creates and launches ofp threads
@@ -86,6 +96,14 @@ int ofp_thread_create(ofp_thread_t *thread_tbl,
  */
 
 int ofp_thread_join(ofp_thread_t *thread_tbl, int num);
+
+/**
+ * Initialize a ofp_process_param_t argument with the default values.
+ *
+ * @param param    Argument to initialize.
+ **/
+
+void ofp_process_param_init(ofp_process_param_t *param);
 
 /**
  * Fork a number of ofp processes

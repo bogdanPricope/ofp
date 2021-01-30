@@ -52,7 +52,7 @@ pid_t fork(void)
 			netwrap_pid = -1;
 		else if (pid == 0) {	/* child*/
 			netwrap_pid = 0;
-			ofp_init_local_resources();
+			ofp_init_local_resources(NULL);
 		} else				/* parent */
 			netwrap_pid = pid;
 	} else if (libc_fork)

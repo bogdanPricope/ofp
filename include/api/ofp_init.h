@@ -485,12 +485,15 @@ int ofp_terminate(void);
  * directly to create threads or processes. In that case it must
  * call it before calling any other OFP API on that thread or process.
  *
+ * @param description Thread or process short description. Takes a null
+ * terminated string value or NULL if no description is given.
+ *
  * @retval 0 on success
  * @retval -1 on failure
  *
  * @see ofp_initialize() which must have been called prior to this.
  */
-int ofp_init_local_resources(void);
+int ofp_init_local_resources(const char *description);
 
 /**
  * Thread or process resources termination

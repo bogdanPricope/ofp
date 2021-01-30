@@ -604,7 +604,7 @@ int ofp_initialize(ofp_initialize_param_t *params)
 	odp_schedule_resume();
 
 	state = OFP_INIT_STATE_OFP_LOCAL_INIT;
-	if (ofp_init_local_resources() != 0) {
+	if (ofp_init_local_resources("ofp_main") != 0) {
 		OFP_ERR("Failed to thread local settings");
 		goto init_error;
 	}
@@ -672,8 +672,10 @@ init_error:
 }
 
 
-int ofp_init_local_resources(void)
+int ofp_init_local_resources(const char *description)
 {
+	int ofp_thr_id = -1;
+
 	/* This must be done first */
 	HANDLE_ERROR(ofp_shared_memory_init_local());
 
@@ -709,7 +711,15 @@ int ofp_init_local_resources(void)
 	HANDLE_ERROR(ofp_send_pkt_out_init_local());
 	HANDLE_ERROR(ofp_ipsec_init_local());
 
-	OFP_SET_PACKET_STAT(cpu_id, odp_cpu_id());
+	ofp_thr_id = odp_thread_id();
+	V_global_thread_info[ofp_thr_id].cpu_id = odp_cpu_id();
+	V_global_thread_info[ofp_thr_id].description[0] = 0;
+	if (description) {
+		char *dscr = V_global_thread_info[ofp_thr_id].description;
+
+		strncpy(dscr, description, OFP_THREAD_DESCR_SIZE_MAX + 1);
+		dscr[OFP_THREAD_DESCR_SIZE_MAX] = 0;
+	}
 
 	return 0;
 }

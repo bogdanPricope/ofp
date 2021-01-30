@@ -11,6 +11,8 @@
 typedef struct {
 	int (*start)(void *start_arg); /**< Thread entry point function */
 	void *arg;                     /**< Argument for the function */
+	char description[OFP_THREAD_DESCR_SIZE_MAX + 1]; /**< Thread
+					description */
 } ofp_start_thread_arg_t;
 
 int ofp_get_default_worker_cpumask(int req_num, int req_num_max,
@@ -40,6 +42,14 @@ int ofp_get_default_worker_cpumask(int req_num, int req_num_max,
 	return 0;
 }
 
+void ofp_thread_param_init(ofp_thread_param_t *param)
+{
+	if (!param)
+		return;
+
+	odp_memset(param, 0, sizeof(ofp_thread_param_t));
+}
+
 static void cleanup_thr_param(odph_thread_param_t *thr_param,
 			      int st_idx, int cnt)
 {
@@ -55,7 +65,7 @@ static int ofp_thread_start(void *arg)
 	ofp_start_thread_arg_t *thread_start_arg =
 		(ofp_start_thread_arg_t *)arg;
 
-	if (ofp_init_local_resources())
+	if (ofp_init_local_resources(thread_start_arg->description))
 		return -1;
 
 	ret = thread_start_arg->start(thread_start_arg->arg);
@@ -108,6 +118,16 @@ int ofp_thread_create(ofp_thread_t *thread_tbl,
 
 		thread_start_arg->start = thread_param->start;
 		thread_start_arg->arg = thread_param->arg;
+		thread_start_arg->description[0] = 0;
+		if (thread_param->description) {
+			size_t array_size =
+				sizeof(thread_start_arg->description);
+
+			strncpy(thread_start_arg->description,
+				thread_param->description,
+				array_size);
+			thread_start_arg->description[array_size - 1] = 0;
+		}
 		thr_param[i].arg = thread_start_arg;
 	}
 
@@ -126,6 +146,15 @@ int ofp_thread_join(ofp_thread_t *thread_tbl, int num)
 	if (!thread_tbl || num <= 0)
 		return -1;
 	return odph_thread_join(thread_tbl, num);
+}
+
+void ofp_process_param_init(ofp_process_param_t *param)
+{
+	if (!param)
+		return;
+
+	odp_memset(param, 0, sizeof(ofp_process_param_t));
+	param->thr_type = ODP_THREAD_WORKER;
 }
 
 int ofp_process_fork_n(ofp_process_t *proc_tbl,
@@ -147,7 +176,7 @@ int ofp_process_fork_n(ofp_process_t *proc_tbl,
 					mask, &thr_params);
 
 	if (ret == 0) { /* child process*/
-		if (ofp_init_local_resources())
+		if (ofp_init_local_resources(proc_param->description))
 			exit(EXIT_FAILURE);
 	}
 

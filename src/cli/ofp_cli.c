@@ -1737,7 +1737,7 @@ static int cli_server(void *arg)
 
 	OFP_INFO("CLI server started on core %i\n", odp_cpu_id());
 
-	if (ofp_init_local_resources()) {
+	if (ofp_init_local_resources("cli")) {
 		OFP_ERR("Error: OFP local init failed.\n");
 		return -1;
 	}

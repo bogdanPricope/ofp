@@ -166,6 +166,7 @@ int main(int argc, char *argv[])
 	 */
 
 	memset(thread_tbl, 0, sizeof(thread_tbl));
+	ofp_thread_param_init(&thread_param);
 	thread_param.start = default_event_dispatcher;
 	thread_param.arg = ofp_eth_vlan_processing;
 	thread_param.thr_type = ODP_THREAD_WORKER;
@@ -450,9 +451,11 @@ static int start_performance(ofp_thread_t *thread_perf, int core_id)
 	odp_cpumask_zero(&cpumask);
 	odp_cpumask_set(&cpumask, core_id);
 
+	ofp_thread_param_init(&thread_param);
 	thread_param.start = perf_client;
 	thread_param.arg = NULL;
 	thread_param.thr_type = ODP_THREAD_CONTROL;
+	thread_param.description = "perf";
 
 	return ofp_thread_create(thread_perf,
 					 1,

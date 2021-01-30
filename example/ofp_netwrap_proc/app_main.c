@@ -145,6 +145,7 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 	 * input arguments, the cpumask is used to control this.
 	 */
 	memset(thread_tbl, 0, sizeof(thread_tbl));
+	ofp_thread_param_init(&thread_param);
 	thread_param.start = default_event_dispatcher;
 	thread_param.arg = ofp_eth_vlan_processing;
 	thread_param.thr_type = ODP_THREAD_WORKER;

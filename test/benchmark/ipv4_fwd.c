@@ -415,6 +415,7 @@ int main(int argc, char *argv[])
 		ofp_thread_param_t thread_param;
 
 		memset(&thread_param, 0, sizeof(thread_param));
+		ofp_thread_param_init(&thread_param);
 		thread_param.start = worker;
 		thread_param.arg = NULL;
 		thread_param.thr_type = ODP_THREAD_WORKER;

@@ -12,6 +12,11 @@
 #include "api/ofp_init.h"
 #include "ofpi_vnet.h"
 
+struct ofp_thread_info {
+	int cpu_id;
+	char description[OFP_THREAD_DESCR_SIZE_MAX + 1];
+};
+
 struct ofp_global_config_mem {
 	odp_bool_t is_running ODP_ALIGNED_CACHE;
 
@@ -33,6 +38,8 @@ struct ofp_global_config_mem {
 	VNET_DEFINE(enum ofp_log_level_s, loglevel);
 
 	VNET_DEFINE(ofp_initialize_param_t, global_param);
+
+	struct ofp_thread_info thread_info[ODP_THREAD_COUNT_MAX];
 };
 
 extern __thread struct ofp_global_config_mem *shm_global;
@@ -57,6 +64,8 @@ extern __thread ofp_initialize_param_t *global_param;
 #define	V_global_loglevel VNET(shm_global->loglevel)
 
 #define	V_global_param VNET(shm_global->global_param)
+
+#define	V_global_thread_info VNET(shm_global->thread_info)
 
 int ofp_global_param_init_global(ofp_initialize_param_t *params,
 				 odp_instance_t instance,

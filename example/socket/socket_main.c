@@ -105,6 +105,7 @@ int main(int argc, char *argv[])
 
 	/* Start dataplane dispatcher worker threads */
 	memset(thread_tbl, 0, sizeof(thread_tbl));
+	ofp_thread_param_init(&thread_param);
 	thread_param.start = default_event_dispatcher;
 	thread_param.arg = ofp_eth_vlan_processing;
 	thread_param.thr_type = ODP_THREAD_WORKER;

@@ -55,6 +55,7 @@ static int init_suite(void)
 	odp_cpumask_set(&cpumask, 0x1);
 
 	memset(&thread_param, 0, sizeof(thread_param));
+	ofp_thread_param_init(&thread_param);
 	thread_param.start = pp_thread;
 	thread_param.arg = NULL;
 	thread_param.thr_type = ODP_THREAD_WORKER;

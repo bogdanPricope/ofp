@@ -462,6 +462,7 @@ int ofp_start_webserver_thread(ofp_thread_t *webserver_pthread, int core_id,
 	odp_cpumask_zero(&cpumask);
 	odp_cpumask_set(&cpumask, core_id);
 
+	ofp_thread_param_init(&thread_param);
 	thread_param.start = webserver;
 	thread_param.arg = arg;
 	thread_param.thr_type = ODP_THREAD_CONTROL;

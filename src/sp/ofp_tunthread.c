@@ -195,7 +195,7 @@ int sp_rx_thread(void *ifnet_void)
 
 	(void) len;
 
-	if (ofp_init_local_resources()) {
+	if (ofp_init_local_resources("tap_rx")) {
 		OFP_ERR("Error: OFP local init failed.");
 		return -1;
 	}
@@ -264,7 +264,7 @@ int sp_tx_thread(void *ifnet_void)
 	struct timeval timeout;
 	fd_set read_fd;
 
-	if (ofp_init_local_resources()) {
+	if (ofp_init_local_resources("tap_tx")) {
 		OFP_ERR("Error: OFP local init failed.\n");
 		return -1;
 	}

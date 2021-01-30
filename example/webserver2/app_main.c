@@ -380,6 +380,8 @@ int main(int argc, char *argv[])
 	/* Create worker threads */
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 	for (i = 0; i < num_workers; i++) {
+		ofp_thread_param_init(&thread_param);
+
 		if (params.mode == EXEC_MODE_DIRECT_RSS) {
 			thread_param.start = pkt_io_direct_mode_recv;
 			thread_param.arg = &workers_arg_direct_rss[i];

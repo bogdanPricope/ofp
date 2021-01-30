@@ -44,20 +44,21 @@ static void print_thread_stat(struct cli_conn *conn,
 
 	ofp_sendf(conn->fd, " Thread   Core        ODP_to_FP        FP_to_ODP"
 		"     FP_to_SP    SP_to_ODP      Tx_frag   Rx_IP_frag"
-		"   Rx_IP_reas\r\n\r\n");
+		"   Rx_IP_reas    Description\r\n\r\n");
 	next_thr = odp_thrmask_first(&thrmask);
 	while (next_thr >= 0) {
 		ofp_sendf(conn->fd, "%7u %6d %16llu %16llu %12llu %12llu"
-			" %12llu %12llu %12llu\r\n",
+			" %12llu %12llu %12llu %14s\r\n",
 			next_thr,
-			st->per_thr[next_thr].cpu_id,
+			V_global_thread_info[next_thr].cpu_id,
 			st->per_thr[next_thr].rx_fp,
 			st->per_thr[next_thr].tx_fp,
 			st->per_thr[next_thr].rx_sp,
 			st->per_thr[next_thr].tx_sp,
 			st->per_thr[next_thr].tx_eth_frag,
 			st->per_thr[next_thr].rx_ip_frag,
-			st->per_thr[next_thr].rx_ip_reass);
+			st->per_thr[next_thr].rx_ip_reass,
+			V_global_thread_info[next_thr].description);
 		next_thr = odp_thrmask_next(&thrmask, next_thr);
 	}
 	ofp_sendf(conn->fd, "\r\n");

@@ -128,6 +128,7 @@ int main(int argc, char *argv[])
 
 	/* Start worker processes */
 	memset(proc_tbl, 0, sizeof(proc_tbl));
+	ofp_process_param_init(&proc_param);
 	proc_param.thr_type = ODP_THREAD_WORKER;
 
 	ret = ofp_process_fork_n(proc_tbl, &cpumask_workers, &proc_param);

@@ -1080,6 +1080,7 @@ int main(int argc, char *argv[])
 	 * client.
 	 */
 	if (!(gbl_args->appl.single_thread == 1 && gbl_args->appl.mode == MODE_CLIENT)) {
+		ofp_thread_param_init(&thread_param);
 		thread_param.start = pktio_recv;
 		/*
 		 * If single thread server, then we need a separate
@@ -1096,6 +1097,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Create server/client thread */
+	ofp_thread_param_init(&thread_param);
 	if (gbl_args->appl.single_thread) {
 		thread_param.start = (gbl_args->appl.mode == MODE_SERVER) ?
 			run_server_single : run_client_single;

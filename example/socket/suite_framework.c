@@ -43,12 +43,14 @@ void run_suite(run_function run_func1, run_function run_func2)
 	odp_cpumask_zero(&sock_cpumask);
 	odp_cpumask_set(&sock_cpumask, core_id);
 
+	ofp_thread_param_init(&thread_param);
 	thread_param.start = suite_thread1;
 	thread_param.arg = run_func1;
 	thread_param.thr_type = ODP_THREAD_CONTROL;
 	ofp_thread_create(&sock_pthread1, 1,
 			  &sock_cpumask, &thread_param);
 
+	ofp_thread_param_init(&thread_param);
 	thread_param.start = suite_thread2;
 	thread_param.arg = run_func2;
 	thread_param.thr_type = ODP_THREAD_CONTROL;

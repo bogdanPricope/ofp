@@ -55,6 +55,8 @@ int ofp_global_param_init_global(ofp_initialize_param_t *params,
 				 odp_instance_t instance,
 				 odp_bool_t instance_owner)
 {
+	unsigned int i;
+
 	HANDLE_ERROR(ofp_global_config_alloc_shared_memory());
 
 	memset(shm_global, 0, sizeof(*shm_global));
@@ -77,6 +79,9 @@ int ofp_global_param_init_global(ofp_initialize_param_t *params,
 	V_global_loglevel = params->loglevel;
 
 	V_global_param = *params;
+
+	for (i = 0; i < ODP_THREAD_COUNT_MAX; i++)
+		V_global_thread_info[i].cpu_id = -1;
 
 	return 0;
 }
