@@ -1033,16 +1033,6 @@ static void cmd_help(struct cli_conn *conn, const char *s)
 	sendcrlf(conn);
 }
 
-struct cli_command {
-	const char *command;
-	const char *help;
-#if 0
-	void (*func)(struct cli_conn *, const char *);
-#else
-	void *func;
-#endif
-};
-
 static struct cli_command commands[] = {
 	/*
 	 * IPsec SA template
@@ -1239,8 +1229,6 @@ static struct cli_command commands[] = {
 	{ NULL, NULL, NULL }
 };
 
-void ofpcli_ipsec_init(void);
-
 void ofpcli_ipsec_init(void)
 {
 	struct cli_command *cmd = commands;
@@ -1251,7 +1239,7 @@ void ofpcli_ipsec_init(void)
 	initialized = 1;
 
 	while (cmd->command) {
-		ofp_cli_add_command(cmd->command, cmd->help, cmd->func);
+		ofp_cli_parser_add_command(cmd);
 		cmd++;
 	}
 }

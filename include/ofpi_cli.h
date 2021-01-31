@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include "ofpi_api_cli.h"
 
+void ofpcli_ipsec_init(void);
+
 #define PASSWORD_LEN 32
 
 #define NUM_OLD_BUFS 8
@@ -29,6 +31,14 @@ struct cli_conn {
 	char          passwd[PASSWORD_LEN + 1];
 };
 
+/** CLI Command descriptor
+ */
+struct cli_command {
+	const char *command;
+	const char *help;
+	void (*func)(struct cli_conn *conn, const char *s);
+};
+
 /* API implementation */
 int ofp_start_cli_thread_imp(int core_id, char *cli_file);
 int ofp_stop_cli_thread_imp(void);
@@ -36,9 +46,16 @@ void ofp_cli_add_command_imp(const char *cmd, const char *help,
 			     ofp_cli_cb_func func);
 int ofp_cli_get_fd_imp(void *handle);
 
+/** CLI parser
+ */
+void ofp_cli_parser_parse(struct cli_conn *conn, int extra);
+void ofp_cli_parser_add_command(struct cli_command *cc);
+void ofp_cli_parser_print_nodes(int fd);
+
 /** utils
  */
 void sendcrlf(struct cli_conn *conn);
+void sendstr(struct cli_conn *conn, const char *s); /* To Change*/
 int ip4addr_get(const char *tk, uint32_t *addr);
 int ip4net_get(const char *tk, uint32_t *addr, int *mask);
 int ip6addr_get(const char *tk, int tk_len, uint8_t *addr);
