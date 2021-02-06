@@ -42,6 +42,7 @@
 #include "ofpi_ipsec.h"
 
 #include "ofpi_cli.h"
+#include "ofpi_cli_shm.h"
 
 #include "ofpi_log.h"
 #include "ofpi_debug.h"
@@ -406,6 +407,9 @@ static void ofp_init_prepare(void)
 	ofp_ip6_init_prepare();
 #endif /*INET6*/
 	ofp_ipsec_init_prepare(&global_param->ipsec);
+#ifdef CLI
+	ofp_cli_init_prepare();
+#endif /* CLI */
 }
 
 static int ofp_initialize_stack_global(ofp_initialize_param_t *params,
@@ -486,6 +490,10 @@ static int ofp_initialize_stack_global(ofp_initialize_param_t *params,
 	HANDLE_ERROR(ofp_igmp_var_init_global());
 	HANDLE_ERROR(ofp_inet_init());
 	HANDLE_ERROR(ofp_ipsec_init_global(&params->ipsec));
+
+#ifdef CLI
+	HANDLE_ERROR(ofp_cli_init_global());
+#endif /*CLI*/
 
 	return 0;
 }
@@ -721,6 +729,10 @@ int ofp_init_local_resources(const char *description)
 		dscr[OFP_THREAD_DESCR_SIZE_MAX] = 0;
 	}
 
+#ifdef CLI
+	HANDLE_ERROR(ofp_cli_init_local());
+#endif /* CLI */
+
 	return 0;
 }
 
@@ -794,6 +806,10 @@ int ofp_terminate_stack_global(const char *pool_name)
 {
 	odp_pool_t pool;
 	int rc = 0;
+
+#ifdef CLI
+	CHECK_ERROR(ofp_cli_term_global(), rc);
+#endif /* CLI */
 
 	/* Cleanup sockets */
 	CHECK_ERROR(ofp_socket_term_global(), rc);

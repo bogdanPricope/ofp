@@ -35,8 +35,6 @@
  * Only core 0 runs this.
  */
 
-static int close_cli;
-
 int cli_display_width = 80, cli_display_height = 24;
 int cli_curses = 0;
 int cli_display_row = 2, cli_display_col = 5;
@@ -59,12 +57,7 @@ static struct cli_conn connection;
 
 int run_alias = -1;
 
-static void close_connection(struct cli_conn *conn)
-{
-	(void)conn;
-	OFP_DBG("Closing connection...\r\n");
-	close_cli = 1; /* tell server to close the socket */
-}
+static void close_connection(struct cli_conn *conn);
 
 static uint8_t txt_to_hex(char val)
 {
@@ -185,6 +178,14 @@ void sendstr(struct cli_conn *conn, const char *s)
 		(void)(write(conn->fd, s, strlen(s)) + 1);
 }
 
+static void sendbuf(struct cli_conn *conn, const char *buff, size_t buff_len)
+{
+	if (S_ISSOCK(conn->fd))
+		send(conn->fd, buff, buff_len, 0);
+	else
+		(void)(write(conn->fd, buff, buff_len) + 1);
+}
+
 void sendcrlf(struct cli_conn *conn)
 {
 	if ((conn->status & DO_ECHO) == 0)
@@ -203,21 +204,14 @@ static void sendprompt(struct cli_conn *conn)
 		sendstr(conn, "\r> ");
 }
 
-static void cli_send_welcome_banner(int fd)
+static void cli_send_welcome_banner(struct cli_conn *conn)
 {
-	struct cli_conn *conn;
-	char sendbuf[100];
-	(void)fd;
-
-	conn = &connection;
-
-	sprintf(sendbuf,
+	sendstr(conn,
 		"\r\n"
 		"--==--==--==--==--==--==--\r\n"
 		"-- WELCOME to OFP CLI --\r\n"
 		"--==--==--==--==--==--==--\r\n"
 		);
-	sendstr(conn, sendbuf);
 	sendcrlf(conn);
 }
 
@@ -834,7 +828,7 @@ int ofp_cli_get_fd_imp(void *handle)
 	return conn->fd;
 }
 
-static void cli_init_commands(void)
+void cli_init_commands(void)
 {
 	unsigned i = 0;
 	static int initialized = 0;
@@ -871,7 +865,7 @@ static void cli_init_commands(void)
 	}
 }
 
-static void cli_process_file(char *file_name)
+void cli_process_file(char *file_name)
 {
 	FILE *f;
 	struct cli_conn conn;
@@ -909,18 +903,8 @@ static char telnet_echo_off[] = {
 	0xff, 0xfd, 0x03, /* IAC DO SUPPRESS_GO_AHEAD */
 };
 
-static int cli_read(int fd)
+int cli_conn_recv(struct cli_conn *conn, unsigned char c)
 {
-	struct cli_conn *conn = &connection;
-	unsigned char c;
-
-	//receive data from client
-	if (recv(fd, &c, 1, 0) <= 0) {
-		OFP_ERR("Failed to recive data on socket: %s", strerror(errno));
-		close_connection(conn);
-		return -1;
-	}
-
 	if (conn->status & WAITING_PASSWD) {
 		unsigned int plen = strlen(conn->passwd);
 		if (c == 10 || c == 13) {
@@ -962,7 +946,7 @@ static int cli_read(int fd)
 		conn->status |= WILL_SUPPRESS;
 		// ask for display size
 		char com[] = {255, 253, 31};
-		send(fd, com, sizeof(com), 0);
+		sendbuf(conn, com, sizeof(com));
 	} else if (conn->ch1 == (unsigned char)0x251 && c == 31) {
 		// IAC WILL NAWS (display size)
 	} else if (conn->ch1 == 250 && c == 31) {  // (display size info)
@@ -1039,13 +1023,13 @@ static int cli_read(int fd)
 	} else if (c == 13 || c == 10) {
 	char nl[] = {13, 10};
 	if (conn->status & DO_ECHO)
-		send(fd, nl, sizeof(nl), 0);
+		sendbuf(conn, nl, sizeof(nl));
 	conn->inbuf[conn->pos] = 0;
 	if (0 && conn->pos == 0) {
 		strcpy(conn->inbuf, conn->oldbuf[conn->old_put_cnt]);
 		conn->pos = strlen(conn->inbuf);
 		sendstr(conn, conn->inbuf);
-		send(fd, nl, sizeof(nl), 0);
+		sendbuf(conn, nl, sizeof(nl));
 	} else if (conn->pos > 0 && strcmp(conn->oldbuf[conn->old_put_cnt], conn->inbuf)) {
 		conn->old_put_cnt++;
 		if (conn->old_put_cnt >= NUM_OLD_BUFS)
@@ -1071,7 +1055,7 @@ static int cli_read(int fd)
 		if (conn->pos > 0) {
 			char bs[] = {8, ' ', 8};
 			if (conn->status & DO_ECHO)
-				send(fd, bs, sizeof(bs), 0);
+				sendbuf(conn, bs, sizeof(bs));
 			conn->pos--;
 			conn->inbuf[conn->pos] = 0;
 		}
@@ -1083,216 +1067,40 @@ static int cli_read(int fd)
 			conn->inbuf[conn->pos] = 0;
 
 			if (conn->status & DO_ECHO)
-				send(fd, &c, 1, 0);
+				sendbuf(conn, (char *)&c, 1);
 		}
 	}
 
 	return 0;
 }
 
-static void cli_sa_accept(int fd)
+struct cli_conn *cli_conn_accept(int fd)
 {
 	struct cli_conn *conn;
 
 	conn = &connection;
 	bzero(conn, sizeof(*conn));
 	conn->fd = fd;
-	send(fd, telnet_echo_off, sizeof(telnet_echo_off), 0);
+	sendbuf(conn, telnet_echo_off, sizeof(telnet_echo_off));
 
 	OFP_DBG("new sock %d opened\r\n", conn->fd);
+
+	cli_send_welcome_banner(conn);
+
+	return conn;
 }
 
-#define OFP_SERVER_PORT 2345
-
-static int cli_serv_fd = -1, cli_tmp_fd = -1;
-
-/** CLI server thread
- *
- * @param arg void*
- * @return void*
- *
- */
-static int cli_server(void *arg)
+static void close_connection(struct cli_conn *conn)
 {
-	int alen;
-	struct sockaddr_in my_addr, caller;
-	int reuse = 1;
-	fd_set read_fd, fds;
-	char *file_name;
-	struct ofp_global_config_mem *ofp_global_cfg = NULL;
-	int select_nfds;
-
-	close_cli = 0;
-
-	file_name = (char *)arg;
-
-	OFP_INFO("CLI server started on core %i\n", odp_cpu_id());
-
-	if (ofp_init_local_resources("cli")) {
-		OFP_ERR("Error: OFP local init failed.\n");
-		return -1;
-	}
-
-	ofp_global_cfg = ofp_get_global_config();
-	if (!ofp_global_cfg) {
-		OFP_ERR("Error: Failed to retrieve global configuration.");
-		ofp_term_local_resources();
-		return -1;
-	}
-
-	cli_init_commands();
-
-	cli_process_file(file_name);
-
-	cli_serv_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (cli_serv_fd < 0) {
-		OFP_ERR("cli serv socket\n");
-		ofp_term_local_resources();
-		return -1;
-	}
-
-	if (setsockopt(cli_serv_fd, SOL_SOCKET,
-		   SO_REUSEADDR, (void *)&reuse, sizeof(reuse)) < 0)
-		OFP_ERR("cli setsockopt (SO_REUSEADDR)\n");
-
-	memset(&my_addr, 0, sizeof(my_addr));
-	my_addr.sin_family = AF_INET;
-	my_addr.sin_port = odp_cpu_to_be_16(OFP_SERVER_PORT);
-	my_addr.sin_addr.s_addr = odp_cpu_to_be_32(INADDR_ANY);
-
-	if (bind(cli_serv_fd, (struct sockaddr *)&my_addr,
-		 sizeof(struct sockaddr)) < 0) {
-		OFP_ERR("serv bind\n");
-		ofp_term_local_resources();
-		return -1;
-	}
-
-	listen(cli_serv_fd, 1);
-
-	FD_ZERO(&read_fd);
-	FD_SET(cli_serv_fd, &read_fd);
-
-	while (ofp_global_cfg->is_running) {
-		struct timeval timeout;
-		int r;
-
-		fds = read_fd;
-		select_nfds = cli_serv_fd + 1;
-
-		if (cli_tmp_fd > 0) {
-			FD_SET(cli_tmp_fd, &fds);
-			if (cli_tmp_fd > select_nfds - 1)
-				select_nfds = cli_tmp_fd + 1;
-		}
-
-		timeout.tv_sec = 1;
-		timeout.tv_usec = 0;
-
-		r = select(select_nfds, &fds, NULL, NULL, &timeout);
-
-		if (close_cli) {
-			if (cli_tmp_fd > 0)
-				close(cli_tmp_fd);
-			cli_tmp_fd = -1;
-			close_cli = 0;
-			OFP_DBG("CLI connection closed\r\n");
-		}
-
-		if (r < 0)
-			continue;
-
-		if (FD_ISSET(cli_serv_fd, &fds)) {
-			close_cli = 0;
-
-			if (cli_tmp_fd > 0)
-				close(cli_tmp_fd);
-
-			alen = sizeof(caller);
-			cli_tmp_fd = accept(cli_serv_fd,
-					(struct sockaddr *)&caller,
-					(socklen_t *)&alen);
-			if (cli_tmp_fd < 0) {
-				OFP_ERR("cli serv accept");
-				continue;
-			}
-			cli_sa_accept(cli_tmp_fd);
-			cli_send_welcome_banner(cli_tmp_fd);
-			OFP_DBG("CLI connection established\r\n");
-		}
-
-	if (cli_tmp_fd > 0 && FD_ISSET(cli_tmp_fd, &fds)) {
-			if (cli_read(cli_tmp_fd)) {
-				close(cli_tmp_fd);
-				cli_tmp_fd = -1;
-				OFP_DBG("CLI connection closed\r\n");
-			}
-		}
-	} /* while () */
-
-	if (cli_tmp_fd > 0)
-		close(cli_tmp_fd);
-	cli_tmp_fd = -1;
-
-	close(cli_serv_fd);
-	cli_serv_fd = -1;
-
-	OFP_DBG("CLI server exiting");
-	ofp_term_local_resources();
-	return 0;
+	conn->close_cli = 1;
+	OFP_DBG("Closing connection...\r\n");
 }
 
-int ofp_start_cli_thread_imp(int core_id, char *cli_file)
+void close_connections(void)
 {
-	odp_cpumask_t cpumask;
-	struct ofp_global_config_mem *ofp_global_cfg;
-	odph_odpthread_params_t thr_params;
+	struct cli_conn *conn = &connection;
 
-	ofp_global_cfg = ofp_get_global_config();
-	if (!ofp_global_cfg) {
-		OFP_ERR("Error: Failed to retrieve global configuration.");
-		return -1;
-	}
-	if (ofp_global_cfg->cli_thread_is_running) {
-		OFP_ERR("Error: CLI thread is running.");
-		return -1;
-	}
-	odp_cpumask_zero(&cpumask);
-	odp_cpumask_set(&cpumask, core_id);
-
-	thr_params.start = cli_server;
-	thr_params.arg = cli_file;
-	thr_params.thr_type = ODP_THREAD_CONTROL;
-	thr_params.instance = ofp_global_cfg->odp_instance;
-
-	if (odph_odpthreads_create(&ofp_global_cfg->cli_thread,
-				   &cpumask,
-				   &thr_params) == 0) {
-		OFP_ERR("Failed to start CLI thread.");
-		ofp_global_cfg->cli_thread_is_running = 0;
-		return -1;
-	}
-	ofp_global_cfg->cli_thread_is_running = 1;
-
-	return 0;
-}
-
-int ofp_stop_cli_thread_imp(void)
-{
-	struct ofp_global_config_mem *ofp_global_cfg;
-
-	ofp_global_cfg = ofp_get_global_config();
-	if (!ofp_global_cfg) {
-		OFP_ERR("Error: Failed to retrieve global configuration.");
-		return -1;
-	}
-
-	if (ofp_global_cfg->cli_thread_is_running) {
-		close_connection(NULL);
-		odph_odpthreads_join(&ofp_global_cfg->cli_thread);
-		ofp_global_cfg->cli_thread_is_running = 0;
-	}
-
-	return 0;
+	close_connection(conn);
 }
 
 /*end*/

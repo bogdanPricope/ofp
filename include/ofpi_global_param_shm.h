@@ -28,9 +28,6 @@ struct ofp_global_config_mem {
 	VNET_DEFINE(odp_bool_t, nl_thread_is_running);
 #endif /* SP */
 
-	VNET_DEFINE(odph_odpthread_t, cli_thread);
-	VNET_DEFINE(odp_bool_t, cli_thread_is_running);
-
 	VNET_DEFINE(odp_cpumask_t, linux_cpumask);
 
 	VNET_DEFINE(odp_pool_t, packet_pool);
@@ -54,9 +51,6 @@ extern __thread ofp_initialize_param_t *global_param;
 #define	V_global_nl_thread	VNET(shm_global->nl_thread)
 #define	V_global_nl_thread_is_running	VNET(shm_global->nl_thread_is_running)
 #endif /* SP */
-
-#define	V_global_cli_thread	VNET(shm_global->cli_thread)
-#define	V_global_cli_thread_is_running	VNET(shm_global->cli_thread_is_running)
 
 #define	V_global_linux_cpumask VNET(shm_global->linux_cpumask)
 #define	V_global_packet_pool VNET(shm_global->packet_pool)

@@ -126,6 +126,8 @@ if OFP_CLI
 __LIB__libofp_la_SOURCES += \
 cli/ofp_cli.c \
 cli/ofp_cli_parser.c \
+cli/ofp_cli_thread.c \
+cli/ofp_cli_shm.c \
 cli/ofp_cli_route.c \
 cli/ofp_cli_debug.c \
 cli/ofp_cli_log.c \

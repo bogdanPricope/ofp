@@ -68,7 +68,6 @@ int ofp_global_param_init_global(ofp_initialize_param_t *params,
 #ifdef SP
 	V_global_nl_thread_is_running = 0;
 #endif /* SP */
-	shm_global->cli_thread_is_running = 0;
 
 	/* cpu mask for slow path threads */
 	odp_cpumask_zero(&V_global_linux_cpumask);

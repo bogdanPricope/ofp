@@ -51,6 +51,7 @@ noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_callout.h\
 		  $(top_srcdir)/include/ofpi_api_cli.h \
 		  $(top_srcdir)/include/ofpi_cli.h \
+		  $(top_srcdir)/include/ofpi_cli_shm.h \
 		  $(top_srcdir)/include/ofpi_thread_proc.h \
 		  $(top_srcdir)/include/ofpi_config.h \
 		  $(top_srcdir)/include/ofpi_debug.h \

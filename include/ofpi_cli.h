@@ -29,6 +29,7 @@ struct cli_conn {
 	unsigned int  pos;
 	unsigned char ch1;
 	char          passwd[PASSWORD_LEN + 1];
+	int           close_cli;
 };
 
 /** CLI Command descriptor
@@ -59,6 +60,12 @@ void sendstr(struct cli_conn *conn, const char *s); /* To Change*/
 int ip4addr_get(const char *tk, uint32_t *addr);
 int ip4net_get(const char *tk, uint32_t *addr, int *mask);
 int ip6addr_get(const char *tk, int tk_len, uint8_t *addr);
+
+void cli_init_commands(void);
+void cli_process_file(char *file_name);
+void close_connections(void);
+struct cli_conn *cli_conn_accept(int fd);
+int cli_conn_recv(struct cli_conn *conn, unsigned char c);
 
 /** commands
  */
