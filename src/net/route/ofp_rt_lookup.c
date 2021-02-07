@@ -366,30 +366,33 @@ void ofp_rtl_destroy(struct ofp_rtl_tree *tree, void (*func)(void *data))
 	tree->root = NULL;
 }
 
-static void traverse(int fd, struct ofp_rtl_node *node,
-					 void (*func)(int fd, uint32_t key, int level, struct ofp_nh_entry *data),
-					 uint32_t key, int level)
+static void traverse(ofp_print_t *pr, struct ofp_rtl_node *node,
+		     void (*func)(ofp_print_t *pr, uint32_t key, int level,
+				  struct ofp_nh_entry *data),
+		     uint32_t key, int level)
 {
 	if (!node)
 		return;
 
 	if (func && (node->flags & OFP_RTL_FLAGS_VALID_DATA))
-			func(fd, key, level, &(node->data[0]));
+		func(pr, key, level, &(node->data[0]));
 
-	traverse(fd, node->left, func, key, level+1);
-	if (node->right) key |= 0x80000000 >> level;
-	traverse(fd, node->right, func, key, level+1);
+	traverse(pr, node->left, func, key, level + 1);
+	if (node->right)
+		key |= 0x80000000 >> level;
+	traverse(pr, node->right, func, key, level + 1);
 }
 
-void ofp_rtl_traverse(int fd, struct ofp_rtl_tree *tree,
-					  void (*func)(int fd, uint32_t key, int level, struct ofp_nh_entry *data))
+void ofp_rtl_traverse(ofp_print_t *pr, struct ofp_rtl_tree *tree,
+		      void (*func)(ofp_print_t *pr, uint32_t key, int level,
+				   struct ofp_nh_entry *data))
 {
-	traverse(fd, tree->root, func, 0, 0);
+	traverse(pr, tree->root, func, 0, 0);
 }
 
 struct ofp_nh6_entry *
 ofp_rtl_insert6(struct ofp_rtl6_tree *tree, uint8_t *addr,
-				uint32_t masklen, struct ofp_nh6_entry *data)
+		uint32_t masklen, struct ofp_nh6_entry *data)
 {
 	struct ofp_rtl6_node  *node;
 	struct ofp_rtl6_node  *last = NULL;
@@ -546,10 +549,11 @@ ofp_rtl_remove6(struct ofp_rtl6_tree *tree, uint8_t *addr, uint32_t masklen)
 }
 
 #if 0
-static void tr(int fd, struct ofp_rtl6_node *n, int level)
+static void tr(ofp_print_t *pr, struct ofp_rtl6_node *n, int level)
 {
-	ofp_sendf(fd, "level=%d node=%d left=%d right=%d flags=%d\r\n", level, NUM(n),
-			  NUM(n->left), NUM(n->right), n->flags);
+	ofp_print(pr, "level=%d node=%d left=%d right=%d flags=%d\r\n",
+		  level, NUM(n),
+		  NUM(n->left), NUM(n->right), n->flags);
 	if (n->left) {
 		tr(fd, n->left, level+1);
 	}
@@ -559,8 +563,9 @@ static void tr(int fd, struct ofp_rtl6_node *n, int level)
 }
 #endif
 
-void ofp_rtl_traverse6(int fd, struct ofp_rtl6_tree *tree,
-					   void (*func)(int fd, uint8_t *key, int level, struct ofp_nh6_entry *data))
+void ofp_rtl_traverse6(ofp_print_t *pr, struct ofp_rtl6_tree *tree,
+		       void (*func)(ofp_print_t *pr, uint8_t *key, int level,
+				    struct ofp_nh6_entry *data))
 {
 	char key[16];
 	memset(key, 0, sizeof(key));
@@ -576,7 +581,7 @@ void ofp_rtl_traverse6(int fd, struct ofp_rtl6_tree *tree,
 
 	for (;;) {
 		if (func && (node->flags & OFP_RTL_FLAGS_VALID_DATA) && visited[depth] == 0) {
-			func(fd, (uint8_t*)key, depth, &(node->data));
+			func(pr, (uint8_t *)key, depth, &(node->data));
 		}
 
 		stack[depth] = node;
@@ -599,12 +604,13 @@ void ofp_rtl_traverse6(int fd, struct ofp_rtl6_tree *tree,
 	}
 }
 
-void ofp_print_rt_stat(int fd)
+void ofp_print_rt_stat(ofp_print_t *pr)
 {
-	ofp_sendf(fd, "rt tree alloc now=%d max=%d total=%d\r\n",
-			  shm->nodes_allocated, shm->max_nodes_allocated, NUM_NODES);
-	ofp_sendf(fd, "rt6 tree alloc now=%d max=%d total=%d\r\n",
-			  shm->nodes_allocated6, shm->max_nodes_allocated6, NUM_NODES_6);
+	ofp_print(pr, "rt tree alloc now=%d max=%d total=%d\r\n",
+		  shm->nodes_allocated, shm->max_nodes_allocated, NUM_NODES);
+	ofp_print(pr, "rt6 tree alloc now=%d max=%d total=%d\r\n",
+		  shm->nodes_allocated6, shm->max_nodes_allocated6,
+		  NUM_NODES_6);
 }
 
 static int ofp_rt_lookup_alloc_shared_memory(void)

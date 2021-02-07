@@ -39,7 +39,8 @@ include_HEADERS = \
 		$(top_srcdir)/include/api/ofp_tcp.h \
 		$(top_srcdir)/include/api/ofp_epoll.h \
 		$(top_srcdir)/include/api/ofp_ipsec.h \
-		$(top_srcdir)/include/api/ofp_ipsec_init.h
+		$(top_srcdir)/include/api/ofp_ipsec_init.h \
+		$(top_srcdir)/include/api/ofp_print.h
 
 noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_global_param_shm.h \
@@ -129,6 +130,7 @@ noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_brlock.h \
 		  $(top_srcdir)/include/ofpi_ipsec.h \
 		  $(top_srcdir)/include/ofpi_ipsec_spd.h \
-		  $(top_srcdir)/include/ofpi_ipsec_sad.h
+		  $(top_srcdir)/include/ofpi_ipsec_sad.h \
+		  $(top_srcdir)/include/ofpi_print.h
 
 EXTRA_DIST = bootstrap .scmversion

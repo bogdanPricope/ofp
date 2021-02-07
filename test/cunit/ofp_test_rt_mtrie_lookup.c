@@ -668,19 +668,21 @@ void add_rule(uint16_t vrf, uint32_t masklen, uint16_t port)
 
 char print_buffer[256];
 int print_index;
-static void rule_printer(int fd, uint32_t key, int level,
+static void rule_printer(ofp_print_t *pr, uint32_t key, int level,
 			 struct ofp_nh_entry *data)
 {
+	uint16_t vrf = *(uint16_t *)pr;
 	(void)key;
+	(void)pr;
 	print_index += snprintf(&print_buffer[print_index],
 				sizeof(print_buffer) - print_index,
-				"[%d,%d,%u]", fd, level, data->port);
+				"[%d,%d,%u]", vrf, level, data->port);
 }
 
 const char *print_rule(uint16_t vrf)
 {
 	print_index = 0;
-	ofp_rt_rule_print(vrf, vrf, rule_printer);
+	ofp_rt_rule_print((ofp_print_t *)&vrf, vrf, rule_printer);
 	print_buffer[print_index] = '\0';
 	return print_buffer;
 }

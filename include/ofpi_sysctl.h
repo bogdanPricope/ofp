@@ -37,6 +37,7 @@
 
 #include "ofpi_queue.h"
 #include "api/ofp_sysctl.h"
+#include "ofpi_print.h"
 
 /*
  * USE THIS instead of a hardwired number from the categories below
@@ -252,7 +253,7 @@ int sysctl_handle_opaque(OFP_SYSCTL_HANDLER_ARGS);
 void ofp_sysctl_add_child(struct ofp_sysctl_oid *oidp,
 			  struct ofp_sysctl_oid *parent);
 
-void ofp_sysctl_write_tree(int fd);
+void ofp_sysctl_write_tree(ofp_print_t *pr);
 
 void ofp_sysctl_init_prepare(void);
 int ofp_sysctl_init_global(void);

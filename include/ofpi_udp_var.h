@@ -41,6 +41,7 @@
 #include "ofpi_udp.h"
 #include "ofpi_sysctl.h"
 #include "ofpi_vnet.h"
+#include "ofpi_print.h"
 
 struct mbuf;
 //struct inpcb;
@@ -107,7 +108,7 @@ void		 ofp_udp_ctlinput(int, struct ofp_sockaddr *, void *);
 int		 ofp_udp_ctloutput(struct socket *, struct sockopt *);
 void		 ofp_udp_init(void);
 void		 ofp_udp_destroy(void);
-void		 ofp_udp_netstat(int fd);
+void		 ofp_udp_netstat(ofp_print_t *pr);
 enum ofp_return_code ofp_udp_input(odp_packet_t *, int);
 struct inpcb	*ofp_udp_notify(struct inpcb *, int);
 int		 ofp_udp_shutdown(struct socket *so);

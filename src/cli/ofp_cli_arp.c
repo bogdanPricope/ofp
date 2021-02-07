@@ -16,28 +16,28 @@
 #include "ofpi_util.h"
 
 
-void f_arp(struct cli_conn *conn, const char *s)
+void f_arp(ofp_print_t *pr, const char *s)
 {
 	(void)s;
 
-	ofp_show_routes(conn->fd, OFP_SHOW_ARP);
-	ofp_arp_show_saved_packets(conn->fd);
+	ofp_show_routes(pr, OFP_SHOW_ARP);
+	ofp_arp_show_saved_packets(pr);
 }
 
-void f_arp_flush(struct cli_conn *conn, const char *s)
+void f_arp_flush(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	(void)conn;
+	(void)pr;
 
 	ofp_arp_init_tables();
 }
 
-void f_arp_cleanup(struct cli_conn *conn, const char *s)
+void f_arp_cleanup(ofp_print_t *pr, const char *s)
 {
 	int cli = 1;
 
 	(void)s;
-	(void)conn;
+	(void)pr;
 #ifdef OFP_USE_LIBCK
 	(void)cli;
 	/* Aging not defined in arp ck impl */
@@ -46,7 +46,7 @@ void f_arp_cleanup(struct cli_conn *conn, const char *s)
 #endif
 }
 
-void f_arp_add(struct cli_conn *conn, const char *s)
+void f_arp_add(ofp_print_t *pr, const char *s)
 {
 	int a, b, c, d, e, f, g, h, i, j;
 	char dev[16];
@@ -69,30 +69,30 @@ void f_arp_add(struct cli_conn *conn, const char *s)
 
 	port = ofp_name_to_port_vlan(dev, &vlan);
 	if (port == -1 || !PHYS_PORT(port)) {
-		ofp_sendf(conn->fd, "Invalid device name.\r\n");
+		ofp_print(pr, "Invalid device name.\r\n");
 		return;
 	}
 
 	itf = ofp_get_ifnet(port, vlan);
 	if (itf == NULL) {
-		ofp_sendf(conn->fd, "Device not found.\r\n");
+		ofp_print(pr, "Device not found.\r\n");
 		return;
 	}
 
 	if (ofp_arp_ipv4_insert(ipv4_addr, mac, itf, TRUE)) {
-		ofp_sendf(conn->fd, "Failed to insert arp entry.\r\n");
+		ofp_print(pr, "Failed to insert arp entry.\r\n");
 		return;
 	}
 }
 
-void f_help_arp(struct cli_conn *conn, const char *s)
+void f_help_arp(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	ofp_sendf(conn->fd,
-		"Show arp table:\r\n"
-		"  arp\r\n\r\n");
+	ofp_print(pr,
+		  "Show arp table:\r\n"
+		  "  arp\r\n\r\n");
 
-	ofp_sendf(conn->fd,
+	ofp_print(pr,
 		  "Add arp entry:\r\n"
 		  "  arp set IP4ADDR HWADDR dev DEV\r\n"
 		  "    IP4ADDR: ip address in a.b.c.d format\r\n"
@@ -101,15 +101,15 @@ void f_help_arp(struct cli_conn *conn, const char *s)
 		  "  Example:\r\n"
 		  "    arp set 192.168.0.20 90:1b:0e:9a:cf:fc dev fp0\r\n\r\n");
 
-	ofp_sendf(conn->fd,
-		"Flush arp table:\r\n"
-		"  arp flush\r\n\r\n");
+	ofp_print(pr,
+		  "Flush arp table:\r\n"
+		  "  arp flush\r\n\r\n");
 
-	ofp_sendf(conn->fd,
-		"Clean old entries from arp table:\r\n"
-		"  arp cleanup\r\n\r\n");
+	ofp_print(pr,
+		  "Clean old entries from arp table:\r\n"
+		  "  arp cleanup\r\n\r\n");
 
-	ofp_sendf(conn->fd,
-		"Show (this) help:\r\n"
-		"  arp help\r\n\r\n");
+	ofp_print(pr,
+		  "Show (this) help:\r\n"
+		  "  arp help\r\n\r\n");
 }

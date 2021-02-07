@@ -1311,10 +1311,10 @@ void avl_node_unlock(avl_node *node)
 }
 #endif
 
-void ofp_print_avl_stat(int fd)
+void ofp_print_avl_stat(ofp_print_t *pr)
 {
-    ofp_sendf(fd, "avl tree alloc now=%d max=%d total=%d\r\n",
-              shm->nodes_allocated, shm->max_nodes_allocated, NUM_NODES);
+	ofp_print(pr, "avl tree alloc now=%d max=%d total=%d\r\n",
+		  shm->nodes_allocated, shm->max_nodes_allocated, NUM_NODES);
 }
 
 static int ofp_avl_alloc_shared_memory(void)

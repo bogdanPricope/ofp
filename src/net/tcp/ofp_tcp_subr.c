@@ -396,7 +396,7 @@ ofp_tcp_destroy(void)
 }
 
 void
-ofp_tcp_netstat(int fd)
+ofp_tcp_netstat(ofp_print_t *pr)
 {
 	struct inpcb *inp, *inp_temp;
 	struct inpcbhead *ipi_listhead;
@@ -405,17 +405,15 @@ ofp_tcp_netstat(int fd)
 
 	OFP_LIST_FOREACH_SAFE(inp, ipi_listhead, inp_list, inp_temp) {
 #ifdef INET6
-		if (inp->inp_inc.inc_flags & INC_ISIPV6)
-			ofp_sendf(fd, "tcp6\t%s:%d\r\n",
-				ofp_print_ip6_addr(inp->inp_inc.
-					inc6_laddr.__u6_addr.__u6_addr8),
-				odp_be_to_cpu_16(inp->inp_inc.inc_lport));
-		else
+	if (inp->inp_inc.inc_flags & INC_ISIPV6)
+		ofp_print(pr, "tcp6\t%s:%d\r\n",
+			  ofp_print_ip6_addr(inp->inp_inc.inc6_laddr.__u6_addr.__u6_addr8),
+			  odp_be_to_cpu_16(inp->inp_inc.inc_lport));
+	else
 #endif
-			ofp_sendf(fd, "tcp\t%s:%d\r\n",
-				ofp_print_ip_addr(inp->inp_inc.
-					inc_laddr.s_addr),
-				odp_be_to_cpu_16(inp->inp_inc.inc_lport));
+		ofp_print(pr, "tcp\t%s:%d\r\n",
+			  ofp_print_ip_addr(inp->inp_inc.inc_laddr.s_addr),
+			  odp_be_to_cpu_16(inp->inp_inc.inc_lport));
 	}
 }
 

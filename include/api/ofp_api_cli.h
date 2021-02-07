@@ -63,20 +63,18 @@ int ofp_stop_cli_thread(void);
  * @code
  * void my_func(void *handle, const char *args)
  * {
- *     // get socket
- *     int s =  ofp_cli_get_fd(handle);
  *     int pos;
  *     uint32_t addr;
  *     // args has format "10.20.30.4 5"
  *     [...parse args...]
  *
  *     if (my_array[pos] == 0) {
- *         send(s, "Pos not free!\r\n", 15, 0);
+ *         ofp_cli_print(handle, "Pos not free!\r\n", 15);
  *         return;
  *     }
  *
  *     my_array[pos] = addr;
- *     send(s, "OK\r\n", 4, 0);
+ *     ofp_cli_print(handle, "OK\r\n", 4, 0);
  * }
  *
  * ofp_cli_add_command("add_ip_addr IP4ADDR to NUMBER",
@@ -93,7 +91,7 @@ int ofp_stop_cli_thread(void);
 /**
  * CLI callback function type.
  *
- * @param  handle  Use handle to get file descriptor.
+ * @param  handle  The handle used to print the command output.
  * @param  args    Command line arguments separated by a space.
  */
 typedef void (*ofp_cli_cb_func)(void *handle, const char *args);
@@ -109,13 +107,15 @@ void ofp_cli_add_command(const char *cmd, const char *help,
 			 ofp_cli_cb_func func);
 
 /**
- * Get file descriptor (socket) to write the response.
+ * Print the output of the CLI command
  *
- * @param  handle  Handle is the first argument of the callback function.
- *
- * @retval  File descriptor.
+ * @param  handle   The CLI command function handle argument
+ * @param  buf      Buffer containing the text to print
+ * @param  buf_size Size of the buffer
+ * @retval Number of characters printed.
+ * @retval <0 Failure.
  */
-int ofp_cli_get_fd(void *handle);
+int ofp_cli_print(void *handle, char *buf, size_t buf_size);
 
 #if __GNUC__ >= 4
 #pragma GCC visibility pop

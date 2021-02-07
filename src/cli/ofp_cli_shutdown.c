@@ -13,12 +13,12 @@
 #include "ofpi_global_param_shm.h"
 #include "ofpi_util.h"
 
-void f_shutdown(struct cli_conn *conn, const char *s)
+void f_shutdown(ofp_print_t *pr, const char *s)
 {
 	(void)s;
 
 	if (V_global_param.cli.enable_shutdown_cmd == 0) {
-		ofp_sendf(conn->fd, "Error: shutdown through CLI not "
+		ofp_print(pr, "Error: shutdown through CLI not "
 			"permitted.\r\n\r\n");
 		return;
 	}
@@ -26,9 +26,9 @@ void f_shutdown(struct cli_conn *conn, const char *s)
 	ofp_stop_processing();
 }
 
-void f_help_shutdown(struct cli_conn *conn, const char *s)
+void f_help_shutdown(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	ofp_sendf(conn->fd, "Shutdown OFP:\r\n"
+	ofp_print(pr, "Shutdown OFP:\r\n"
 		"  shutdown\r\n\r\n");
 }

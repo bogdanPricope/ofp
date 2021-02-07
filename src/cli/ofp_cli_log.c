@@ -23,33 +23,33 @@ const char *loglevel_descript[] = {
 
 /* loglevel help */
 /* help loglevel */
-void f_help_loglevel(struct cli_conn *conn, const char *s)
+void f_help_loglevel(ofp_print_t *pr, const char *s)
 {
 	(void)s;
 
-	ofp_sendf(conn->fd, "Show log level\r\n"
+	ofp_print(pr, "Show log level\r\n"
 		"  loglevel show\r\n\r\n");
-	ofp_sendf(conn->fd, "Set log level\r\n"
+	ofp_print(pr, "Set log level\r\n"
 		"  loglevel set <debug|info|warning|error|disabled>\r\n"
                 "  Note:\r\n"
                 "    Debug level logs require --enable-debug configuration option\r\n"
                 "  Example: Set log level to generate warning and error logs:\r\n"
 		"    loglevel set warning\r\n\r\n");
-	ofp_sendf(conn->fd, "Show log level help (this help)\r\n"
+	ofp_print(pr, "Show log level help (this help)\r\n"
 		"  loglevel help\r\n");
 }
 
 /* loglevel */
 /* loglevel show */
-void f_loglevel_show(struct cli_conn *conn, const char *s)
+void f_loglevel_show(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	ofp_sendf(conn->fd, "Log level: %s\r\n",
-		loglevel_descript[ofp_loglevel_get()]);
+	ofp_print(pr, "Log level: %s\r\n",
+		  loglevel_descript[ofp_loglevel_get()]);
 }
 
 /* loglevel set */
-void f_loglevel(struct cli_conn *conn, const char *s)
+void f_loglevel(ofp_print_t *pr, const char *s)
 {
 	int i;
 
@@ -61,7 +61,7 @@ void f_loglevel(struct cli_conn *conn, const char *s)
 		}
 	}
 
-	ofp_sendf(conn->fd, "Invalid value!\r\nUsage:\r\n");
+	ofp_print(pr, "Invalid value!\r\nUsage:\r\n");
 
-	f_help_loglevel(conn, NULL);
+	f_help_loglevel(pr, NULL);
 }

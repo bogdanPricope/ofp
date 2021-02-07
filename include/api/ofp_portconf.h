@@ -9,6 +9,7 @@
 #define __OFP_PORTCONF_H__
 
 #include <odp_api.h>
+#include "ofp_print.h"
 
 #if __GNUC__ >= 4
 #pragma GCC visibility push(default)
@@ -41,10 +42,10 @@ const char *ofp_config_interface_del_ip_v4(int port, uint16_t vlan,
 								int vrf, uint32_t addr, int masklen);
 
 /* Interfaces: SHOW */
-void ofp_show_interfaces(int fd);
+void ofp_show_interfaces(ofp_print_t *pr);
 
 /* Show ifnet ips */
-void ofp_show_ifnet_ip_addrs(int fd);
+void ofp_show_ifnet_ip_addrs(ofp_print_t *pr);
 
 /* Interfaces: operations*/
 int ofp_get_num_ports(void);

@@ -104,7 +104,6 @@ void ofp_ip6_masklen_to_mask(int masklen, uint8_t *mask);
 int ofp_mask_length(int masklen, uint8_t *mask);
 int ofp_name_to_port_vlan(const char *dev, int *vlan);
 char *ofp_port_vlan_to_ifnet_name(int port, int vlan);
-int ofp_sendf(int fd, const char *fmt, ...);
 int ofp_has_mac(uint8_t *mac);
 
 static inline odp_pool_t ofp_pool_create(const char *name,

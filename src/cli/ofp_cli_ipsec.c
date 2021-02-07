@@ -194,7 +194,7 @@ static struct sp_template *find_spt(const char *name)
 	return NULL;
 }
 
-static void cmd_sat_add(struct cli_conn *conn, const char *s)
+static void cmd_sat_add(ofp_print_t *pr, const char *s)
 {
 	struct sa_template *sat;
 	char name[MAX_STR];
@@ -202,13 +202,13 @@ static void cmd_sat_add(struct cli_conn *conn, const char *s)
 	sscanf(s, "%"SCNs, name); /* strip whitespace */
 
 	if (find_sat(name)) {
-		ofp_sendf(conn->fd, "Template already exists\r\n");
+		ofp_print(pr, "Template already exists\r\n");
 		return;
 	}
 
 	sat = sat_alloc();
 	if (sat == NULL) {
-		ofp_sendf(conn->fd, "Template allocation failed");
+		ofp_print(pr, "Template allocation failed");
 		return;
 	}
 	memset(sat, 0, sizeof(*sat));
@@ -217,7 +217,7 @@ static void cmd_sat_add(struct cli_conn *conn, const char *s)
 	sat->allocated = 1;
 }
 
-static void cmd_spt_add(struct cli_conn *conn, const char *s)
+static void cmd_spt_add(ofp_print_t *pr, const char *s)
 {
 	struct sp_template *spt;
 	char name[MAX_STR];
@@ -225,13 +225,13 @@ static void cmd_spt_add(struct cli_conn *conn, const char *s)
 	sscanf(s, "%"SCNs, name); /* strip whitespace */
 
 	if (find_spt(name)) {
-		ofp_sendf(conn->fd, "Template already exists\r\n");
+		ofp_print(pr, "Template already exists\r\n");
 		return;
 	}
 
 	spt = spt_alloc();
 	if (spt == NULL) {
-		ofp_sendf(conn->fd, "Template allocation failed");
+		ofp_print(pr, "Template allocation failed");
 		return;
 	}
 	memset(spt, 0, sizeof(*spt));
@@ -240,51 +240,51 @@ static void cmd_spt_add(struct cli_conn *conn, const char *s)
 	spt->allocated = 1;
 }
 
-static struct sa_template *sat_from_cmd(struct cli_conn *conn, const char *s)
+static struct sa_template *sat_from_cmd(ofp_print_t *pr, const char *s)
 {
 	char name[MAX_STR];
 	struct sa_template *sat;
 
 	if (sscanf(s, "%"SCNs, name) != 1) {
-		ofp_sendf(conn->fd, "Syntax error\r\n");
+		ofp_print(pr, "Syntax error\r\n");
 		return NULL;
 	}
 	sat = find_sat(name);
 
 	if (sat == NULL) {
-		ofp_sendf(conn->fd, "Template not found\r\n");
+		ofp_print(pr, "Template not found\r\n");
 	}
 	return sat;
 }
 
-static struct sp_template *spt_from_cmd(struct cli_conn *conn, const char *s)
+static struct sp_template *spt_from_cmd(ofp_print_t *pr, const char *s)
 {
 	char name[MAX_STR];
 	struct sp_template *spt;
 
 	if (sscanf(s, "%"SCNs, name) != 1) {
-		ofp_sendf(conn->fd, "Syntax error\r\n");
+		ofp_print(pr, "Syntax error\r\n");
 		return NULL;
 	}
 	spt = find_spt(name);
 
 	if (spt == NULL) {
-		ofp_sendf(conn->fd, "Template not found\r\n");
+		ofp_print(pr, "Template not found\r\n");
 	}
 	return spt;
 }
 
-static void cmd_sat_del(struct cli_conn *conn, const char *s)
+static void cmd_sat_del(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 
 	if (sat)
 		sat->allocated = 0;
 }
 
-static void cmd_spt_del(struct cli_conn *conn, const char *s)
+static void cmd_spt_del(ofp_print_t *pr, const char *s)
 {
-	struct sp_template *spt = spt_from_cmd(conn, s);
+	struct sp_template *spt = spt_from_cmd(pr, s);
 
 	if (spt)
 		spt->allocated = 0;
@@ -295,7 +295,7 @@ static void cmd_spt_del(struct cli_conn *conn, const char *s)
  * through 'byte'.
  * Return 0 if 's' is empty, 1 on success and -1 on failure.
  */
-static int get_byte(struct cli_conn *conn, const char *s, uint8_t *byte)
+static int get_byte(ofp_print_t *pr, const char *s, uint8_t *byte)
 {
 	char tmp[3];
 	char *endptr;
@@ -307,13 +307,13 @@ static int get_byte(struct cli_conn *conn, const char *s, uint8_t *byte)
 	tmp[2] = 0;
 	*byte = strtoul(tmp, &endptr, 16);
 	if (endptr != &tmp[2]) {
-		ofp_sendf(conn->fd, "Invalid key\r\n");
+		ofp_print(pr, "Invalid key\r\n");
 		return -1;
 	}
 	return 1;
 }
 
-static void parse_key(struct cli_conn *conn, const char *s,
+static void parse_key(ofp_print_t *pr, const char *s,
 		      ofp_ipsec_key_t *key)
 {
 	char key_str[MAX_STR];
@@ -321,14 +321,14 @@ static void parse_key(struct cli_conn *conn, const char *s,
 	int t;
 
 	if (sscanf(s, "%*s%"SCNs, key_str) != 1) {
-		ofp_sendf(conn->fd, "Syntax error\r\n");
+		ofp_print(pr, "Syntax error\r\n");
 		return;
 	}
 	s = key_str;
 
 	tmp_key.key_len = 0;
 	while (1) {
-		t = get_byte(conn, s, &tmp_key.key_data[tmp_key.key_len]);
+		t = get_byte(pr, s, &tmp_key.key_data[tmp_key.key_len]);
 		if (t == -1)
 			break;
 		if (t == 0) {
@@ -336,7 +336,7 @@ static void parse_key(struct cli_conn *conn, const char *s,
 			break;
 		}
 		if (tmp_key.key_len >= OFP_IPSEC_MAX_KEY_SZ) {
-			ofp_sendf(conn->fd, "Key too long\r\n");
+			ofp_print(pr, "Key too long\r\n");
 			break;
 		}
 		tmp_key.key_len++;
@@ -344,209 +344,209 @@ static void parse_key(struct cli_conn *conn, const char *s,
 	}
 }
 
-static void parse_enum(struct cli_conn *conn, const char *s,
+static void parse_enum(ofp_print_t *pr, const char *s,
 		       const char *context, int *result)
 {
 	char new_value[MAX_STR];
 
 	if (sscanf(s, "%*s%"SCNs, new_value) != 1) {
-		ofp_sendf(conn->fd, "Syntax error\r\n");
+		ofp_print(pr, "Syntax error\r\n");
 		return;
 	}
 	if (!value_str_valid(context, new_value)) {
-		ofp_sendf(conn->fd, "Invalid %s\r\n", context);
+		ofp_print(pr, "Invalid %s\r\n", context);
 		return;
 	}
 	*result = value_str_to_num(context, new_value);
 }
 
-static void cmd_sat_set_vrf(struct cli_conn *conn, const char *s)
+static void cmd_sat_set_vrf(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 	uint16_t vrf;
 
 	if (sat) {
 		if (sscanf(s, "%*s%"SCNu16, &vrf) != 1) {
-			ofp_sendf(conn->fd, "Syntax error\r\n");
+			ofp_print(pr, "Syntax error\r\n");
 			return;
 		}
 		sat->vrf = vrf;
 	}
 }
 
-static void cmd_sat_set_dir(struct cli_conn *conn, const char *s)
+static void cmd_sat_set_dir(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 
 	if (sat)
-		parse_enum(conn, s, "direction", &sat->dir);
+		parse_enum(pr, s, "direction", &sat->dir);
 }
 
-static void cmd_sat_set_mode(struct cli_conn *conn, const char *s)
+static void cmd_sat_set_mode(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 
 	if (sat)
-		parse_enum(conn, s, "mode", &sat->mode);
+		parse_enum(pr, s, "mode", &sat->mode);
 }
 
-static void cmd_sat_set_proto(struct cli_conn *conn, const char *s)
+static void cmd_sat_set_proto(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 
 	if (sat)
-		parse_enum(conn, s, "protocol", &sat->proto);
+		parse_enum(pr, s, "protocol", &sat->proto);
 }
 
-static void cmd_sat_set_cipher(struct cli_conn *conn, const char *s)
+static void cmd_sat_set_cipher(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 
 	if (sat)
-		parse_enum(conn, s, "cipher", &sat->cipher);
+		parse_enum(pr, s, "cipher", &sat->cipher);
 }
 
-static void cmd_sat_set_cipher_key(struct cli_conn *conn, const char *s)
+static void cmd_sat_set_cipher_key(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 
 	if (sat)
-		parse_key(conn, s, &sat->cipher_key);
+		parse_key(pr, s, &sat->cipher_key);
 }
 
-static void cmd_sat_set_auth(struct cli_conn *conn, const char *s)
+static void cmd_sat_set_auth(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 
 	if (sat)
-		parse_enum(conn, s, "auth-alg", &sat->auth);
+		parse_enum(pr, s, "auth-alg", &sat->auth);
 }
 
-static void cmd_sat_set_auth_key(struct cli_conn *conn, const char *s)
+static void cmd_sat_set_auth_key(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 
 	if (sat)
-		parse_key(conn, s, &sat->auth_key);
+		parse_key(pr, s, &sat->auth_key);
 }
 
-static void cmd_sat_set_window_size(struct cli_conn *conn, const char *s)
+static void cmd_sat_set_window_size(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 	uint32_t size;
 
 	if (sat) {
 		if (sscanf(s, "%*s%"SCNu32, &size) != 1) {
-			ofp_sendf(conn->fd, "Syntax error\r\n");
+			ofp_print(pr, "Syntax error\r\n");
 			return;
 		}
 		sat->window_size = size;
 	}
 }
 
-static void cmd_sat_set_tun_src(struct cli_conn *conn, const char *s)
+static void cmd_sat_set_tun_src(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 	char addr[MAX_STR];
 
 	if (sat) {
 		if (sscanf(s, "%*s %"SCNs, addr) != 1) {
-			ofp_sendf(conn->fd, "Syntax error\r\n");
+			ofp_print(pr, "Syntax error\r\n");
 		} else if (!ip4addr_get(addr, &sat->tun_src)) {
-			ofp_sendf(conn->fd, "Invalid address\r\n");
+			ofp_print(pr, "Invalid address\r\n");
 		}
 	}
 }
 
-static void cmd_sat_set_tun_dst(struct cli_conn *conn, const char *s)
+static void cmd_sat_set_tun_dst(ofp_print_t *pr, const char *s)
 {
-	struct sa_template *sat = sat_from_cmd(conn, s);
+	struct sa_template *sat = sat_from_cmd(pr, s);
 	char addr[MAX_STR];
 
 	if (sat) {
 		if (sscanf(s, "%*s %"SCNs, addr) != 1) {
-			ofp_sendf(conn->fd, "Syntax error\r\n");
+			ofp_print(pr, "Syntax error\r\n");
 		} else if (!ip4addr_get(addr, &sat->tun_dst)) {
-			ofp_sendf(conn->fd, "Invalid address\r\n");
+			ofp_print(pr, "Invalid address\r\n");
 		}
 	}
 }
 
-static void cmd_spt_set_vrf(struct cli_conn *conn, const char *s)
+static void cmd_spt_set_vrf(ofp_print_t *pr, const char *s)
 {
-	struct sp_template *spt = spt_from_cmd(conn, s);
+	struct sp_template *spt = spt_from_cmd(pr, s);
 	uint16_t vrf;
 
 	if (spt) {
 		if (sscanf(s, "%*s%"SCNu16, &vrf) != 1) {
-			ofp_sendf(conn->fd, "Syntax error\r\n");
+			ofp_print(pr, "Syntax error\r\n");
 			return;
 		}
 		spt->vrf = vrf;
 	}
 }
 
-static void cmd_spt_set_dir(struct cli_conn *conn, const char *s)
+static void cmd_spt_set_dir(ofp_print_t *pr, const char *s)
 {
-	struct sp_template *spt = spt_from_cmd(conn, s);
+	struct sp_template *spt = spt_from_cmd(pr, s);
 
 	if (spt)
-		parse_enum(conn, s, "direction", &spt->dir);
+		parse_enum(pr, s, "direction", &spt->dir);
 }
 
-static void parse_addr_range(struct cli_conn *conn, const char *s,
+static void parse_addr_range(ofp_print_t *pr, const char *s,
 			     uint32_t *start, uint32_t *end)
 {
 	char start_str[MAX_STR], end_str[MAX_STR];
 	uint32_t start_bin, end_bin;
 
 	if (sscanf(s, "%*s%"SCNs"%"SCNs, start_str, end_str) != 2) {
-		ofp_sendf(conn->fd, "Syntax error\r\n");
+		ofp_print(pr, "Syntax error\r\n");
 	} else if (!ip4addr_get(start_str, &start_bin) ||
 		   !ip4addr_get(end_str, &end_bin)) {
-		ofp_sendf(conn->fd, "Invalid address\r\n");
+		ofp_print(pr, "Invalid address\r\n");
 	} else {
 		*start = start_bin;
 		*end = end_bin;
 	}
 }
 
-static void cmd_spt_set_src(struct cli_conn *conn, const char *s)
+static void cmd_spt_set_src(ofp_print_t *pr, const char *s)
 {
-	struct sp_template *spt = spt_from_cmd(conn, s);
+	struct sp_template *spt = spt_from_cmd(pr, s);
 
 	if (spt)
-		parse_addr_range(conn, s, &spt->src_start, &spt->src_end);
+		parse_addr_range(pr, s, &spt->src_start, &spt->src_end);
 }
 
-static void cmd_spt_set_dst(struct cli_conn *conn, const char *s)
+static void cmd_spt_set_dst(ofp_print_t *pr, const char *s)
 {
-	struct sp_template *spt = spt_from_cmd(conn, s);
+	struct sp_template *spt = spt_from_cmd(pr, s);
 
 	if (spt)
-		parse_addr_range(conn, s, &spt->dst_start, &spt->dst_end);
+		parse_addr_range(pr, s, &spt->dst_start, &spt->dst_end);
 }
 
-static void cmd_spt_set_proto(struct cli_conn *conn, const char *s)
+static void cmd_spt_set_proto(ofp_print_t *pr, const char *s)
 {
-	struct sp_template *spt = spt_from_cmd(conn, s);
+	struct sp_template *spt = spt_from_cmd(pr, s);
 	uint16_t proto;
 
 	if (spt) {
 		if (sscanf(s, "%*s%"SCNu16, &proto) != 1) {
-			ofp_sendf(conn->fd, "Syntax error\r\n");
+			ofp_print(pr, "Syntax error\r\n");
 			return;
 		}
 		spt->ip_proto = proto;
 	}
 }
 
-static void cmd_spt_set_action(struct cli_conn *conn, const char *s)
+static void cmd_spt_set_action(ofp_print_t *pr, const char *s)
 {
-	struct sp_template *spt = spt_from_cmd(conn, s);
+	struct sp_template *spt = spt_from_cmd(pr, s);
 
 	if (spt)
-		parse_enum(conn, s, "action", &spt->action);
+		parse_enum(pr, s, "action", &spt->action);
 }
 
 static void ip4addr_print(char *buf, int maxlen, uint32_t addr)
@@ -559,14 +559,14 @@ static void ip4addr_print(char *buf, int maxlen, uint32_t addr)
 		 (addr)       & 0xff);
 }
 
-static void show_sat_params(struct cli_conn *conn, struct sa_template *sat)
+static void show_sat_params(ofp_print_t *pr, struct sa_template *sat)
 {
 	char tun_src[MAX_IP_STR], tun_dst[MAX_IP_STR];
 
 	ip4addr_print(tun_src, sizeof(tun_src), sat->tun_src);
 	ip4addr_print(tun_dst, sizeof(tun_dst), sat->tun_dst);
 
-	ofp_sendf(conn->fd,
+	ofp_print(pr,
 		  "  direction:  %s\r\n"
 		  "  protocol:   %s\r\n"
 		  "  mode:       %s\r\n"
@@ -589,7 +589,7 @@ static void show_sat_params(struct cli_conn *conn, struct sa_template *sat)
 		  tun_dst);
 }
 
-static void show_spt_params(struct cli_conn *conn, struct sp_template *spt)
+static void show_spt_params(ofp_print_t *pr, struct sp_template *spt)
 {
 	char src_s[MAX_IP_STR], src_e[MAX_IP_STR];
 	char dst_s[MAX_IP_STR], dst_e[MAX_IP_STR];
@@ -599,7 +599,7 @@ static void show_spt_params(struct cli_conn *conn, struct sp_template *spt)
 	ip4addr_print(dst_s, sizeof(dst_s), spt->dst_start);
 	ip4addr_print(dst_e, sizeof(dst_e), spt->dst_end);
 
-	ofp_sendf(conn->fd,
+	ofp_print(pr,
 		  "  direction:  %s\r\n"
 		  "  src_addr:   %s - %s\r\n"
 		  "  dst_addr:   %s - %s\r\n"
@@ -612,35 +612,35 @@ static void show_spt_params(struct cli_conn *conn, struct sp_template *spt)
 		  value_str_from_num("action", spt->action));
 }
 
-static void cmd_show_sat(struct cli_conn *conn, const char *s)
+static void cmd_show_sat(ofp_print_t *pr, const char *s)
 {
 	(void) s;
 	int n;
 
 	for (n = 0; n < NUM_TEMPLATES; n++) {
 		if (sa_templates[n].allocated) {
-			ofp_sendf(conn->fd, "\r\nSA template name: %s\r\n",
+			ofp_print(pr, "\r\nSA template name: %s\r\n",
 				  sa_templates[n].name);
-			show_sat_params(conn, &sa_templates[n]);
+			show_sat_params(pr, &sa_templates[n]);
 		}
 	}
 }
 
-static void cmd_show_spt(struct cli_conn *conn, const char *s)
+static void cmd_show_spt(ofp_print_t *pr, const char *s)
 {
 	(void) s;
 	int n;
 
 	for (n = 0; n < NUM_TEMPLATES; n++) {
 		if (sp_templates[n].allocated) {
-			ofp_sendf(conn->fd, "\r\nSA template name: %s\r\n",
+			ofp_print(pr, "\r\nSA template name: %s\r\n",
 				  sp_templates[n].name);
-			show_spt_params(conn, &sp_templates[n]);
+			show_spt_params(pr, &sp_templates[n]);
 		}
 	}
 }
 
-static void cmd_sa_add(struct cli_conn *conn, const char *s)
+static void cmd_sa_add(ofp_print_t *pr, const char *s)
 {
 	char template[MAX_STR];
 	uint32_t id;
@@ -650,13 +650,13 @@ static void cmd_sa_add(struct cli_conn *conn, const char *s)
 	ofp_ipsec_sa_param_t param;
 
 	if (sscanf(s, "%"SCNu32 "%"SCNu32"%"SCNs, &id, &spi, template) != 3) {
-		ofp_sendf(conn->fd, "Syntax error\r\n");
+		ofp_print(pr, "Syntax error\r\n");
 		return;
 	}
 
 	sat = find_sat(template);
 	if (sat == NULL) {
-		ofp_sendf(conn->fd, "Template not found\r\n");
+		ofp_print(pr, "Template not found\r\n");
 		return;
 	}
 
@@ -688,10 +688,10 @@ static void cmd_sa_add(struct cli_conn *conn, const char *s)
 	sa = ofp_ipsec_sa_create(&param);
 	ofp_ipsec_sa_unref(sa); /* forget the returned handle */
 	if (sa == NULL)
-		ofp_sendf(conn->fd, "SA creation failed\r\n");
+		ofp_print(pr, "SA creation failed\r\n");
 }
 
-static void cmd_sp_add(struct cli_conn *conn, const char *s)
+static void cmd_sp_add(ofp_print_t *pr, const char *s)
 {
 	uint32_t id;
 	char template[MAX_STR];
@@ -701,12 +701,12 @@ static void cmd_sp_add(struct cli_conn *conn, const char *s)
 	ofp_ipsec_sp_param_t param;
 
 	if (sscanf(s, "%"SCNu32 "%"SCNu32"%"SCNs, &id, &prio, template) != 3) {
-		ofp_sendf(conn->fd, "Syntax error\r\n");
+		ofp_print(pr, "Syntax error\r\n");
 		return;
 	}
 	spt = find_spt(template);
 	if (spt == NULL) {
-		ofp_sendf(conn->fd, "Template not found\r\n");
+		ofp_print(pr, "Template not found\r\n");
 		return;
 	}
 
@@ -726,102 +726,102 @@ static void cmd_sp_add(struct cli_conn *conn, const char *s)
 	sp = ofp_ipsec_sp_create(&param);
 	ofp_ipsec_sp_unref(sp); /* forget the returned handle */
 	if (sp == NULL)
-		ofp_sendf(conn->fd, "SP creation failed\r\n");
+		ofp_print(pr, "SP creation failed\r\n");
 }
 
-static void cmd_sa_del(struct cli_conn *conn, const char *s)
+static void cmd_sa_del(ofp_print_t *pr, const char *s)
 {
 	uint32_t id;
 	ofp_ipsec_sa_handle sa;
 
 	if (sscanf(s, "%"SCNu32, &id) != 1) {
-		ofp_sendf(conn->fd, "Syntax error\r\n");
+		ofp_print(pr, "Syntax error\r\n");
 		return;
 	}
 	sa = ofp_ipsec_sa_find_by_id(id);
 	if (!sa) {
-		ofp_sendf(conn->fd, "SA not found\r\n");
+		ofp_print(pr, "SA not found\r\n");
 		return;
 	}
 	if (ofp_ipsec_sa_destroy(sa))
-		ofp_sendf(conn->fd, "SA deletion failed\r\n");
+		ofp_print(pr, "SA deletion failed\r\n");
 	ofp_ipsec_sa_unref(sa);
 }
 
-static void cmd_sp_del(struct cli_conn *conn, const char *s)
+static void cmd_sp_del(ofp_print_t *pr, const char *s)
 {
 	uint32_t id;
 	ofp_ipsec_sp_handle sp;
 
 	if (sscanf(s, "%"SCNu32, &id) != 1) {
-		ofp_sendf(conn->fd, "Syntax error\r\n");
+		ofp_print(pr, "Syntax error\r\n");
 		return;
 	}
 	sp = ofp_ipsec_sp_find_by_id(id);
 	if (!sp) {
-		ofp_sendf(conn->fd, "SP not found\r\n");
+		ofp_print(pr, "SP not found\r\n");
 		return;
 	}
 	if (ofp_ipsec_sp_destroy(sp))
-		ofp_sendf(conn->fd, "SP deletion failed\r\n");
+		ofp_print(pr, "SP deletion failed\r\n");
 	ofp_ipsec_sp_unref(sp);
 }
 
-static void cmd_sp_bind(struct cli_conn *conn, const char *s)
+static void cmd_sp_bind(ofp_print_t *pr, const char *s)
 {
 	uint32_t sp_id, sa_id;
 	ofp_ipsec_sp_handle sp;
 	ofp_ipsec_sa_handle sa;
 
 	if (sscanf(s, "%"SCNu32"%"SCNu32, &sp_id, &sa_id) != 2) {
-		ofp_sendf(conn->fd, "Syntax error\r\n");
+		ofp_print(pr, "Syntax error\r\n");
 		return;
 	}
 	sp = ofp_ipsec_sp_find_by_id(sp_id);
 	if (sp == NULL) {
-		ofp_sendf(conn->fd, "SP not found\r\n");
+		ofp_print(pr, "SP not found\r\n");
 		return;
 	}
 	sa = ofp_ipsec_sa_find_by_id(sa_id);
 	if (sa == NULL) {
-		ofp_sendf(conn->fd, "SA not found\r\n");
+		ofp_print(pr, "SA not found\r\n");
 		ofp_ipsec_sp_unref(sp);
 		return;
 	}
 	if (ofp_ipsec_sp_bind(sp, sa))
-		ofp_sendf(conn->fd, "Binding SA to SP failed\r\n");
+		ofp_print(pr, "Binding SA to SP failed\r\n");
 	ofp_ipsec_sp_unref(sp);
 	ofp_ipsec_sa_unref(sa);
 }
 
-static void cmd_sp_unbind(struct cli_conn *conn, const char *s)
+static void cmd_sp_unbind(ofp_print_t *pr, const char *s)
 {
 	uint32_t id;
 	ofp_ipsec_sp_handle sp;
 
 	if (sscanf(s, "%"SCNu32, &id) != 1) {
-		ofp_sendf(conn->fd, "Syntax error\r\n");
+		ofp_print(pr, "Syntax error\r\n");
 		return;
 	}
 	sp = ofp_ipsec_sp_find_by_id(id);
 	if (sp == NULL) {
-		ofp_sendf(conn->fd, "SP not found\r\n");
+		ofp_print(pr, "SP not found\r\n");
 		return;
 	}
 	if (ofp_ipsec_sp_bind(sp, OFP_IPSEC_SA_INVALID))
-		ofp_sendf(conn->fd, "Unbinding SA from SP failed\r\n");
+		ofp_print(pr, "Unbinding SA from SP failed\r\n");
 	ofp_ipsec_sp_unref(sp);
 }
 
-static void show_sa(struct cli_conn *conn, ofp_ipsec_sa_handle sa)
+static void show_sa(ofp_print_t *pr, ofp_ipsec_sa_handle sa)
 {
 	ofp_ipsec_sa_info_t info;
 
 	ofp_ipsec_sa_get_info(sa, &info);
 	if (info.status == OFP_IPSEC_SA_DESTROYED)
 		return;
-	ofp_sendf(conn->fd, "\r\nSA ID: %"PRIu32"\r\n", info.param.id);
-	ofp_sendf(conn->fd,
+	ofp_print(pr, "\r\nSA ID: %"PRIu32"\r\n", info.param.id);
+	ofp_print(pr,
 		  "   status:     %s\r\n"
 		  "   VRF:        %"PRIu16"\r\n"
 		  "   SPI:        %"PRIu32"\r\n"
@@ -847,14 +847,14 @@ static void show_sa(struct cli_conn *conn, ofp_ipsec_sa_handle sa)
 
 		ip4addr_print(src, sizeof(src), tun->ipv4.src_addr.s_addr);
 		ip4addr_print(dst, sizeof(dst), tun->ipv4.dst_addr.s_addr);
-		ofp_sendf(conn->fd,
+		ofp_print(pr,
 			  "   tunnel-src: %s\r\n"
 			  "   tunnel-dst: %s\r\n",
 			  src, dst);
 	}
 }
 
-static void show_sp(struct cli_conn *conn, ofp_ipsec_sp_handle sp)
+static void show_sp(ofp_print_t *pr, ofp_ipsec_sp_handle sp)
 {
 	ofp_ipsec_sp_info_t info;
 	char src_s[MAX_IP_STR], src_e[MAX_IP_STR];
@@ -863,8 +863,8 @@ static void show_sp(struct cli_conn *conn, ofp_ipsec_sp_handle sp)
 	ofp_ipsec_sp_get_info(sp, &info);
 	if (info.status == OFP_IPSEC_SP_DESTROYED)
 		return;
-	ofp_sendf(conn->fd, "\r\nSP ID: %"PRIu32"\r\n", info.param.id);
-	ofp_sendf(conn->fd,
+	ofp_print(pr, "\r\nSP ID: %"PRIu32"\r\n", info.param.id);
+	ofp_print(pr,
 		  "   status:     %s\r\n"
 		  "   VRF:        %"PRIu16"\r\n"
 		  "   direction:  %s\r\n"
@@ -886,7 +886,7 @@ static void show_sp(struct cli_conn *conn, ofp_ipsec_sp_handle sp)
 	ip4addr_print(dst_e, sizeof(dst_e),
 		      info.param.selectors.dst_ipv4_range.last_addr.s_addr);
 
-	ofp_sendf(conn->fd,
+	ofp_print(pr,
 		  "   selectors:\r\n"
 		  "      src_addr:   %s - %s\r\n"
 		  "      dst_addr:   %s - %s\r\n"
@@ -896,37 +896,37 @@ static void show_sp(struct cli_conn *conn, ofp_ipsec_sp_handle sp)
 		  info.param.selectors.ip_proto);
 }
 
-static void cmd_show_sa(struct cli_conn *conn, const char *s)
+static void cmd_show_sa(ofp_print_t *pr, const char *s)
 {
 	ofp_ipsec_sa_handle sa;
 	(void) s;
 
 	sa = ofp_ipsec_sa_first();
 	while (sa != OFP_IPSEC_SA_INVALID) {
-		show_sa(conn, sa);
+		show_sa(pr, sa);
 		sa = ofp_ipsec_sa_next(sa);
 	}
 }
 
-static void cmd_show_sp(struct cli_conn *conn, const char *s)
+static void cmd_show_sp(ofp_print_t *pr, const char *s)
 {
 	ofp_ipsec_sp_handle sp;
 	(void) s;
 
 	sp = ofp_ipsec_sp_first();
 	while (sp != OFP_IPSEC_SP_INVALID) {
-		show_sp(conn, sp);
+		show_sp(pr, sp);
 		sp = ofp_ipsec_sp_next(sp);
 	}
 }
 
-static void cmd_show_ipsec(struct cli_conn *conn, const char *s)
+static void cmd_show_ipsec(ofp_print_t *pr, const char *s)
 {
-	ofp_sendf(conn->fd, "IPsec SPD:\r\n");
-	cmd_show_sp(conn, s);
+	ofp_print(pr, "IPsec SPD:\r\n");
+	cmd_show_sp(pr, s);
 
-	ofp_sendf(conn->fd, "IPsec SAD:\r\n");
-	cmd_show_sa(conn, s);
+	ofp_print(pr, "IPsec SAD:\r\n");
+	cmd_show_sa(pr, s);
 }
 
 static const char *help_text[] = {
@@ -968,14 +968,14 @@ static const char *help_text[] = {
 	"  ipsec sp unbind <sp id> sa <sa id>",
 	0};
 
-static void cmd_help(struct cli_conn *conn, const char *s)
+static void cmd_help(ofp_print_t *pr, const char *s)
 {
 	const char **line = help_text;
 	(void) s;
 
 	while (*line) {
-		ofp_sendf(conn->fd, *line);
-		ofp_sendf(conn->fd, "\r\n");
+		ofp_print(pr, *line);
+		ofp_print(pr, "\r\n");
 		line++;
 	}
 }

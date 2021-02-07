@@ -373,8 +373,9 @@ static void ofp_rt_rule_vrf_iter(uint16_t vrf,
 }
 
 struct ofp_rt_rule_print_iter_arg_st {
-	void (*func)(int fd, uint32_t key, int level, struct ofp_nh_entry *data);
-	int32_t fd;
+	void (*func)(ofp_print_t *pr, uint32_t key, int level,
+		     struct ofp_nh_entry *data);
+	ofp_print_t *pr;
 };
 
 static int ofp_rt_rule_print_iter(void *key, void *iter_arg)
@@ -382,16 +383,17 @@ static int ofp_rt_rule_print_iter(void *key, void *iter_arg)
 	struct ofp_rt_rule_print_iter_arg_st *print_iter_arg = iter_arg;
 	struct ofp_rt_rule *rule = key;
 
-	print_iter_arg->func(print_iter_arg->fd, rule->u1.s1.addr,
+	print_iter_arg->func(print_iter_arg->pr, rule->u1.s1.addr,
 			     rule->u1.s1.masklen, &rule->u1.s1.data[0]);
 	/*return 0 to continue with the iteration*/
 	return 0;
 }
 
-void ofp_rt_rule_print(int fd, uint16_t vrf,
-		       void (*func)(int fd, uint32_t key, int level, struct ofp_nh_entry *data))
+void ofp_rt_rule_print(ofp_print_t *pr, uint16_t vrf,
+		       void (*func)(ofp_print_t *pr, uint32_t key, int level,
+				    struct ofp_nh_entry *data))
 {
-	struct ofp_rt_rule_print_iter_arg_st print_arg = {func, fd};
+	struct ofp_rt_rule_print_iter_arg_st print_arg = {func, pr};
 
 	ofp_rt_rule_vrf_iter(vrf, ofp_rt_rule_print_iter, (void *)&print_arg);
 }
@@ -767,8 +769,9 @@ ofp_rtl_remove6(struct ofp_rtl6_tree *tree, uint8_t *addr, uint32_t masklen)
 	return data;
 }
 
-void ofp_rtl_traverse6(int fd, struct ofp_rtl6_tree *tree,
-					   void (*func)(int fd, uint8_t *key, int level, struct ofp_nh6_entry *data))
+void ofp_rtl_traverse6(ofp_print_t *pr, struct ofp_rtl6_tree *tree,
+		       void (*func)(ofp_print_t *pr, uint8_t *key, int level,
+				    struct ofp_nh6_entry *data))
 {
 	char key[16];
 	memset(key, 0, sizeof(key));
@@ -784,7 +787,7 @@ void ofp_rtl_traverse6(int fd, struct ofp_rtl6_tree *tree,
 
 	for (;;) {
 		if (func && (node->flags & OFP_RTL_FLAGS_VALID_DATA) && visited[depth] == 0) {
-			func(fd, (uint8_t*)key, depth, &(node->data));
+			func(pr, (uint8_t *)key, depth, &(node->data));
 		}
 
 		stack[depth] = node;
@@ -807,15 +810,16 @@ void ofp_rtl_traverse6(int fd, struct ofp_rtl6_tree *tree,
 	}
 }
 
-void ofp_print_rt_stat(int fd)
+void ofp_print_rt_stat(ofp_print_t *pr)
 {
-	ofp_sendf(fd, "rt tree alloc now=%d max=%d total=%d\r\n",
-			  shm->nodes_allocated, shm->max_nodes_allocated, NUM_NODES);
-	ofp_sendf(fd, "rt6 tree alloc now=%d max=%d total=%d\r\n",
-			  shm->nodes_allocated6, shm->max_nodes_allocated6, NUM_NODES_6);
-	ofp_sendf(fd, "rt rule alloc now=%d max=%d total=%d\r\n",
-			  shm->rt_rule_table.rule_allocated,
-			  shm->rt_rule_table.max_rule_allocated, NUM_RT_RULES);
+	ofp_print(pr, "rt tree alloc now=%d max=%d total=%d\r\n",
+		  shm->nodes_allocated, shm->max_nodes_allocated, NUM_NODES);
+	ofp_print(pr, "rt6 tree alloc now=%d max=%d total=%d\r\n",
+		  shm->nodes_allocated6, shm->max_nodes_allocated6,
+		  NUM_NODES_6);
+	ofp_print(pr, "rt rule alloc now=%d max=%d total=%d\r\n",
+		  shm->rt_rule_table.rule_allocated,
+		  shm->rt_rule_table.max_rule_allocated, NUM_RT_RULES);
 }
 
 static int ofp_rt_lookup_alloc_shared_memory(void)

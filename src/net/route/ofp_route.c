@@ -69,8 +69,8 @@ static __thread struct vrf_route_mem *vrf_shm;
 __thread struct ofp_locks_str *ofp_locks_shm;
 
 #ifdef INET6
-static void route6_cleanup(int fd, uint8_t *key, int level,
-		struct ofp_nh6_entry *data);
+static void route6_cleanup(ofp_print_t *pr, uint8_t *key, int level,
+			   struct ofp_nh6_entry *data);
 #endif /* INET6 */
 
 static inline void *pkt6_entry_alloc(void)
@@ -364,78 +364,81 @@ enum ofp_return_code ofp_route_save_ipv6_pkt(odp_packet_t pkt,
 }
 #endif /* INET6 */
 
-static void send_flags(int fd, uint32_t flags)
+static void send_flags(ofp_print_t *pr, uint32_t flags)
 {
 	if (flags & OFP_RTF_NET)
-		ofp_sendf(fd, " net");
+		ofp_print(pr, " net");
 	if (flags & OFP_RTF_GATEWAY)
-		ofp_sendf(fd, " gateway");
+		ofp_print(pr, " gateway");
 	if (flags & OFP_RTF_HOST)
-		ofp_sendf(fd, " host");
+		ofp_print(pr, " host");
 	if (flags & OFP_RTF_REJECT)
-		ofp_sendf(fd, " reject");
+		ofp_print(pr, " reject");
 	if (flags & OFP_RTF_BLACKHOLE)
-		ofp_sendf(fd, " blackhole");
+		ofp_print(pr, " blackhole");
 	if (flags & OFP_RTF_LOCAL)
-		ofp_sendf(fd, " local");
+		ofp_print(pr, " local");
 	if (flags & OFP_RTF_BROADCAST)
-		ofp_sendf(fd, " bcast");
+		ofp_print(pr, " bcast");
 	if (flags & OFP_RTF_MULTICAST)
-		ofp_sendf(fd, " mcast");
+		ofp_print(pr, " mcast");
 }
 
-static void show_routes(int fd, uint32_t key, int level, struct ofp_nh_entry *data)
+static void show_routes(ofp_print_t *pr, uint32_t key, int level,
+			struct ofp_nh_entry *data)
 {
 	char buf[24];
 	snprintf(buf, sizeof(buf), "%s/%d", ofp_print_ip_addr(odp_cpu_to_be_32(key)), level);
-	ofp_sendf(fd, "%-18s %-15s %s   ",
+	ofp_print(pr, "%-18s %-15s %s   ",
 		  buf,
 		  ofp_print_ip_addr(data->gw),
 		  ofp_port_vlan_to_ifnet_name(data->port, data->vlan));
-	send_flags(fd, data->flags);
-	ofp_sendf(fd, "\r\n");
+	send_flags(pr, data->flags);
+	ofp_print(pr, "\r\n");
 }
 
 #ifdef INET6
-static void show_routes6(int fd, uint8_t *key, int level, struct ofp_nh6_entry *data)
+static void show_routes6(ofp_print_t *pr, uint8_t *key, int level,
+			 struct ofp_nh6_entry *data)
 {
 	char buf[128];
 	snprintf(buf, sizeof(buf), "%s/%d", ofp_print_ip6_addr(key), level);
-	ofp_sendf(fd, "%-30s %-28s  %s ",
+	ofp_print(pr, "%-30s %-28s  %s ",
 		  buf,
 		  ofp_print_ip6_addr(data->gw),
 		  ofp_port_vlan_to_ifnet_name(data->port, data->vlan));
-	send_flags(fd, data->flags);
-	ofp_sendf(fd, "\r\n");
+	send_flags(pr, data->flags);
+	ofp_print(pr, "\r\n");
 }
 #endif /* INET6 */
 
-static void iter_routes(int fd, int vrf, struct ofp_rtl_tree *tree)
+static void iter_routes(ofp_print_t *pr, int vrf, struct ofp_rtl_tree *tree)
 {
-	ofp_sendf(fd, "VRF: %d\r\n", vrf);
+	ofp_print(pr, "VRF: %d\r\n", vrf);
 #ifdef MTRIE
 	(void) tree;
-	ofp_rt_rule_print(fd, vrf, show_routes);
+	ofp_rt_rule_print(pr, vrf, show_routes);
 #else
-	ofp_rtl_traverse(fd, tree, show_routes);
+	ofp_rtl_traverse(pr, tree, show_routes);
 #endif
 }
 
-void ofp_show_routes(int fd, int what)
+void ofp_show_routes(ofp_print_t *pr, int what)
 {
 	int i;
 
 	switch (what) {
 	case OFP_SHOW_ARP:
-		ofp_arp_show_table(fd);
+		ofp_arp_show_table(pr);
 		break;
 	case OFP_SHOW_ROUTES:
-		ofp_sendf(fd, "Destination        Gateway         Iface  Flags\r\n");
+		ofp_print(pr, "Destination        Gateway         Iface"
+			  "  Flags\r\n");
 		for (i = 0; i < global_param->num_vrf; i++)
-			iter_routes(fd, i, &vrf_shm->fib[i].routes);
+			iter_routes(pr, i, &vrf_shm->fib[i].routes);
 #ifdef INET6
-		ofp_sendf(fd, "\r\nIPv6 routes\r\n");
-		ofp_rtl_traverse6(fd, &shm->default_routes_6, show_routes6);
+		ofp_print(pr, "\r\nIPv6 routes\r\n");
+		ofp_rtl_traverse6(pr, &shm->default_routes_6, show_routes6);
 #endif /* INET6 */
 		break;
 	}
@@ -655,7 +658,7 @@ int ofp_route_term_global(void)
 		rc = -1;
 	} else {
 #ifdef INET6
-		ofp_rtl_traverse6(0, &shm->default_routes_6, route6_cleanup);
+		ofp_rtl_traverse6(NULL, &shm->default_routes_6, route6_cleanup);
 #endif /*INET6*/
 	}
 
@@ -674,12 +677,12 @@ int ofp_route_term_global(void)
 }
 
 #ifdef INET6
-static void route6_cleanup(int fd, uint8_t *key, int level,
-		struct ofp_nh6_entry *data)
+static void route6_cleanup(ofp_print_t *pr, uint8_t *key, int level,
+			   struct ofp_nh6_entry *data)
 {
 	struct pkt6_entry *pktentry;
 
-	(void)fd;
+	(void)pr;
 	(void)key;
 	(void)level;
 

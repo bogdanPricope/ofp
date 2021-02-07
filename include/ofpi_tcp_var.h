@@ -38,6 +38,7 @@
 
 #include "ofpi_tcp.h"
 #include "ofpi_vnet.h"
+#include "ofpi_print.h"
 
 /*
  * Kernel variables for tcp.
@@ -570,7 +571,7 @@ void	 ofp_tcp_drain(void);
 void	 ofp_tcp_tcbinfo_hashstats(unsigned int *min, unsigned int *avg, unsigned int *max);
 void	 ofp_tcp_init(void);
 void	 ofp_tcp_destroy(void);
-void	 ofp_tcp_netstat(int fd);
+void	 ofp_tcp_netstat(ofp_print_t *pr);
 void	 ofp_tcp_fini(void *);
 char	*ofp_tcp_log_addrs(struct in_conninfo *, struct ofp_tcphdr *, void *,
 	    const void *);

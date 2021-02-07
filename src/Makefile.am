@@ -35,6 +35,7 @@ ofp_md5c.c \
 ofp_errno.c \
 ofp_stat.c \
 ofp_hook.c \
+ofp_print.c \
 ofp_util.c \
 ofp_shared_mem.c \
 ofp_uma.c \

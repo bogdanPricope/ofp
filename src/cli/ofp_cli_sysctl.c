@@ -17,37 +17,37 @@
 #include "ofpi_sysctl.h"
 
 
-void f_help_sysctl(struct cli_conn *conn, const char *s)
+void f_help_sysctl(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	ofp_sendf(conn->fd, "sysctl - configure system parameters at ");
-	ofp_sendf(conn->fd, "runtime.\r\n\r\n");
+	ofp_print(pr, "sysctl - configure system parameters at ");
+	ofp_print(pr, "runtime.\r\n\r\n");
 
-	ofp_sendf(conn->fd, "Show sysctl tree:\r\n"
+	ofp_print(pr, "Show sysctl tree:\r\n"
 				"  sysctl dump\r\n\r\n");
 
-	ofp_sendf(conn->fd, "Read sysctl variable value:\r\n"
+	ofp_print(pr, "Read sysctl variable value:\r\n"
 				"  sysctl r VARIABLE\r\n"
 				"  Example:\r\n"
 				"    sysctl r net.inet.udp.checksum\r\n\r\n");
 
-	ofp_sendf(conn->fd, "Write sysctl variable value:\r\n"
+	ofp_print(pr, "Write sysctl variable value:\r\n"
 				"  sysctl w VARIABLE VALUE\r\n"
 				"  Example:\r\n"
 				"    sysctl w net.inet.udp.checksum 0\r\n\r\n");
 
-	ofp_sendf(conn->fd, "Show (this) help:\r\n"
+	ofp_print(pr, "Show (this) help:\r\n"
 				"  sysctl help\r\n\r\n");
 }
 
-void f_sysctl_dump(struct cli_conn *conn, const char *s)
+void f_sysctl_dump(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	ofp_sysctl_write_tree(conn->fd);
+	ofp_sysctl_write_tree(pr);
 }
 
 #define SYSCTL_BUFF 1024
-void f_sysctl_read(struct cli_conn *conn, const char *s)
+void f_sysctl_read(ofp_print_t *pr, const char *s)
 {
 	int ret = 0;
 	unsigned int var_type;
@@ -58,62 +58,62 @@ void f_sysctl_read(struct cli_conn *conn, const char *s)
 	ret = ofp_sysctl("vartype", &var_type, &var_type_len,
 			 s, strlen(s), NULL);
 	if (ret != 0) {
-		ofp_sendf(conn->fd, "Variable's type not found: error %d", ret);
+		ofp_print(pr, "Variable's type not found: error %d", ret);
 		return;
 	}
 
 	ret = ofp_sysctl(s, old, &old_len, NULL, 0, NULL);
 	if (ret != 0) {
-		ofp_sendf(conn->fd,
+		ofp_print(pr,
 			  "Variable not found or type not supported: error %d",
 			  ret);
 		return;
 	}
 
-	ofp_sendf(conn->fd, "%s = ", s);
+	ofp_print(pr, "%s = ", s);
 
 	switch (var_type & OFP_CTLTYPE) {
 	case OFP_CTLTYPE_INT: {
 		int *r = (int *)old;
 
-		ofp_sendf(conn->fd, "%d\r\n", *r);
+		ofp_print(pr, "%d\r\n", *r);
 		break;
 	}
 	case OFP_CTLTYPE_UINT: {
 		unsigned int *r = (unsigned int *)old;
 
-		ofp_sendf(conn->fd, "%u\r\n", *r);
+		ofp_print(pr, "%u\r\n", *r);
 		break;
 	}
 	case OFP_CTLTYPE_LONG: {
 		long int *r = (long int *)old;
 
-		ofp_sendf(conn->fd, "%ld\r\n", *r);
+		ofp_print(pr, "%ld\r\n", *r);
 		break;
 	}
 	case OFP_CTLTYPE_ULONG: {
 		unsigned long *r = (unsigned long *)old;
 
-		ofp_sendf(conn->fd, "%lu\r\n", *r);
+		ofp_print(pr, "%lu\r\n", *r);
 		break;
 	}
 	case OFP_CTLTYPE_STRING: {
 		char *r = (char *)old;
 
 		r[old_len] = 0;
-		ofp_sendf(conn->fd, "%s\r\n", r);
+		ofp_print(pr, "%s\r\n", r);
 		break;
 	}
 	case OFP_CTLTYPE_U64: {
 		uint64_t *r = (uint64_t *)old;
 
-		ofp_sendf(conn->fd, "%lu\r\n", *r);
+		ofp_print(pr, "%lu\r\n", *r);
 		break;
 	}
 	case OFP_CTLTYPE_S64: {
 		int64_t *r = (int64_t *)old;
 
-		ofp_sendf(conn->fd, "%ld\r\n", *r);
+		ofp_print(pr, "%ld\r\n", *r);
 		break;
 	}
 	case OFP_CTLTYPE_OPAQUE: {
@@ -121,21 +121,21 @@ void f_sysctl_read(struct cli_conn *conn, const char *s)
 		unsigned char *r = (unsigned char *)old;
 
 		for (i = 0; i < old_len; i++)
-			ofp_sendf(conn->fd, " %02x", r[i]);
-		ofp_sendf(conn->fd, "\r\n");
+			ofp_print(pr, " %02x", r[i]);
+		ofp_print(pr, "\r\n");
 		break;
 	}
 	case OFP_CTLTYPE_NODE:
 	{
-		ofp_sendf(conn->fd, "Error: Not a variable.\r\n");
+		ofp_print(pr, "Error: Not a variable.\r\n");
 		break;
 	}
 	default:
-		ofp_sendf(conn->fd, "unknown type\r\n");
+		ofp_print(pr, "unknown type\r\n");
 	}
 }
 
-void f_sysctl_write(struct cli_conn *conn, const char *s)
+void f_sysctl_write(ofp_print_t *pr, const char *s)
 {
 	char var_name[SYSCTL_BUFF];
 	char val_str[SYSCTL_BUFF];
@@ -151,7 +151,7 @@ void f_sysctl_write(struct cli_conn *conn, const char *s)
 	ret = ofp_sysctl("vartype", &var_type, &var_type_len,
 			 var_name, strlen(var_name), NULL);
 	if (ret != 0) {
-		ofp_sendf(conn->fd, "Variable's type not found: error %d", ret);
+		ofp_print(pr, "Variable's type not found: error %d", ret);
 		return;
 	}
 
@@ -195,13 +195,13 @@ void f_sysctl_write(struct cli_conn *conn, const char *s)
 		break;
 	}
 	default:
-		ofp_sendf(conn->fd, "unsupported type for writing\r\n");
+		ofp_print(pr, "unsupported type for writing\r\n");
 		return;
 	}
 
 	ret = ofp_sysctl(var_name, NULL, NULL, val, val_len, NULL);
 	if (ret != 0) {
-		ofp_sendf(conn->fd,	"Error %d", ret);
+		ofp_print(pr,	"Error %d", ret);
 		return;
 	}
 }

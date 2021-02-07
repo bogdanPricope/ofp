@@ -15,14 +15,14 @@
 
 struct alias_table_s alias_table[ALIAS_TABLE_LEN];
 
-void f_alias_set(struct cli_conn *conn, const char *s)
+void f_alias_set(ofp_print_t *pr, const char *s)
 {
 	const char *name;
 	int name_len;
 	const char *line;
 	int i;
 
-	(void)conn;
+	(void)pr;
 
 	name = s;
 	while ((*s != ' ') && (*s != 0))
@@ -55,36 +55,35 @@ void f_alias_set(struct cli_conn *conn, const char *s)
 	}
 }
 
-void f_alias_show(struct cli_conn *conn, const char *s)
+void f_alias_show(ofp_print_t *pr, const char *s)
 {
 	int i;
 
 	(void)s;
-	ofp_sendf(conn->fd, "Alias      Command\r\n");
+	ofp_print(pr, "Alias      Command\r\n");
 	for (i = 0; i < ALIAS_TABLE_LEN; i++) {
 		if (alias_table[i].name != 0) {
-			ofp_sendf(conn->fd, "%-10s %s\r\n",
-				alias_table[i].name,
-				alias_table[i].cmd);
+			ofp_print(pr, "%-10s %s\r\n", alias_table[i].name,
+				  alias_table[i].cmd);
 		} else
 			break;
 	}
 }
 
-void f_help_alias(struct cli_conn *conn, const char *s)
+void f_help_alias(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	ofp_sendf(conn->fd,
-		"Add an alias for a command:\r\n"
-		"  alias set <name> \"<command line>\"\r\n"
-		"  Example:\r\n"
-		"    alias set ll \"loglevel show\"\r\n\r\n");
+	ofp_print(pr,
+		  "Add an alias for a command:\r\n"
+		  "  alias set <name> \"<command line>\"\r\n"
+		  "  Example:\r\n"
+		  "    alias set ll \"loglevel show\"\r\n\r\n");
 
-	ofp_sendf(conn->fd,
-		"Show alias table:\r\n"
-		"  alias show\r\n\r\n");
+	ofp_print(pr,
+		  "Show alias table:\r\n"
+		  "  alias show\r\n\r\n");
 
-	ofp_sendf(conn->fd,
-		"Show (this) help:\r\n"
-		"  alias help\r\n\r\n");
+	ofp_print(pr,
+		  "Show (this) help:\r\n"
+		  "  alias help\r\n\r\n");
 }

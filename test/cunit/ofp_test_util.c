@@ -176,34 +176,6 @@ test_ofp_port_vlan_to_ifnet_name(void)
 	CU_ASSERT_STRING_EQUAL(res, "fp4.100");
 }
 
-static void
-test_ofp_sendf(void)
-{
-#define BUFLEN 15
-	char res[BUFLEN];
-	int fd, l;
-	FILE *f;
-
-	memset(res, 0x0, BUFLEN);
-
-	fd = open(testFileName,
-		  O_WRONLY | O_CREAT | O_TRUNC,
-		  S_IWRITE | S_IREAD);
-	l = ofp_sendf(fd, "%s %d", "Hello ODP!", 0xA);
-	close(fd);
-
-	CU_ASSERT_EQUAL(l, 13);
-
-	f = fopen(testFileName, "r");
-	if (fgets(res, BUFLEN, f) != NULL)
-		CU_ASSERT_STRING_EQUAL(res, "Hello ODP! 10")
-	else
-		CU_FAIL("Cannot read output file.")
-
-	fclose(f);
-#undef BUFLEN
-}
-
 static void test_ofp_has_mac(void)
 {
 	int res;
@@ -271,10 +243,6 @@ main(void)
 	}
 	if (NULL == CU_ADD_TEST(ptr_suite,
 				test_ofp_port_vlan_to_ifnet_name)) {
-		CU_cleanup_registry();
-		return CU_get_error();
-	}
-	if (NULL == CU_ADD_TEST(ptr_suite, test_ofp_sendf)) {
 		CU_cleanup_registry();
 		return CU_get_error();
 	}

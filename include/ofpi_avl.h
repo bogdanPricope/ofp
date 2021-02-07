@@ -9,6 +9,7 @@
 
 #include <odp_api.h>
 #include "ofpi_brlock.h"
+#include "ofpi_print.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -186,7 +187,7 @@ void ofp_avl_init_prepare(void);
 int ofp_avl_init_global(void);
 int ofp_avl_term_global(void);
 
-void ofp_print_avl_stat(int fd);
+void ofp_print_avl_stat(ofp_print_t *pr);
 
 #ifdef __cplusplus
 }

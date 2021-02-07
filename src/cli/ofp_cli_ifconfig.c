@@ -18,24 +18,23 @@
 /* "ifconfig" */
 /* "ifconfig show" */
 /* "show ifconfig" */
-void f_ifconfig_show(struct cli_conn *conn, const char *s)
+void f_ifconfig_show(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	(void)conn;
 
-	ofp_show_interfaces(conn->fd);
+	ofp_show_interfaces(pr);
 }
 
 /* "ifconfig help" */
 /* "help ifconfig" */
-void f_help_ifconfig(struct cli_conn *conn, const char *s)
+void f_help_ifconfig(ofp_print_t *pr, const char *s)
 {
 	(void)s;
 
-	ofp_sendf(conn->fd, "Show interfaces:\r\n"
+	ofp_print(pr, "Show interfaces:\r\n"
 		"  ifconfig [show]\r\n\r\n");
 
-	ofp_sendf(conn->fd, "Create or configure an interface:\r\n"
+	ofp_print(pr, "Create or configure an interface:\r\n"
 		"  ifconfig [-A inet4] DEV IP4NET [vrf VRF]\r\n"
 		"    DEV: ethernet, vlan or loopback interface name.\r\n"
 		"         VLAN interfaces are named <phys dev>.<vlan_id>\r\n"
@@ -47,7 +46,7 @@ void f_help_ifconfig(struct cli_conn *conn, const char *s)
 		"    ifconfig %s0.100 192.168.200.1/24\r\n"
 		"    ifconfig %s0 192.168.200.1/24 vrf 2\r\n\r\n",
 		OFP_IFNAME_PREFIX, OFP_IFNAME_PREFIX, OFP_IFNAME_PREFIX);
-	ofp_sendf(conn->fd, "Create or configure a GRE tunnel:\r\n"
+	ofp_print(pr, "Create or configure a GRE tunnel:\r\n"
 		"  ifconfig tunnel gre DEV local IP4ADDR remote IP4ADDR peer IP4ADDR IP4ADDR [vrf VRF]\r\n"
 		"    DEV: gre interface name\r\n"
 		"    local: local tunnel endpoint ip address in a.b.c.d format\r\n"
@@ -59,7 +58,7 @@ void f_help_ifconfig(struct cli_conn *conn, const char *s)
 		"    ifconfig tunnel gre %s100 local 192.168.200.1 remote 192.168.200.2 peer 10.10.10.2 10.10.10.1\r\n"
 		"    ifconfig tunnel gre %s100 local 192.168.200.1 remote 192.168.200.2 peer 10.10.10.2 10.10.10.1 vrf 2\r\n\r\n",
 		OFP_GRE_IFNAME_PREFIX, OFP_GRE_IFNAME_PREFIX);
-	ofp_sendf(conn->fd, "Create or configure a VXLAN interface:\r\n"
+	ofp_print(pr, "Create or configure a VXLAN interface:\r\n"
 		"  ifconfig vxlan DEV group IP4ADDR dev DEV_PHYS IP4NET\r\n"
 		"    DEV: vxlan interface name (interface number is the vni)\r\n"
 		"    IP4ADDR: group ip address in a.b.c.d format\r\n"
@@ -70,7 +69,7 @@ void f_help_ifconfig(struct cli_conn *conn, const char *s)
 		"    (vni = 42)\r\n\r\n",
 		OFP_VXLAN_IFNAME_PREFIX);
 #ifdef INET6
-	ofp_sendf(conn->fd, "Create or configure an IPv6 interface:\r\n"
+	ofp_print(pr, "Create or configure an IPv6 interface:\r\n"
 		"  ifconfig -A inet6 DEV IP6NET\r\n"
 		"    DEV: ethernet interface name\r\n"
 		"    IP6NET: network address in a:b:c:d:e:f:g:h/n or"
@@ -79,19 +78,19 @@ void f_help_ifconfig(struct cli_conn *conn, const char *s)
 		"    ifconfig -A inet6 %s0 2000:1baf::/64\r\n\r\n",
 		OFP_IFNAME_PREFIX);
 #endif /* INET6 */
-	ofp_sendf(conn->fd, "Delete or unconfigure an interface:\r\n"
+	ofp_print(pr, "Delete or unconfigure an interface:\r\n"
 		"  ifconfig DEV down\r\n"
 		"    DEV: ethernet interface name\r\n"
 		"  Example:\r\n"
 		"    ifconfig %s0 down\r\n\r\n",
 		OFP_IFNAME_PREFIX);
 
-	ofp_sendf(conn->fd, "Show (this) help:\r\n"
+	ofp_print(pr, "Show (this) help:\r\n"
 		"  ifconfig help\r\n\r\n");
 }
 
 /* "ifconfig [-A inet 4] DEV IP4NET";*/
-void f_ifconfig(struct cli_conn *conn, const char *s)
+void f_ifconfig(ofp_print_t *pr, const char *s)
 {
 
 	char dev[16];
@@ -106,7 +105,7 @@ void f_ifconfig(struct cli_conn *conn, const char *s)
 	port = ofp_name_to_port_vlan(dev, &vlan);
 
 	if (port == GRE_PORTS || port == VXLAN_PORTS) {
-		ofp_sendf(conn->fd, "Invalid device name.\r\n");
+		ofp_print(pr, "Invalid device name.\r\n");
 		return;
 	}
 
@@ -117,11 +116,11 @@ void f_ifconfig(struct cli_conn *conn, const char *s)
 		err = ofp_config_interface_up_local(vlan, vrf,
 						    addr, m);
 	if (err != NULL)
-		ofp_sendf(conn->fd, err);
+		ofp_print(pr, err);
 }
 
 /* "ifconfig tunnel gre DEV local IP4ADDR remote IP4ADDR peer IP4ADDR IP4ADDR vrf NUMBER";*/
-void f_ifconfig_tun(struct cli_conn *conn, const char *s)
+void f_ifconfig_tun(ofp_print_t *pr, const char *s)
 {
 	char dev[16], loc[16], rem[16], ip[16], peer[16];
 	uint32_t tun_loc, tun_rem, addr, p2p;
@@ -134,7 +133,7 @@ void f_ifconfig_tun(struct cli_conn *conn, const char *s)
 	port = ofp_name_to_port_vlan(dev, &vlan);
 
 	if (port != GRE_PORTS) {
-		ofp_sendf(conn->fd, "Invalid device name.\r\n");
+		ofp_print(pr, "Invalid device name.\r\n");
 		return;
 	}
 
@@ -151,11 +150,11 @@ void f_ifconfig_tun(struct cli_conn *conn, const char *s)
 	err = ofp_config_interface_up_tun(port, vlan, vrf, tun_loc, tun_rem,
 					    p2p, addr, masklen);
 	if (err != NULL)
-		ofp_sendf(conn->fd, err);
+		ofp_print(pr, err);
 }
 
 /* ifconfig vxlan DEV group IP4ADDR dev DEV IP4NET */
-void f_ifconfig_vxlan(struct cli_conn *conn, const char *s)
+void f_ifconfig_vxlan(ofp_print_t *pr, const char *s)
 {
 	char dev[16], physdev[16], group[16];
 	uint32_t vxlan_group, addr;
@@ -172,14 +171,14 @@ void f_ifconfig_vxlan(struct cli_conn *conn, const char *s)
 	port = ofp_name_to_port_vlan(dev, &vlan);
 
 	if (port != VXLAN_PORTS) {
-		ofp_sendf(conn->fd, "Invalid device name %s.\r\n", dev);
+		ofp_print(pr, "Invalid device name %s.\r\n", dev);
 		return;
 	}
 
 	physport = ofp_name_to_port_vlan(physdev, &physvlan);
 
 	if (!ip4addr_get(group, &vxlan_group)) {
-		ofp_sendf(conn->fd, "Invalid group address.\r\n");
+		ofp_print(pr, "Invalid group address.\r\n");
 		return;
 	}
 
@@ -187,12 +186,12 @@ void f_ifconfig_vxlan(struct cli_conn *conn, const char *s)
 	err = ofp_config_interface_up_vxlan(0, addr, m, vlan, vxlan_group,
 					    physport, physvlan);
 	if (err != NULL)
-		ofp_sendf(conn->fd, err);
+		ofp_print(pr, err);
 }
 
 /* ifconfig -A inet6 DEV IP6NET */
 #ifdef INET6
-void f_ifconfig_v6(struct cli_conn *conn, const char *s)
+void f_ifconfig_v6(ofp_print_t *pr, const char *s)
 {
 	char dev[16];
 	uint8_t addr6[16];
@@ -206,7 +205,7 @@ void f_ifconfig_v6(struct cli_conn *conn, const char *s)
 	tk_end = strstr(tk, " ");
 
 	if (!tk_end || ((int)(tk_end - tk) > (int)(sizeof(dev) - 1))) {
-		ofp_sendf(conn->fd, "Invalid device name.\r\n");
+		ofp_print(pr, "Invalid device name.\r\n");
 		return;
 	}
 	memcpy(dev, tk, tk_end - tk);
@@ -214,7 +213,7 @@ void f_ifconfig_v6(struct cli_conn *conn, const char *s)
 
 	port = ofp_name_to_port_vlan(dev, &vlan);
 	if (port == -1 || port == GRE_PORTS) {
-		ofp_sendf(conn->fd, "Invalid device name.\r\n");
+		ofp_print(pr, "Invalid device name.\r\n");
 		return;
 	}
 
@@ -223,19 +222,19 @@ void f_ifconfig_v6(struct cli_conn *conn, const char *s)
 	tk_end = strstr(tk, "/");
 
 	if (!tk_end || tk_end - tk > 40) {
-		ofp_sendf(conn->fd, "Invalid IP6NET address.\r\n");
+		ofp_print(pr, "Invalid IP6NET address.\r\n");
 		return;
 	}
 
 	if (!ip6addr_get(tk, tk_end - tk, addr6)) {
-		ofp_sendf(conn->fd, "Invalid IP6NET address.\r\n");
+		ofp_print(pr, "Invalid IP6NET address.\r\n");
 		return;
 	}
 
 	/* get IP6NET prefix len*/
 	tk = tk_end + 1;
 	if (sscanf(tk, "%d", &prefix) < 1) {
-		ofp_sendf(conn->fd, "Invalid IP6NET prefix.\r\n");
+		ofp_print(pr, "Invalid IP6NET prefix.\r\n");
 		return;
 	}
 
@@ -244,11 +243,11 @@ void f_ifconfig_v6(struct cli_conn *conn, const char *s)
 	else
 		err = ofp_config_interface_up_v6(port, vlan, addr6, prefix);
 	if (err != NULL)
-		ofp_sendf(conn->fd, err);
+		ofp_print(pr, err);
 }
 #endif /* INET6 */
 
-void f_ifconfig_down(struct cli_conn *conn, const char *s)
+void f_ifconfig_down(ofp_print_t *pr, const char *s)
 {
 	/* "ifconfig DEV down"; */
 	char dev[16];
@@ -262,5 +261,5 @@ void f_ifconfig_down(struct cli_conn *conn, const char *s)
 	err = ofp_config_interface_down(port, vlan);
 
 	if (err != NULL)
-		ofp_sendf(conn->fd, err);
+		ofp_print(pr, err);
 }

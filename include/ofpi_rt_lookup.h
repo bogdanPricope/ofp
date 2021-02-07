@@ -5,6 +5,7 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 #include "ofpi_pkt_processing.h"
+#include "ofpi_print.h"
 
 #ifndef _OFPI_RT_LOOKUP_H
 #define _OFPI_RT_LOOKUP_H
@@ -78,33 +79,46 @@ struct ofp_rtl6_tree {
 
 extern int ofp_rtl_init(struct ofp_rtl_tree *tree);
 extern int ofp_rtl_root_init(struct ofp_rtl_tree *tree, uint16_t vrf);
-extern struct ofp_nh_entry *ofp_rtl_insert(struct ofp_rtl_tree *tree, uint32_t addr,
-										   uint32_t masklen, struct ofp_nh_entry *data);
-extern struct ofp_nh_entry *ofp_rtl_remove(struct ofp_rtl_tree *tree, uint32_t addr,
-										   uint32_t masklen);
+extern struct ofp_nh_entry *ofp_rtl_insert(struct ofp_rtl_tree *tree,
+					   uint32_t addr,
+					   uint32_t masklen,
+					   struct ofp_nh_entry *data);
+extern struct ofp_nh_entry *ofp_rtl_remove(struct ofp_rtl_tree *tree,
+					   uint32_t addr,
+					   uint32_t masklen);
 #ifdef MTRIE
-extern int ofp_rt_rule_add(uint16_t vrf, uint32_t addr, uint32_t masklen, struct ofp_nh_entry *data);
+extern int ofp_rt_rule_add(uint16_t vrf, uint32_t addr, uint32_t masklen,
+			   struct ofp_nh_entry *data);
 extern int ofp_rt_rule_remove(uint16_t vrf, uint32_t addr, uint32_t masklen);
-extern void ofp_rt_rule_print(int fd, uint16_t vrf,
-					 void (*func)(int fd, uint32_t key, int level, struct ofp_nh_entry *data));
+extern void ofp_rt_rule_print(ofp_print_t *pr, uint16_t vrf,
+			      void (*func)(ofp_print_t *pr, uint32_t key,
+					   int level,
+					   struct ofp_nh_entry *data));
 #else
 extern struct ofp_nh_entry *ofp_rtl_search_exact(struct ofp_rtl_tree *tree,
-								 uint32_t addr, uint32_t masklen);
+						 uint32_t addr,
+						 uint32_t masklen);
 extern void ofp_rtl_destroy(struct ofp_rtl_tree *tree,
-							void (*func)(void *data));
-extern void ofp_rtl_traverse(int fd, struct ofp_rtl_tree *tree,
-							 void (*func)(int fd, uint32_t key, int level, struct ofp_nh_entry *data));
+			    void (*func)(void *data));
+extern void ofp_rtl_traverse(ofp_print_t *pr, struct ofp_rtl_tree *tree,
+			     void (*func)(ofp_print_t *pr, uint32_t key,
+					  int level,
+					  struct ofp_nh_entry *data));
 #endif
 extern int ofp_rtl6_init(struct ofp_rtl6_tree *tree);
-extern struct ofp_nh6_entry *ofp_rtl_insert6(struct ofp_rtl6_tree *tree, uint8_t *addr,
-											uint32_t masklen, struct ofp_nh6_entry *data);
-extern struct ofp_nh6_entry *ofp_rtl_remove6(struct ofp_rtl6_tree *tree, uint8_t *addr,
-											uint32_t masklen);
-extern void ofp_rtl_traverse6(int fd, struct ofp_rtl6_tree *tree,
-							  void (*func)(int fd, uint8_t *key, int level, struct ofp_nh6_entry *data));
-extern void ofp_print_rt_stat(int fd);
+extern struct ofp_nh6_entry *ofp_rtl_insert6(struct ofp_rtl6_tree *tree,
+					     uint8_t *addr, uint32_t masklen,
+					     struct ofp_nh6_entry *data);
+extern struct ofp_nh6_entry *ofp_rtl_remove6(struct ofp_rtl6_tree *tree,
+					     uint8_t *addr, uint32_t masklen);
+extern void ofp_rtl_traverse6(ofp_print_t *pr, struct ofp_rtl6_tree *tree,
+			      void (*func)(ofp_print_t *pr, uint8_t *key,
+					   int level,
+					   struct ofp_nh6_entry *data));
+extern void ofp_print_rt_stat(ofp_print_t *pr);
 #ifndef MTRIE
-static __inline struct ofp_nh_entry *ofp_rtl_search(struct ofp_rtl_tree *tree, uint32_t addr_be)
+static inline struct ofp_nh_entry *ofp_rtl_search(struct ofp_rtl_tree *tree,
+						  uint32_t addr_be)
 {
 	struct ofp_rtl_node *node;
 	uint32_t             mask = 0x80000000;

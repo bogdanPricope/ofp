@@ -182,29 +182,29 @@ static void ofp_vlan_free(struct ofp_ifnet *vlan)
 	odp_rwlock_write_unlock(&vlan_shm->vlan_mtx);
 }
 
-static void print_eth_stats (odp_pktio_stats_t stats, int fd)
+static void print_eth_stats(odp_pktio_stats_t stats, ofp_print_t *pr)
 {
-	ofp_sendf(fd,
-		"\tRX: bytes:%lu packets:%lu dropped:%lu errors:%lu unknown:%lu\r\n",
-		stats.in_octets,
-		stats.in_ucast_pkts,
-		stats.in_discards,
-		stats.in_errors,
-		stats.in_unknown_protos);
+	ofp_print(pr,
+		  "\tRX: bytes:%lu packets:%lu dropped:%lu errors:%lu unknown:%lu\r\n",
+		  stats.in_octets,
+		  stats.in_ucast_pkts,
+		  stats.in_discards,
+		  stats.in_errors,
+		  stats.in_unknown_protos);
 
-	ofp_sendf(fd,
-		"\tTX: bytes:%lu packets:%lu dropped:%lu error:%lu\r\n\r\n",
-		stats.out_octets,
-		stats.out_ucast_pkts,
-		stats.out_discards,
-		stats.out_errors);
+	ofp_print(pr,
+		  "\tTX: bytes:%lu packets:%lu dropped:%lu error:%lu\r\n\r\n",
+		  stats.out_octets,
+		  stats.out_ucast_pkts,
+		  stats.out_discards,
+		  stats.out_errors);
 }
 
 static int iter_vlan(void *key, void *iter_arg)
 {
 	struct ofp_ifnet *iface = key;
 	char buf[16];
-	int fd = *((int *)iter_arg);
+	ofp_print_t *pr = (ofp_print_t *)iter_arg;
 	odp_pktio_stats_t stats;
 	int res;
 	uint32_t mask = ~0;
@@ -216,68 +216,67 @@ static int iter_vlan(void *key, void *iter_arg)
 
 	if (ofp_if_type(iface) == OFP_IFT_GRE && iface->vlan) {
 #ifdef SP
-		ofp_sendf(fd, "gre%d	(%d) slowpath: %s\r\n", iface->vlan,
-			    iface->linux_index,
-			    iface->sp_status ? "on" : "off");
+		ofp_print(pr, "gre%d	(%d) slowpath: %s\r\n", iface->vlan,
+			  iface->linux_index, iface->sp_status ? "on" : "off");
 #else
-		ofp_sendf(fd, "gre%d\r\n", iface->vlan);
+		ofp_print(pr, "gre%d\r\n", iface->vlan);
 #endif /* SP */
 
 		if (iface->vrf)
-			ofp_sendf(fd, "	VRF: %d\r\n", iface->vrf);
+			ofp_print(pr, "	VRF: %d\r\n", iface->vrf);
 
-		ofp_sendf(fd,
-			"	Link encap:Ethernet	HWaddr: %s\r\n"
-			"	inet addr:%s	P-t-P:%s	Mask:%s\r\n"
+		ofp_print(pr,
+			  "	Link encap:Ethernet	HWaddr: %s\r\n"
+			  "	inet addr:%s	P-t-P:%s	Mask:%s\r\n"
 #ifdef INET6
-			"	inet6 addr: %s\r\n"
+			  "	inet6 addr: %s\r\n"
 #endif /* INET6 */
-			"	MTU: %d\r\n",
-			ofp_print_mac(iface->mac),
-			ofp_print_ip_addr(iface->ip_addr_info[0].ip_addr),
-			ofp_print_ip_addr(iface->ip_p2p),
-			ofp_print_ip_addr(mask),
+			  "	MTU: %d\r\n",
+			  ofp_print_mac(iface->mac),
+			  ofp_print_ip_addr(iface->ip_addr_info[0].ip_addr),
+			  ofp_print_ip_addr(iface->ip_p2p),
+			  ofp_print_ip_addr(mask),
 #ifdef INET6
-			ofp_print_ip6_addr(iface->link_local),
+			  ofp_print_ip6_addr(iface->link_local),
 #endif /* INET6 */
-			iface->if_mtu);
+			  iface->if_mtu);
 
-		ofp_sendf(fd,
-			"	Local: %s	Remote: %s\r\n",
-			ofp_print_ip_addr(iface->ip_local),
-			ofp_print_ip_addr(iface->ip_remote));
+		ofp_print(pr,
+			  "	Local: %s	Remote: %s\r\n",
+			  ofp_print_ip_addr(iface->ip_local),
+			  ofp_print_ip_addr(iface->ip_remote));
 		if (res == 0)
-			print_eth_stats(stats, fd);
+			print_eth_stats(stats, pr);
 		else
-			ofp_sendf(fd, "\r\n");
+			ofp_print(pr, "\r\n");
 		return 0;
 	} else if (ofp_if_type(iface) == OFP_IFT_GRE && !iface->vlan) {
-		ofp_sendf(fd, "gre%d\r\n"
-				"	Link not configured\r\n\r\n",
-				iface->vlan);
+		ofp_print(pr, "gre%d\r\n"
+			  "	Link not configured\r\n\r\n",
+			  iface->vlan);
 		return 0;
 	}
 
 	if (ofp_if_type(iface) == OFP_IFT_VXLAN) {
 #ifdef SP
-		ofp_sendf(fd, "vxlan%d	(%d) slowpath: %s\r\n", iface->vlan,
-			    iface->linux_index,
-			    iface->sp_status ? "on" : "off");
+		ofp_print(pr, "vxlan%d	(%d) slowpath: %s\r\n", iface->vlan,
+			  iface->linux_index,
+			  iface->sp_status ? "on" : "off");
 #else
-		ofp_sendf(fd, "vxlan%d\r\n", iface->vlan);
+		ofp_print(pr, "vxlan%d\r\n", iface->vlan);
 #endif /* SP */
 
 		if (iface->vrf)
-			ofp_sendf(fd, "	VRF: %d\r\n", iface->vrf);
+			ofp_print(pr, "	VRF: %d\r\n", iface->vrf);
 
-		ofp_sendf(fd,
-			"	Link encap:Ethernet	HWaddr: %s\r\n"
-			"	inet addr:%s	Bcast:%s	Mask:%s\r\n"
+		ofp_print(pr,
+			  "	Link encap:Ethernet	HWaddr: %s\r\n"
+			  "	inet addr:%s	Bcast:%s	Mask:%s\r\n"
 #ifdef INET6
-			"	inet6 addr: %s\r\n"
+			  "	inet6 addr: %s\r\n"
 #endif /* INET6 */
-			"	Group:%s	Iface:%s\r\n"
-			"	MTU: %d\r\n",
+			  "	Group:%s	Iface:%s\r\n"
+			  "	MTU: %d\r\n",
 			  ofp_print_mac(iface->mac),
 			  ofp_print_ip_addr(iface->ip_addr_info[0].ip_addr),
 			  ofp_print_ip_addr(iface->ip_addr_info[0].bcast_addr),
@@ -290,31 +289,31 @@ static int iter_vlan(void *key, void *iter_arg)
 						      iface->physvlan),
 			  iface->if_mtu);
 		if (res == 0)
-			print_eth_stats(stats, fd);
+			print_eth_stats(stats, pr);
 		else
-			ofp_sendf(fd, "\r\n");
+			ofp_print(pr, "\r\n");
 		return 0;
 	}
 
 	if (ofp_if_type(iface) == OFP_IFT_LOOP) {
 #ifdef SP
-		ofp_sendf(fd, "lo%d  (%d) slowpath: %s\r\n", iface->vlan,
-			    iface->linux_index,
-			    iface->sp_status ? "on" : "off");
+		ofp_print(pr, "lo%d  (%d) slowpath: %s\r\n", iface->vlan,
+			  iface->linux_index,
+			  iface->sp_status ? "on" : "off");
 #else
-		ofp_sendf(fd, "lo%d\r\n", iface->vlan);
+		ofp_print(pr, "lo%d\r\n", iface->vlan);
 #endif /* SP */
 
 		if (iface->vrf)
-			ofp_sendf(fd, "	VRF: %d\r\n", iface->vrf);
+			ofp_print(pr, "	VRF: %d\r\n", iface->vrf);
 
-		ofp_sendf(fd,
-			"	Link encap:loopback\r\n"
-			"	inet addr:%s	Bcast:%s	Mask:%s\r\n"
+		ofp_print(pr,
+			  "	Link encap:loopback\r\n"
+			  "	inet addr:%s	Bcast:%s	Mask:%s\r\n"
 #ifdef INET6
-			"	inet6 addr: %s/%d\r\n"
+			  "	inet6 addr: %s/%d\r\n"
 #endif /* INET6 */
-			"	MTU: %d\r\n",
+			  "	MTU: %d\r\n",
 			  ofp_print_ip_addr(iface->ip_addr_info[0].ip_addr),
 			  ofp_print_ip_addr(iface->ip_addr_info[0].bcast_addr),
 			  ofp_print_ip_addr(mask),
@@ -324,9 +323,9 @@ static int iter_vlan(void *key, void *iter_arg)
 #endif /* INET6 */
 			  iface->if_mtu);
 		if (res == 0)
-			print_eth_stats(stats, fd);
+			print_eth_stats(stats, pr);
 		else
-			ofp_sendf(fd, "\r\n");
+			ofp_print(pr, "\r\n");
 		return 0;
 	}
 
@@ -334,121 +333,121 @@ static int iter_vlan(void *key, void *iter_arg)
 
 	if (ofp_has_mac(iface->mac)) {
 #ifdef SP
-		ofp_sendf(fd,
-			"%s%d%s	(%d) (%s) slowpath: %s\r\n",
-			OFP_IFNAME_PREFIX,
-			iface->port,
-			iface->vlan ? buf : "",
-			iface->linux_index,
-		        iface->if_name,
-			iface->sp_status ? "on" : "off");
+		ofp_print(pr,
+			  "%s%d%s	(%d) (%s) slowpath: %s\r\n",
+			  OFP_IFNAME_PREFIX,
+			  iface->port,
+			  iface->vlan ? buf : "",
+			  iface->linux_index,
+			  iface->if_name,
+			  iface->sp_status ? "on" : "off");
 #else
-		ofp_sendf(fd,
-			"%s%d%s	(%s)\r\n",
-			OFP_IFNAME_PREFIX,
-			iface->port,
-			iface->vlan ? buf : "",
-			iface->if_name);
+		ofp_print(pr,
+			  "%s%d%s	(%s)\r\n",
+			  OFP_IFNAME_PREFIX,
+			  iface->port,
+			  iface->vlan ? buf : "",
+			  iface->if_name);
 #endif /* SP */
 
 		if (iface->vrf)
-			ofp_sendf(fd, "	VRF: %d\r\n", iface->vrf);
+			ofp_print(pr, "	VRF: %d\r\n", iface->vrf);
 
-		ofp_sendf(fd,
-			"	Link encap:Ethernet	HWaddr: %s\r\n",
-			ofp_print_mac(iface->mac));
+		ofp_print(pr,
+			  "	Link encap:Ethernet	HWaddr: %s\r\n",
+			  ofp_print_mac(iface->mac));
 
 		if (iface->ip_addr_info[0].ip_addr)
-			ofp_sendf(fd,
-				"	inet addr:%s	Bcast:%s	Mask:%s\r\n",
-				ofp_print_ip_addr(iface->ip_addr_info[0].ip_addr),
-				ofp_print_ip_addr(iface->ip_addr_info[0].bcast_addr),
-				ofp_print_ip_addr(mask));
+			ofp_print(pr,
+				  "	inet addr:%s	Bcast:%s	Mask:%s\r\n",
+				  ofp_print_ip_addr(iface->ip_addr_info[0].ip_addr),
+				  ofp_print_ip_addr(iface->ip_addr_info[0].bcast_addr),
+				  ofp_print_ip_addr(mask));
 
 #ifdef INET6
-		ofp_sendf(fd,
-			"	inet6 addr: %s Scope:Link\r\n",
-			ofp_print_ip6_addr(iface->link_local));
+		ofp_print(pr,
+			  "	inet6 addr: %s Scope:Link\r\n",
+			  ofp_print_ip6_addr(iface->link_local));
 
 		if (ofp_ip6_is_set(iface->ip6_addr))
-			ofp_sendf(fd,
-				"	inet6 addr: %s/%d\r\n",
-				ofp_print_ip6_addr(iface->ip6_addr),
-				iface->ip6_prefix);
+			ofp_print(pr,
+				  "	inet6 addr: %s/%d\r\n",
+				  ofp_print_ip6_addr(iface->ip6_addr),
+				  iface->ip6_prefix);
 #endif /* INET6 */
 
-		ofp_sendf(fd,
-			"	MTU: %d\r\n",
-			iface->if_mtu);
+		ofp_print(pr,
+			  "	MTU: %d\r\n",
+			  iface->if_mtu);
 		if (res == 0)
-			print_eth_stats(stats, fd);
+			print_eth_stats(stats, pr);
 		else
-			ofp_sendf(fd, "\r\n");
+			ofp_print(pr, "\r\n");
 	} else {
-		ofp_sendf(fd, "%s%d%s\r\n"
-			"	Link not configured\r\n\r\n",
-			OFP_IFNAME_PREFIX,
-			iface->port, iface->vlan ? buf : "");
+		ofp_print(pr, "%s%d%s\r\n"
+			  "	Link not configured\r\n\r\n",
+			  OFP_IFNAME_PREFIX,
+			  iface->port, iface->vlan ? buf : "");
 	}
 
 	return 0;
 }
 
-void ofp_show_interfaces(int fd)
+void ofp_show_interfaces(ofp_print_t *pr)
 {
 	int i;
 
 	/* fp interfaces */
 	for (i = 0; i < OFP_FP_INTERFACE_MAX; i++) {
-		iter_vlan(&shm->ofp_ifnet_data[i], &fd);
+		iter_vlan(&shm->ofp_ifnet_data[i], pr);
 		vlan_iterate_inorder(shm->ofp_ifnet_data[i].vlan_structs,
-					iter_vlan, &fd);
+					iter_vlan, pr);
 	}
 
 	/* gre interfaces */
 	if (avl_get_first(shm->ofp_ifnet_data[GRE_PORTS].vlan_structs))
 		vlan_iterate_inorder(
 			shm->ofp_ifnet_data[GRE_PORTS].vlan_structs,
-			iter_vlan, &fd);
+			iter_vlan, pr);
 	else
-		ofp_sendf(fd, "gre\r\n"
+		ofp_print(pr, "gre\r\n"
 				"	Link not configured\r\n\r\n");
 
 	/* vxlan interfaces */
 	if (avl_get_first(shm->ofp_ifnet_data[VXLAN_PORTS].vlan_structs))
 		vlan_iterate_inorder(
 			shm->ofp_ifnet_data[VXLAN_PORTS].vlan_structs,
-			iter_vlan, &fd);
+			iter_vlan, pr);
 	else
-		ofp_sendf(fd, "vxlan\r\n"
+		ofp_print(pr, "vxlan\r\n"
 				"	Link not configured\r\n\r\n");
 	/* local interfaces */
 	if (avl_get_first(shm->ofp_ifnet_data[LOCAL_PORTS].vlan_structs))
 		vlan_iterate_inorder(
 			shm->ofp_ifnet_data[LOCAL_PORTS].vlan_structs,
-			iter_vlan, &fd);
+			iter_vlan, pr);
 	else
-		ofp_sendf(fd, "lo\r\n"
+		ofp_print(pr, "lo\r\n"
 				"	Link not configured\r\n\r\n");
 }
 
 static int iter_vlan_2(void *key, void *iter_arg)
 {
 	struct ofp_ifnet *iface = key;
-	int fd = *((int *)iter_arg);
+	ofp_print_t *pr = (ofp_print_t *)iter_arg;
 
-	ofp_ifnet_print_ip_info(fd, iface);
+	ofp_ifnet_print_ip_info(pr, iface);
 
 	return 0;
 }
 
-void ofp_show_ifnet_ip_addrs(int fd)
+void ofp_show_ifnet_ip_addrs(ofp_print_t *pr)
 {
 	int i;
 	for (i = 0; i < OFP_FP_INTERFACE_MAX; i++) {
-		iter_vlan_2(&shm->ofp_ifnet_data[i], &fd);
+		iter_vlan_2(&shm->ofp_ifnet_data[i], pr);
 		vlan_iterate_inorder(shm->ofp_ifnet_data[i].vlan_structs,
-				iter_vlan_2, &fd);
+				iter_vlan_2, pr);
 	}
 }
 
@@ -2258,7 +2257,7 @@ inline void ofp_free_ifnet_ip_list(struct ofp_ifnet *dev)
 
 }
 
-inline void ofp_ifnet_print_ip_info(int fd, struct ofp_ifnet *dev)
+inline void ofp_ifnet_print_ip_info(ofp_print_t *pr, struct ofp_ifnet *dev)
 {
 	char buf[16];
 	int i;
@@ -2266,24 +2265,24 @@ inline void ofp_ifnet_print_ip_info(int fd, struct ofp_ifnet *dev)
 	if (dev->vlan)
 		snprintf(buf, sizeof(buf), ".%d", dev->vlan);
 
-	ofp_sendf(fd, "%s%d%s (%s):\r\n",
-			OFP_IFNAME_PREFIX,
-			dev->port,
-			(dev->vlan) ? buf:"",
-			dev->if_name);
+	ofp_print(pr, "%s%d%s (%s):\r\n",
+		  OFP_IFNAME_PREFIX,
+		  dev->port,
+		  (dev->vlan) ? buf : "",
+		  dev->if_name);
 	IP_ADDR_LIST_RLOCK(dev);
 	for(i=0; i < OFP_NUM_IFNET_IP_ADDRS && dev->ip_addr_info[i].ip_addr; i++)
 	{
 		uint32_t mask = ~0;
 		mask = odp_cpu_to_be_32(mask << (32 - dev->ip_addr_info[i].masklen));
-		ofp_sendf(fd,
-				"       inet addr:%s    Bcast:%s        Mask:%s\r\n",
-				ofp_print_ip_addr(dev->ip_addr_info[i].ip_addr),
-				ofp_print_ip_addr(dev->ip_addr_info[i].bcast_addr),
-				ofp_print_ip_addr(mask));
+		ofp_print(pr,
+			  "       inet addr:%s    Bcast:%s        Mask:%s\r\n",
+			  ofp_print_ip_addr(dev->ip_addr_info[i].ip_addr),
+			  ofp_print_ip_addr(dev->ip_addr_info[i].bcast_addr),
+			  ofp_print_ip_addr(mask));
 	}
 	IP_ADDR_LIST_RUNLOCK(dev);
-	ofp_sendf(fd,"\r\n");
+	ofp_print(pr, "\r\n");
 }
 
 #ifdef INET6

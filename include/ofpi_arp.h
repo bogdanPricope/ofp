@@ -11,6 +11,7 @@
 
 #include "ofpi_pkt_processing.h" /* return codes, i.e.: OFP_DROP */
 #include "ofpi.h"
+#include "ofpi_print.h"
 
 /*
  * The size of this must be a multiple of 4. That way the hash
@@ -130,8 +131,8 @@ enum ofp_return_code ofp_arp_save_ipv4_pkt(odp_packet_t pkt,
 					   uint32_t is_link_local,
 					   struct ofp_ifnet *dev);
 
-void ofp_arp_show_table(int fd);
-void ofp_arp_show_saved_packets(int fd);
+void ofp_arp_show_table(ofp_print_t *pr);
+void ofp_arp_show_saved_packets(ofp_print_t *pr);
 void ofp_arp_age_cb(void *arg);
 int ofp_arp_init_tables(void);
 void ofp_arp_init_tables_pkt_list(void);

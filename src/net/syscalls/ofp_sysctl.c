@@ -101,7 +101,8 @@ void ofp_sysctl_add_child(struct ofp_sysctl_oid *oidp,
 }
 
 static void
-ofp_sysctl_debug_dump_node(int fd, struct ofp_sysctl_oid *node, int print_align)
+ofp_sysctl_debug_dump_node(ofp_print_t *pr, struct ofp_sysctl_oid *node,
+			   int print_align)
 {
 	int k;
 	struct ofp_sysctl_oid *oidp;
@@ -118,60 +119,60 @@ ofp_sysctl_debug_dump_node(int fd, struct ofp_sysctl_oid *node, int print_align)
 
 	OFP_SLIST_FOREACH(oidp, &(node->oid_head), oid_link) {
 		for (k = 0; k < print_align; k++)
-			ofp_sendf(fd, " ");
+			ofp_print(pr, " ");
 
-		ofp_sendf(fd, "%d %s ", oidp->oid_number, oidp->oid_name);
+		ofp_print(pr, "%d %s ", oidp->oid_number, oidp->oid_name);
 
-		ofp_sendf(fd, "%c%c",
+		ofp_print(pr, "%c%c",
 			  oidp->oid_kind & OFP_CTLFLAG_RD ? 'R' : ' ',
 			  oidp->oid_kind & OFP_CTLFLAG_WR ? 'W' : ' ');
 
 		switch (oidp->oid_kind & OFP_CTLTYPE) {
 		case OFP_CTLTYPE_NODE:
-			ofp_sendf(fd, " Node  (%s)\r\n", oidp->oid_descr);
+			ofp_print(pr, " Node  (%s)\r\n", oidp->oid_descr);
 			if (!oidp->oid_handler)
-				ofp_sysctl_debug_dump_node(fd, oidp,
+				ofp_sysctl_debug_dump_node(pr, oidp,
 							   print_align + 2);
 			break;
 		case OFP_CTLTYPE_INT:
-			ofp_sendf(fd, " int  (%s)\r\n", oidp->oid_descr);
+			ofp_print(pr, " int  (%s)\r\n", oidp->oid_descr);
 			break;
 		case OFP_CTLTYPE_UINT:
-			ofp_sendf(fd, " u_int  (%s)\r\n", oidp->oid_descr);
+			ofp_print(pr, " u_int  (%s)\r\n", oidp->oid_descr);
 			break;
 		case OFP_CTLTYPE_LONG:
-			ofp_sendf(fd, " long  (%s)\r\n", oidp->oid_descr);
+			ofp_print(pr, " long  (%s)\r\n", oidp->oid_descr);
 			break;
 		case OFP_CTLTYPE_ULONG:
-			ofp_sendf(fd, " u_long  (%s)\r\n", oidp->oid_descr);
+			ofp_print(pr, " u_long  (%s)\r\n", oidp->oid_descr);
 			break;
 		case OFP_CTLTYPE_STRING:
-			ofp_sendf(fd, " string  (%s)\r\n", oidp->oid_descr);
+			ofp_print(pr, " string  (%s)\r\n", oidp->oid_descr);
 			break;
 		case OFP_CTLTYPE_U64:
-			ofp_sendf(fd, " uint64_t  (%s)\r\n", oidp->oid_descr);
+			ofp_print(pr, " uint64_t  (%s)\r\n", oidp->oid_descr);
 			break;
 		case OFP_CTLTYPE_S64:
-			ofp_sendf(fd, " int64_t  (%s)\r\n", oidp->oid_descr);
+			ofp_print(pr, " int64_t  (%s)\r\n", oidp->oid_descr);
 			break;
 		case OFP_CTLTYPE_OPAQUE:
-			ofp_sendf(fd, " opaque/struct  (%s)\r\n",
+			ofp_print(pr, " opaque/struct  (%s)\r\n",
 				  oidp->oid_descr);
 			break;
 		case OFP_CTLTYPE_PROC:
-			ofp_sendf(fd, " Procedure  (%s)\r\n", oidp->oid_descr);
+			ofp_print(pr, " Procedure  (%s)\r\n", oidp->oid_descr);
 			break;
 		}
 	}
 }
 
 void
-ofp_sysctl_write_tree(int fd)
+ofp_sysctl_write_tree(ofp_print_t *pr)
 {
-	ofp_sendf(fd, "ID Name Access Type Description\r\n");
+	ofp_print(pr, "ID Name Access Type Description\r\n");
 
 	SYSCTL_XLOCK();
-	ofp_sysctl_debug_dump_node(fd, &sysctl_root, 0);
+	ofp_sysctl_debug_dump_node(pr, &sysctl_root, 0);
 	SYSCTL_XUNLOCK();
 }
 

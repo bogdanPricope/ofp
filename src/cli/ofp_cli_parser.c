@@ -11,7 +11,7 @@
 /** CLI Commands node
  */
 struct cli_node {
-	void (*func)(struct cli_conn *conn, const char *s);
+	void (*func)(ofp_print_t *pr, const char *s);
 	struct cli_node *nextword;
 	struct cli_node *nextpossibility;
 	const char *word;
@@ -268,6 +268,7 @@ void ofp_cli_parser_parse(struct cli_conn *conn, int extra)
 	char paramlist[100];
 	char *line = conn->inbuf;
 	int linelen = strlen(line);
+	char *func_arg = NULL;
 
 	if (linelen > 0 && line[linelen - 1] == ' ' && extra)
 		extra = '?';
@@ -334,27 +335,35 @@ void ofp_cli_parser_parse(struct cli_conn *conn, int extra)
 	if (extra && p == &end && *token == 0) {
 		if (is_parameter(lastok) ||
 		    strlen(lastok->word) == strlen(lasttoken)) {
-			sendstr(conn, "\r\n <cr>");
+			ofp_print(&conn->pr, "\r\n <cr>");
 			sendcrlf(conn);
-			sendstr(conn, line);
+			ofp_print(&conn->pr, line);
 		} else {
 			addchars(conn, lastok->word + strlen(lasttoken));
 			addchars(conn, " ");
-			sendstr(conn, lastok->word + strlen(lasttoken));
-			sendstr(conn, " ");
+			ofp_print(&conn->pr, lastok->word + strlen(lasttoken));
+			ofp_print(&conn->pr, " ");
 		}
 		return;
 	}
 
 	if (lastok && lastok->func && extra == 0) {
-		lastok->func(conn, paramlist);
+		func_arg = paramlist;
+
+		if (f_run_alias == lastok->func)
+			func_arg = conn->inbuf;
+
+		lastok->func(&conn->pr, func_arg);
+		if (f_exit == lastok->func)
+			close_connection(conn);
+
 		sendcrlf(conn);
 		return;
 	}
 
 	if (extra == '?') {
 		print_q(conn, horpos, lastok);
-		sendstr(conn, line);
+		ofp_print(&conn->pr, line);
 		return;
 	}
 
@@ -364,8 +373,8 @@ void ofp_cli_parser_parse(struct cli_conn *conn, int extra)
 		if (*token == NULL) {
 			addchars(conn, lastok->word + strlen(lasttoken));
 			addchars(conn, " ");
-			sendstr(conn, lastok->word + strlen(lasttoken));
-			sendstr(conn, " ");
+			ofp_print(&conn->pr, lastok->word + strlen(lasttoken));
+			ofp_print(&conn->pr, " ");
 			return;
 		}
 
@@ -374,17 +383,17 @@ void ofp_cli_parser_parse(struct cli_conn *conn, int extra)
 		if (found) {
 			addchars(conn, found->word + strlen(*token));
 			addchars(conn, " ");
-			sendstr(conn, found->word + strlen(*token));
-			sendstr(conn, " ");
+			ofp_print(&conn->pr, found->word + strlen(*token));
+			ofp_print(&conn->pr, " ");
 			return;
 		}
 
 		print_q(conn, horpos, lastok);
-		sendstr(conn, line);
+		ofp_print(&conn->pr, line);
 		return;
 	}
 
-	sendstr(conn, "syntax error\r\n");
+	ofp_print(&conn->pr, "syntax error\r\n");
 	sendcrlf(conn);
 }
 
@@ -478,7 +487,7 @@ static void print_q(struct cli_conn *conn, struct cli_node *s,
 	char sendbuf[200];
 
 	if (s == &end || (ok && ok->func)) {
-		sendstr(conn, "\r\n <cr>");
+		ofp_print(&conn->pr, "\r\n <cr>");
 		//return;
 	}
 	while (s != &end) {
@@ -487,7 +496,7 @@ static void print_q(struct cli_conn *conn, struct cli_node *s,
 				s->word, s->help);
 		else
 			sprintf(sendbuf, "\r\n %.178s", s->word);
-		sendstr(conn, sendbuf);
+		ofp_print(&conn->pr, sendbuf);
 		s = s->nextpossibility;
 	}
 	sendcrlf(conn);
@@ -599,7 +608,7 @@ void ofp_cli_parser_add_command(struct cli_command *cc)
 	start = add_command_in_list(start, cc);
 }
 
-static void print_nodes(int fd, struct cli_node *node)
+static void print_nodes(ofp_print_t *pr, struct cli_node *node)
 {
 	struct cli_node *n;
 	static int depth;
@@ -611,22 +620,22 @@ static void print_nodes(int fd, struct cli_node *node)
 		return;
 
 	for (i = 0; i < depth; i++)
-		ofp_sendf(fd, " ");
+		ofp_print(pr, " ");
 	for (n = node; n != &end; n = n->nextword) {
 		depth += strlen(n->word) + 1;
 		stack[ni++] = n;
-		ofp_sendf(fd, "%s ", n->word);
+		ofp_print(pr, "%s ", n->word);
 	}
 
-	ofp_sendf(fd, "\n");
+	ofp_print(pr, "\n");
 	while (ni > 0) {
 		n = stack[--ni];
 		depth -= strlen(n->word) + 1;
-		print_nodes(fd, n->nextpossibility);
+		print_nodes(pr, n->nextpossibility);
 	}
 }
 
-void ofp_cli_parser_print_nodes(int fd)
+void ofp_cli_parser_print_nodes(ofp_print_t *pr)
 {
-	print_nodes(fd, start);
+	print_nodes(pr, start);
 }

@@ -8,11 +8,11 @@
 #include "ofpi_portconf.h"
 #include "ofpi_util.h"
 
-void f_address_help(struct cli_conn *conn, const char *s)
+void f_address_help(ofp_print_t *pr, const char *s)
 {
 	(void)s;
 
-	ofp_sendf(conn->fd, "Add ipv4 address:\r\n"
+	ofp_print(pr, "Add ipv4 address:\r\n"
 		"  address add IP4NET DEV\r\n"
 		"    DEV: ethernet interface name or local interface(lo0, lo1,...)\r\n"
 		"    IP4NET: network address in a.b.c.d/e format\r\n"
@@ -20,7 +20,7 @@ void f_address_help(struct cli_conn *conn, const char *s)
 		"    address add 192.168.200.1/24 %s0\r\n\r\n",
 		OFP_IFNAME_PREFIX);
 
-	ofp_sendf(conn->fd, "Remove ipv4 address:\r\n"
+	ofp_print(pr, "Remove ipv4 address:\r\n"
 		"  address del IP4NET DEV\r\n"
 		"    DEV: ethernet interface name or local interface(lo0, lo1,...)\r\n"
 		"    IP4NET: network address in a.b.c.d/e format\r\n"
@@ -28,24 +28,23 @@ void f_address_help(struct cli_conn *conn, const char *s)
 		"    address del 192.168.200.1/24 %s0\r\n\r\n",
 		OFP_IFNAME_PREFIX);
 
-	ofp_sendf(conn->fd, "Show ipv4 addresses:\r\n"
+	ofp_print(pr, "Show ipv4 addresses:\r\n"
 			"  address show\r\n"
 			"  Example:\r\n"
 			"    address show\r\n\r\n");
 
 }
 
-void f_address_show(struct cli_conn *conn, const char *s)
+void f_address_show(ofp_print_t *pr, const char *s)
 {
 	/* addressr [show] */
 	(void)s;
-	(void)conn;
 
-	ofp_show_ifnet_ip_addrs(conn->fd);
+	ofp_show_ifnet_ip_addrs(pr);
 }
 
 
-void f_address_add(struct cli_conn *conn, const char *s)
+void f_address_add(ofp_print_t *pr, const char *s)
 {
 	/* address add IP4NET DEV */
 	char dev[16];
@@ -65,17 +64,17 @@ void f_address_add(struct cli_conn *conn, const char *s)
 	port = ofp_name_to_port_vlan(dev, &vlan);
 
 	if (port == GRE_PORTS || port == VXLAN_PORTS || port == LOCAL_PORTS) {
-		ofp_sendf(conn->fd, "Invalid device name.\r\n");
+		ofp_print(pr, "Invalid device name.\r\n");
 		return;
 	}
 
 	err = ofp_config_interface_add_ip_v4(port, vlan, vrf,
 						 addr, m);
 	if (err != NULL)
-		ofp_sendf(conn->fd, err);
+		ofp_print(pr, err);
 }
 
-void f_address_del(struct cli_conn *conn, const char *s)
+void f_address_del(ofp_print_t *pr, const char *s)
 {
 	/* addressr delete IP4NET DEV */
 	char dev[16];
@@ -95,5 +94,5 @@ void f_address_del(struct cli_conn *conn, const char *s)
 	err = ofp_config_interface_del_ip_v4(port, vlan, vrf, addr, m);
 
 	if (err != NULL)
-		ofp_sendf(conn->fd, err);
+		ofp_print(pr, err);
 }

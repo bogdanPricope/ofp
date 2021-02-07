@@ -57,8 +57,6 @@ static struct cli_conn connection;
 
 int run_alias = -1;
 
-static void close_connection(struct cli_conn *conn);
-
 static uint8_t txt_to_hex(char val)
 {
 	if (val >= '0' && val <= '9')
@@ -170,102 +168,79 @@ int ip6addr_get(const char *tk, int tk_len, uint8_t *addr)
 	return 1;
 }
 
-void sendstr(struct cli_conn *conn, const char *s)
-{
-	if (S_ISSOCK(conn->fd))
-		send(conn->fd, s, strlen(s), 0);
-	else
-		(void)(write(conn->fd, s, strlen(s)) + 1);
-}
-
-static void sendbuf(struct cli_conn *conn, const char *buff, size_t buff_len)
-{
-	if (S_ISSOCK(conn->fd))
-		send(conn->fd, buff, buff_len, 0);
-	else
-		(void)(write(conn->fd, buff, buff_len) + 1);
-}
-
 void sendcrlf(struct cli_conn *conn)
 {
 	if ((conn->status & DO_ECHO) == 0)
-		sendstr(conn, "\n"); /* no extra prompts */
+		ofp_print(&conn->pr, "\n"); /* no extra prompts */
 	else if (conn->status & ENABLED_OK)
-		sendstr(conn, "\r\n# ");
+		ofp_print(&conn->pr, "\r\n# ");
 	else
-		sendstr(conn, "\r\n> ");
+		ofp_print(&conn->pr, "\r\n> ");
 }
 
 static void sendprompt(struct cli_conn *conn)
 {
 	if (conn->status & ENABLED_OK)
-		sendstr(conn, "\r# ");
+		ofp_print(&conn->pr, "\r# ");
 	else
-		sendstr(conn, "\r> ");
+		ofp_print(&conn->pr, "\r> ");
 }
 
-static void cli_send_welcome_banner(struct cli_conn *conn)
+static void cli_send_welcome_banner(ofp_print_t *pr)
 {
-	sendstr(conn,
-		"\r\n"
-		"--==--==--==--==--==--==--\r\n"
-		"-- WELCOME to OFP CLI --\r\n"
-		"--==--==--==--==--==--==--\r\n"
-		);
+	ofp_print(pr,
+		  "\r\n"
+		  "--==--==--==--==--==--==--\r\n"
+		  "-- WELCOME to OFP CLI --\r\n"
+		  "--==--==--==--==--==--==--\r\n"
+		  );
 }
 
-static void cli_send_goodbye_banner(struct cli_conn *conn)
+static void cli_send_goodbye_banner(ofp_print_t *pr)
 {
-	sendstr(conn,
-		"\r\n"
-		"--==--==--==--\r\n"
-		"-- Goodbye! --\r\n"
-		"--==--==--==--\r\n"
-		);
+	ofp_print(pr,
+		  "\r\n"
+		  "--==--==--==--\r\n"
+		  "-- Goodbye! --\r\n"
+		  "--==--==--==--\r\n"
+		  );
 }
 
 /***********************************************
  * Functions to be called.                     *
  ***********************************************/
 
-static void f_exit(struct cli_conn *conn, const char *s)
+void f_exit(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	if (conn->status & ENABLED_OK) {
-		conn->status &= ~ENABLED_OK;
-		cli_send_goodbye_banner(conn);
-		return;
-	}
-
-	cli_send_goodbye_banner(conn);
-	close_connection(conn);
+	cli_send_goodbye_banner(pr);
 }
 
-static void f_help(struct cli_conn *conn, const char *s)
+static void f_help(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	ofp_sendf(conn->fd, "Display help information for CLI commands:\r\n"
+	ofp_print(pr, "Display help information for CLI commands:\r\n"
 		"  help <command>\r\n"
 		"    command: alias, address, arp, debug, exit, ifconfig, ");
-	ofp_sendf(conn->fd, "ipsec, loglevel, netstat, route, show, shutdown,");
-	ofp_sendf(conn->fd, " stat, sysctl\r\n\r\n");
+	ofp_print(pr, "ipsec, loglevel, netstat, route, show, shutdown,");
+	ofp_print(pr, " stat, sysctl\r\n\r\n");
 }
 
-static void f_help_exit(struct cli_conn *conn, const char *s)
+static void f_help_exit(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	sendstr(conn, "Exit closes the current connection.\r\n"
+	ofp_print(pr, "Exit closes the current connection.\r\n"
 		"You can type ctl-D, too.");
 }
 
 
-static void f_help_show(struct cli_conn *conn, const char *s)
+static void f_help_show(ofp_print_t *pr, const char *s)
 {
 	(void)s;
-	ofp_sendf(conn->fd, "Display current status:\r\n"
+	ofp_print(pr, "Display current status:\r\n"
 		"  show <command>\r\n"
 		"    command: alias, address, arp, debug, ifconfig, ipsec, ");
-	ofp_sendf(conn->fd, "loglevel, netstat, route, stat, sysctl\r\n\r\n");
+	ofp_print(pr, "loglevel, netstat, route, stat, sysctl\r\n\r\n");
 }
 
 static int authenticate(const char *user, const char *passwd)
@@ -778,17 +753,17 @@ struct cli_command commands[] = {
 	{ NULL, NULL, NULL }
 };
 
-static void f_run_alias(struct cli_conn *conn, const char *s)
+void f_run_alias(ofp_print_t *pr, const char *s)
 {
-	(void)s;
-	char *line = conn->inbuf;
 	int i;
+
+	(void)pr;
 
 	for (i = 0; i < ALIAS_TABLE_LEN; i++) {
 		if (alias_table[i].name == 0 || alias_table[i].cmd == 0)
 			continue;
-		if (strncmp(line, alias_table[i].name,
-			strlen(alias_table[i].name)) == 0) {
+		if (strncmp(s, alias_table[i].name,
+			    strlen(alias_table[i].name)) == 0) {
 			run_alias = i;
 			return;
 		}
@@ -812,7 +787,7 @@ void ofp_cli_add_command_imp(const char *cmd, const char *help,
 
 	a.command = cmd;
 	a.help = help;
-	a.func = (void (*)(struct cli_conn *, const char *))func;
+	a.func = (void (*)(ofp_print_t *, const char *))func;
 	ofp_cli_parser_add_command(&a);
 }
 
@@ -826,18 +801,11 @@ void cli_init_commands(void)
 {
 	unsigned i = 0;
 	static int initialized = 0;
-	struct cli_conn conn;
 
 	if (initialized)
 		return;
 
 	initialized = 1;
-
-	/* virtual connection */
-	memset(&conn, 0, sizeof(conn));
-	conn.fd = 1; /* stdout */
-	conn.status = CONNECTION_ON; /* no prompt */
-
 
 	/* Initalize alias table*/
 	for (i = 0; i < ALIAS_TABLE_LEN; i++) {
@@ -854,8 +822,12 @@ void cli_init_commands(void)
 
 	/* Print nodes */
 	if (ofp_debug_logging_enabled()) {
-	    ofp_sendf(conn.fd, "CLI Command nodes:\n");
-		ofp_cli_parser_print_nodes(conn.fd);
+		ofp_print_t pr;
+
+		ofp_print_init(&pr, 1, OFP_PRINT_FILE);
+
+	    ofp_print(&pr, "CLI Command nodes:\n");
+		ofp_cli_parser_print_nodes(&pr);
 	}
 }
 
@@ -868,6 +840,7 @@ void cli_process_file(char *file_name)
 	memset(&conn, 0, sizeof(conn));
 	conn.fd = 1; /* stdout */
 	conn.status = CONNECTION_ON; /* no prompt */
+	ofp_print_init(&conn.pr, conn.fd, OFP_PRINT_FILE);
 
 	if (file_name != NULL) {
 		f = fopen(file_name, "r");
@@ -879,8 +852,7 @@ void cli_process_file(char *file_name)
 		while (fgets(conn.inbuf, sizeof(conn.inbuf), f)) {
 			if (conn.inbuf[0] == '#' || conn.inbuf[0] <= ' ')
 				continue;
-			ofp_sendf(conn.fd, "CLI: %s\n",
-				conn.inbuf);
+			ofp_print(&conn.pr, "CLI: %s\n", conn.inbuf);
 			ofp_cli_parser_parse(&conn, 0);
 		}
 
@@ -907,7 +879,7 @@ int cli_conn_recv(struct cli_conn *conn, unsigned char c)
 				conn->status |= ENABLED_OK;
 				sendcrlf(conn);
 			} else {
-				sendstr(conn, "Your password fails!");
+				ofp_print(&conn->pr, "Your password fails!");
 				sendcrlf(conn);
 			}
 		} else if (plen < (sizeof(conn->passwd)-1)) {
@@ -940,7 +912,7 @@ int cli_conn_recv(struct cli_conn *conn, unsigned char c)
 		conn->status |= WILL_SUPPRESS;
 		// ask for display size
 		char com[] = {255, 253, 31};
-		sendbuf(conn, com, sizeof(com));
+		ofp_print_buffer(&conn->pr, com, sizeof(com));
 	} else if (conn->ch1 == (unsigned char)0x251 && c == 31) {
 		// IAC WILL NAWS (display size)
 	} else if (conn->ch1 == 250 && c == 31) {  // (display size info)
@@ -998,9 +970,10 @@ int cli_conn_recv(struct cli_conn *conn, unsigned char c)
 				conn->old_get_cnt = 0;
 		}
 		conn->pos = strlen(conn->inbuf);
-		sendstr(conn, "\r                                                                   ");
+		ofp_print(&conn->pr, "\r                                      "
+			  "                             ");
 		sendprompt(conn);
-		sendstr(conn, conn->inbuf);
+		ofp_print(&conn->pr, conn->inbuf);
 	} else if (c == 0x1b) {
 		conn->status |= WAITING_ESC_1;
 	} else if (c == 0xff) {
@@ -1017,13 +990,13 @@ int cli_conn_recv(struct cli_conn *conn, unsigned char c)
 	} else if (c == 13 || c == 10) {
 	char nl[] = {13, 10};
 	if (conn->status & DO_ECHO)
-		sendbuf(conn, nl, sizeof(nl));
+		ofp_print_buffer(&conn->pr, nl, sizeof(nl));
 	conn->inbuf[conn->pos] = 0;
 	if (0 && conn->pos == 0) {
 		strcpy(conn->inbuf, conn->oldbuf[conn->old_put_cnt]);
 		conn->pos = strlen(conn->inbuf);
-		sendstr(conn, conn->inbuf);
-		sendbuf(conn, nl, sizeof(nl));
+		ofp_print(&conn->pr, conn->inbuf);
+		ofp_print_buffer(&conn->pr, nl, sizeof(nl));
 	} else if (conn->pos > 0 && strcmp(conn->oldbuf[conn->old_put_cnt], conn->inbuf)) {
 		conn->old_put_cnt++;
 		if (conn->old_put_cnt >= NUM_OLD_BUFS)
@@ -1049,7 +1022,7 @@ int cli_conn_recv(struct cli_conn *conn, unsigned char c)
 		if (conn->pos > 0) {
 			char bs[] = {8, ' ', 8};
 			if (conn->status & DO_ECHO)
-				sendbuf(conn, bs, sizeof(bs));
+				ofp_print_buffer(&conn->pr, bs, sizeof(bs));
 			conn->pos--;
 			conn->inbuf[conn->pos] = 0;
 		}
@@ -1061,7 +1034,7 @@ int cli_conn_recv(struct cli_conn *conn, unsigned char c)
 			conn->inbuf[conn->pos] = 0;
 
 			if (conn->status & DO_ECHO)
-				sendbuf(conn, (char *)&c, 1);
+				ofp_print_buffer(&conn->pr, (char *)&c, 1);
 		}
 	}
 
@@ -1076,18 +1049,20 @@ struct cli_conn *cli_conn_accept(int fd)
 	bzero(conn, sizeof(*conn));
 	conn->fd = fd;
 	conn->status = 0;
-	sendbuf(conn, telnet_echo_off, sizeof(telnet_echo_off));
+	ofp_print_init(&conn->pr, fd, OFP_PRINT_LINUX_SOCK);
+
+	ofp_print_buffer(&conn->pr, telnet_echo_off, sizeof(telnet_echo_off));
 
 	OFP_DBG("new sock %d opened\r\n", conn->fd);
 
-	cli_send_welcome_banner(conn);
+	cli_send_welcome_banner(&conn->pr);
 
 	sendcrlf(conn);
 
 	return conn;
 }
 
-static void close_connection(struct cli_conn *conn)
+void close_connection(struct cli_conn *conn)
 {
 	conn->close_cli = 1;
 	OFP_DBG("Closing connection...\r\n");

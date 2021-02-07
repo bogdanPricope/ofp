@@ -230,7 +230,7 @@ static inline int remove_entry(int set, struct arp_entry *entry)
 }
 
 #define APR_FLAGS_SIZE_MAX 3
-static inline void show_arp_entry(int fd, struct arp_entry *entry)
+static inline void show_arp_entry(ofp_print_t *pr, struct arp_entry *entry)
 {
 	char flags[APR_FLAGS_SIZE_MAX];
 	uint8_t flags_idx = 0;
@@ -259,7 +259,7 @@ static inline void show_arp_entry(int fd, struct arp_entry *entry)
 	}
 	flags[flags_idx] = 0;
 
-	ofp_sendf(fd, "%3d  %-15s %-17s %4u    %s\r\n",
+	ofp_print(pr, "%3d  %-15s %-17s %4u    %s\r\n",
 		  entry->key.vrf,
 		  ofp_print_ip_addr(entry->key.ipv4_addr),
 		  mac_addr,
@@ -707,12 +707,12 @@ void ofp_arp_age_cb(void *arg)
 	}
 }
 
-void ofp_arp_show_table(int fd)
+void ofp_arp_show_table(ofp_print_t *pr)
 {
 	int i;
 	struct arp_entry *entry;
 
-	ofp_sendf(fd,
+	ofp_print(pr,
 		  "VRF  ADDRESS          MAC                AGE    FLAGS\r\n");
 
 	/* zeroth entry is used as the invalid entry.*/
@@ -721,31 +721,31 @@ void ofp_arp_show_table(int fd)
 
 		if (entry->flags.is_complete ||
 		    OFP_SLIST_FIRST(&entry->pkt_list_head) != NULL)
-			show_arp_entry(fd, entry);
+			show_arp_entry(pr, entry);
 	}
 }
 
-void ofp_arp_show_saved_packets(int fd)
+void ofp_arp_show_saved_packets(ofp_print_t *pr)
 {
 	int i;
 	struct pkt_entry *pktentry;
 	struct arp_entry *entry;
 
-	ofp_sendf(fd, "Saved packets:\r\n");
+	ofp_print(pr, "Saved packets:\r\n");
 
 	/* zeroth entry is used as the invalid entry.*/
 	for (i = 1; i < NUM_ARPS; ++i) {
 		entry = &shm->arp.entries[i];
 		if (entry->key.ipv4_addr &&
 		    OFP_SLIST_FIRST(&entry->pkt_list_head) != NULL) {
-			ofp_sendf(fd, "IP: %-15s: ",
-				    ofp_print_ip_addr(entry->key.ipv4_addr));
+			ofp_print(pr, "IP: %-15s: ",
+				  ofp_print_ip_addr(entry->key.ipv4_addr));
 
 			OFP_SLIST_FOREACH(pktentry, &entry->pkt_list_head, next)
-				ofp_sendf(fd, "%" PRIX64 "\t",
-					    odp_packet_to_u64(pktentry->pkt));
+				ofp_print(pr, "%" PRIX64 "\t",
+					  odp_packet_to_u64(pktentry->pkt));
 
-			ofp_sendf(fd, "\r\n");
+			ofp_print(pr, "\r\n");
 		}
 	}
 }

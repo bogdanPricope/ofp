@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "ofp_log.h"
+#include "ofp_print.h"
 
 #if __GNUC__ >= 4
 #pragma GCC visibility push(default)
@@ -112,7 +113,7 @@ static inline int32_t ofp_set_route6_params(uint32_t type, uint16_t vrf,
 
 #define OFP_SHOW_ARP        0
 #define OFP_SHOW_ROUTES     1
-void ofp_show_routes(int fd, int what);
+void ofp_show_routes(ofp_print_t *pr, int what);
 
 /* ROUTE operations */
 struct ofp_nh_entry *ofp_get_next_hop(uint16_t vrf,

@@ -194,25 +194,25 @@ inline int ofp_ipv4_lookup_mac(uint32_t ipv4_addr, unsigned char *ll_addr,
 	return ret;
 }
 
-static inline void show_arp_entry(int fd, int s, int e)
+static inline void show_arp_entry(ofp_print_t *pr, int s, int e)
 {
 	if (shm->arp_entries[s][e].key.ipv4_addr)
-		ofp_sendf(fd, "%3d  %-15s %s\r\n",
-			    shm->arp_entries[s][e].key.vrf,
-			    ofp_print_ip_addr(shm->arp_entries[s][e].key.ipv4_addr),
-			    ofp_print_mac((uint8_t *)&shm->arp_entries[s][e].macaddr));
+		ofp_print(pr, "%3d  %-15s %s\r\n",
+			  shm->arp_entries[s][e].key.vrf,
+			  ofp_print_ip_addr(shm->arp_entries[s][e].key.ipv4_addr),
+			  ofp_print_mac((uint8_t *)&shm->arp_entries[s][e].macaddr));
 }
 
-void ofp_arp_show_table(int fd)
+void ofp_arp_show_table(ofp_print_t *pr)
 {
 	uint32_t i, j;
 
-	ofp_sendf(fd, "VRF  ADDRESS          MAC\r\n");
+	ofp_print(pr, "VRF  ADDRESS          MAC\r\n");
 
 	ck_epoch_begin(&record, &section);
 	for (i = 0; i < NUM_SETS; ++i)
 		for (j = 0; j < ENTRIES_PER_SET; ++j)
-			show_arp_entry(fd, i, j);
+			show_arp_entry(pr, i, j);
 	ck_epoch_end(&record, &section);
 }
 
@@ -235,9 +235,9 @@ enum ofp_return_code ofp_arp_save_ipv4_pkt(odp_packet_t pkt,
 	return OFP_PKT_DROP;
 }
 
-void ofp_arp_show_saved_packets(int fd)
+void ofp_arp_show_saved_packets(ofp_print_t *pr)
 {
-	(void) fd;
+	(void)pr;
 }
 
 int ofp_arp_init_tables(void)

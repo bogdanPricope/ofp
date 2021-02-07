@@ -57,6 +57,7 @@ extern "C" {
 #include "ofp_epoll.h"
 #include "ofp_ipsec.h"
 #include "ofp_ipsec_init.h"
+#include "ofp_print.h"
 
 #ifdef __cplusplus
 }

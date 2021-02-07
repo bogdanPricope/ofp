@@ -393,9 +393,8 @@ void ofp_get_interfaces(struct ofp_ifconf *ifc);
 int ofp_ifnet_ip_find(struct ofp_ifnet *dev, uint32_t addr);
 int ofp_set_first_ifnet_addr(struct ofp_ifnet *dev, uint32_t addr, uint32_t bcast_addr, int masklen);
 void ofp_free_ifnet_ip_list(struct ofp_ifnet *dev);
-void ofp_ifnet_print_ip_info(int fd, struct ofp_ifnet *dev);
+void ofp_ifnet_print_ip_info(ofp_print_t *pr, struct ofp_ifnet *dev);
 int ofp_ifnet_ip_find_update_fields(struct ofp_ifnet *dev, uint32_t addr, int masklen, uint32_t bcast_addr);
-void ofp_ifnet_print_ip_info(int fd, struct ofp_ifnet *dev);
 int ofp_ifnet_ip_add(struct ofp_ifnet *dev, uint32_t addr);
 void ofp_ifnet_ip_remove(struct ofp_ifnet *dev, uint32_t addr);
 
