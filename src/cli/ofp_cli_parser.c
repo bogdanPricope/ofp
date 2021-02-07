@@ -348,6 +348,7 @@ void ofp_cli_parser_parse(struct cli_conn *conn, int extra)
 
 	if (lastok && lastok->func && extra == 0) {
 		lastok->func(conn, paramlist);
+		sendcrlf(conn);
 		return;
 	}
 

@@ -17,6 +17,8 @@
 void f_debug(struct cli_conn *conn, const char *s)
 {
 	(void)s;
+	(void)conn;
+
 	V_debug_flags = (V_debug_flags &
 		(~OFP_DEBUG_PCAP_PORT_MASK)) |
 		strtol(s, NULL, 0);
@@ -27,7 +29,6 @@ void f_debug(struct cli_conn *conn, const char *s)
 		/*enable capture on first port*/
 		V_debug_pcap_ports = 0x1;
 	}
-	sendcrlf(conn);
 }
 
 /* debug show */
@@ -77,48 +78,47 @@ void f_debug_show(struct cli_conn *conn, const char *s)
 	} else {
 		ofp_sendf(conn->fd, "Capturing NO traffic.\r\n");
 	}
-
-	sendcrlf(conn);
 }
 
 /* debug capture NUMBER */
 void f_debug_capture(struct cli_conn *conn, const char *s)
 {
+	(void)conn;
+
 	V_debug_pcap_ports = strtol(s, NULL, 0);
 
 	if (V_debug_pcap_ports)
 		V_debug_flags |= OFP_DEBUG_CAPTURE;
 	else
 		V_debug_flags &= ~OFP_DEBUG_CAPTURE;
-
-	sendcrlf(conn);
 }
 
 /* debug capture info NUMBER */
 void f_debug_info(struct cli_conn *conn, const char *s)
 {
+	(void)conn;
+
 	if (atoi(s))
 		V_debug_pcap_ports |= OFP_DEBUG_PCAP_CONF_ADD_INFO;
 	else
 		V_debug_pcap_ports &= ~OFP_DEBUG_PCAP_CONF_ADD_INFO;
-
-	sendcrlf(conn);
 }
 
  /* debug capture file STRING */
 void f_debug_capture_file(struct cli_conn *conn, const char *s)
 {
 	(void)s;
+	(void)conn;
+
 	ofp_set_capture_file(s);
-	sendcrlf(conn);
 }
 
 /* debug print file STRING */
 void f_debug_print_file(struct cli_conn *conn, const char *s)
 {
 	(void)s;
+	(void)conn;
 	ofp_set_print_file(s);
-	sendcrlf(conn);
 }
 
 /* debug */
@@ -190,5 +190,4 @@ void f_help_debug(struct cli_conn *conn, const char *s)
 	  "  Example: tcpdump line:\r\n"
 	  "    '11:36:56.851469 b4:b5:2f:63:05:e5 > c0:9d:67:1a:97:7e, ethe...'\r\n"
 	  "    1st octet of dst = 0xc0 -> port = 0, tx via KNI\r\n\r\n");
-	sendcrlf(conn);
 }

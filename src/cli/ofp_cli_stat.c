@@ -134,16 +134,14 @@ void f_stat_show(struct cli_conn *conn, const char *s)
 		ofp_sendf(conn->fd, "Throughput: %4.3f Mpps\r\n",
 				((float)ps->rx_fp_pps)/1000000);
 	}
-	sendcrlf(conn);
 }
 
 void f_stat_set(struct cli_conn *conn, const char *s)
 {
 	(void)s;
+	(void)conn;
 
 	ofp_set_stat_flags(strtol(s, NULL, 0));
-
-	sendcrlf(conn);
 }
 
 void f_stat_perf(struct cli_conn *conn, const char *s)
@@ -157,18 +155,17 @@ void f_stat_perf(struct cli_conn *conn, const char *s)
 		((float)ps->rx_fp_pps)/1000000);
 	} else
 		ofp_sendf(conn->fd, "N/A\r\n");
-
-	sendcrlf(conn);
 }
 void f_stat_clear(struct cli_conn *conn, const char *s)
 {
-	struct ofp_packet_stat *st = ofp_get_packet_statistics();
+	struct ofp_packet_stat *st = NULL;
 
 	(void)s;
+	(void)conn;
+
+	st = ofp_get_packet_statistics();
 
 	memset(st, 0, sizeof(struct ofp_packet_stat));
-
-	sendcrlf(conn);
 }
 
 void f_help_stat(struct cli_conn *conn, const char *s)
@@ -193,6 +190,4 @@ void f_help_stat(struct cli_conn *conn, const char *s)
 
 	ofp_sendf(conn->fd, "Show (this) help:\r\n"
 		"  stat help\r\n\r\n");
-
-	sendcrlf(conn);
 }

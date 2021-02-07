@@ -22,15 +22,14 @@ void f_arp(struct cli_conn *conn, const char *s)
 
 	ofp_show_routes(conn->fd, OFP_SHOW_ARP);
 	ofp_arp_show_saved_packets(conn->fd);
-	sendcrlf(conn);
 }
 
 void f_arp_flush(struct cli_conn *conn, const char *s)
 {
 	(void)s;
+	(void)conn;
 
 	ofp_arp_init_tables();
-	sendcrlf(conn);
 }
 
 void f_arp_cleanup(struct cli_conn *conn, const char *s)
@@ -38,13 +37,13 @@ void f_arp_cleanup(struct cli_conn *conn, const char *s)
 	int cli = 1;
 
 	(void)s;
+	(void)conn;
 #ifdef OFP_USE_LIBCK
 	(void)cli;
 	/* Aging not defined in arp ck impl */
 #else
 	ofp_arp_age_cb(&cli);
 #endif
-	sendcrlf(conn);
 }
 
 void f_arp_add(struct cli_conn *conn, const char *s)
@@ -71,24 +70,19 @@ void f_arp_add(struct cli_conn *conn, const char *s)
 	port = ofp_name_to_port_vlan(dev, &vlan);
 	if (port == -1 || !PHYS_PORT(port)) {
 		ofp_sendf(conn->fd, "Invalid device name.\r\n");
-		sendcrlf(conn);
 		return;
 	}
 
 	itf = ofp_get_ifnet(port, vlan);
 	if (itf == NULL) {
 		ofp_sendf(conn->fd, "Device not found.\r\n");
-		sendcrlf(conn);
 		return;
 	}
 
 	if (ofp_arp_ipv4_insert(ipv4_addr, mac, itf, TRUE)) {
 		ofp_sendf(conn->fd, "Failed to insert arp entry.\r\n");
-		sendcrlf(conn);
 		return;
 	}
-
-	sendcrlf(conn);
 }
 
 void f_help_arp(struct cli_conn *conn, const char *s)
@@ -118,6 +112,4 @@ void f_help_arp(struct cli_conn *conn, const char *s)
 	ofp_sendf(conn->fd,
 		"Show (this) help:\r\n"
 		"  arp help\r\n\r\n");
-
-	sendcrlf(conn);
 }

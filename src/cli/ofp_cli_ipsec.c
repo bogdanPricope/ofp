@@ -203,21 +203,18 @@ static void cmd_sat_add(struct cli_conn *conn, const char *s)
 
 	if (find_sat(name)) {
 		ofp_sendf(conn->fd, "Template already exists\r\n");
-		sendcrlf(conn);
 		return;
 	}
 
 	sat = sat_alloc();
 	if (sat == NULL) {
 		ofp_sendf(conn->fd, "Template allocation failed");
-		sendcrlf(conn);
 		return;
 	}
 	memset(sat, 0, sizeof(*sat));
 	strncpy(sat->name, name, sizeof(sat->name));
 	sat->name[sizeof(sat->name) - 1] = 0;
 	sat->allocated = 1;
-	sendcrlf(conn);
 }
 
 static void cmd_spt_add(struct cli_conn *conn, const char *s)
@@ -229,21 +226,18 @@ static void cmd_spt_add(struct cli_conn *conn, const char *s)
 
 	if (find_spt(name)) {
 		ofp_sendf(conn->fd, "Template already exists\r\n");
-		sendcrlf(conn);
 		return;
 	}
 
 	spt = spt_alloc();
 	if (spt == NULL) {
 		ofp_sendf(conn->fd, "Template allocation failed");
-		sendcrlf(conn);
 		return;
 	}
 	memset(spt, 0, sizeof(*spt));
 	strncpy(spt->name, name, sizeof(spt->name));
 	spt->name[sizeof(spt->name) - 1] = 0;
 	spt->allocated = 1;
-	sendcrlf(conn);
 }
 
 static struct sa_template *sat_from_cmd(struct cli_conn *conn, const char *s)
@@ -286,7 +280,6 @@ static void cmd_sat_del(struct cli_conn *conn, const char *s)
 
 	if (sat)
 		sat->allocated = 0;
-	sendcrlf(conn);
 }
 
 static void cmd_spt_del(struct cli_conn *conn, const char *s)
@@ -295,7 +288,6 @@ static void cmd_spt_del(struct cli_conn *conn, const char *s)
 
 	if (spt)
 		spt->allocated = 0;
-	sendcrlf(conn);
 }
 
 /*
@@ -376,12 +368,10 @@ static void cmd_sat_set_vrf(struct cli_conn *conn, const char *s)
 	if (sat) {
 		if (sscanf(s, "%*s%"SCNu16, &vrf) != 1) {
 			ofp_sendf(conn->fd, "Syntax error\r\n");
-			sendcrlf(conn);
 			return;
 		}
 		sat->vrf = vrf;
 	}
-	sendcrlf(conn);
 }
 
 static void cmd_sat_set_dir(struct cli_conn *conn, const char *s)
@@ -390,7 +380,6 @@ static void cmd_sat_set_dir(struct cli_conn *conn, const char *s)
 
 	if (sat)
 		parse_enum(conn, s, "direction", &sat->dir);
-	sendcrlf(conn);
 }
 
 static void cmd_sat_set_mode(struct cli_conn *conn, const char *s)
@@ -399,7 +388,6 @@ static void cmd_sat_set_mode(struct cli_conn *conn, const char *s)
 
 	if (sat)
 		parse_enum(conn, s, "mode", &sat->mode);
-	sendcrlf(conn);
 }
 
 static void cmd_sat_set_proto(struct cli_conn *conn, const char *s)
@@ -408,7 +396,6 @@ static void cmd_sat_set_proto(struct cli_conn *conn, const char *s)
 
 	if (sat)
 		parse_enum(conn, s, "protocol", &sat->proto);
-	sendcrlf(conn);
 }
 
 static void cmd_sat_set_cipher(struct cli_conn *conn, const char *s)
@@ -417,7 +404,6 @@ static void cmd_sat_set_cipher(struct cli_conn *conn, const char *s)
 
 	if (sat)
 		parse_enum(conn, s, "cipher", &sat->cipher);
-	sendcrlf(conn);
 }
 
 static void cmd_sat_set_cipher_key(struct cli_conn *conn, const char *s)
@@ -426,7 +412,6 @@ static void cmd_sat_set_cipher_key(struct cli_conn *conn, const char *s)
 
 	if (sat)
 		parse_key(conn, s, &sat->cipher_key);
-	sendcrlf(conn);
 }
 
 static void cmd_sat_set_auth(struct cli_conn *conn, const char *s)
@@ -435,7 +420,6 @@ static void cmd_sat_set_auth(struct cli_conn *conn, const char *s)
 
 	if (sat)
 		parse_enum(conn, s, "auth-alg", &sat->auth);
-	sendcrlf(conn);
 }
 
 static void cmd_sat_set_auth_key(struct cli_conn *conn, const char *s)
@@ -444,7 +428,6 @@ static void cmd_sat_set_auth_key(struct cli_conn *conn, const char *s)
 
 	if (sat)
 		parse_key(conn, s, &sat->auth_key);
-	sendcrlf(conn);
 }
 
 static void cmd_sat_set_window_size(struct cli_conn *conn, const char *s)
@@ -455,12 +438,10 @@ static void cmd_sat_set_window_size(struct cli_conn *conn, const char *s)
 	if (sat) {
 		if (sscanf(s, "%*s%"SCNu32, &size) != 1) {
 			ofp_sendf(conn->fd, "Syntax error\r\n");
-			sendcrlf(conn);
 			return;
 		}
 		sat->window_size = size;
 	}
-	sendcrlf(conn);
 }
 
 static void cmd_sat_set_tun_src(struct cli_conn *conn, const char *s)
@@ -475,7 +456,6 @@ static void cmd_sat_set_tun_src(struct cli_conn *conn, const char *s)
 			ofp_sendf(conn->fd, "Invalid address\r\n");
 		}
 	}
-	sendcrlf(conn);
 }
 
 static void cmd_sat_set_tun_dst(struct cli_conn *conn, const char *s)
@@ -490,7 +470,6 @@ static void cmd_sat_set_tun_dst(struct cli_conn *conn, const char *s)
 			ofp_sendf(conn->fd, "Invalid address\r\n");
 		}
 	}
-	sendcrlf(conn);
 }
 
 static void cmd_spt_set_vrf(struct cli_conn *conn, const char *s)
@@ -501,12 +480,10 @@ static void cmd_spt_set_vrf(struct cli_conn *conn, const char *s)
 	if (spt) {
 		if (sscanf(s, "%*s%"SCNu16, &vrf) != 1) {
 			ofp_sendf(conn->fd, "Syntax error\r\n");
-			sendcrlf(conn);
 			return;
 		}
 		spt->vrf = vrf;
 	}
-	sendcrlf(conn);
 }
 
 static void cmd_spt_set_dir(struct cli_conn *conn, const char *s)
@@ -515,7 +492,6 @@ static void cmd_spt_set_dir(struct cli_conn *conn, const char *s)
 
 	if (spt)
 		parse_enum(conn, s, "direction", &spt->dir);
-	sendcrlf(conn);
 }
 
 static void parse_addr_range(struct cli_conn *conn, const char *s,
@@ -541,7 +517,6 @@ static void cmd_spt_set_src(struct cli_conn *conn, const char *s)
 
 	if (spt)
 		parse_addr_range(conn, s, &spt->src_start, &spt->src_end);
-	sendcrlf(conn);
 }
 
 static void cmd_spt_set_dst(struct cli_conn *conn, const char *s)
@@ -550,7 +525,6 @@ static void cmd_spt_set_dst(struct cli_conn *conn, const char *s)
 
 	if (spt)
 		parse_addr_range(conn, s, &spt->dst_start, &spt->dst_end);
-	sendcrlf(conn);
 }
 
 static void cmd_spt_set_proto(struct cli_conn *conn, const char *s)
@@ -561,12 +535,10 @@ static void cmd_spt_set_proto(struct cli_conn *conn, const char *s)
 	if (spt) {
 		if (sscanf(s, "%*s%"SCNu16, &proto) != 1) {
 			ofp_sendf(conn->fd, "Syntax error\r\n");
-			sendcrlf(conn);
 			return;
 		}
 		spt->ip_proto = proto;
 	}
-	sendcrlf(conn);
 }
 
 static void cmd_spt_set_action(struct cli_conn *conn, const char *s)
@@ -575,7 +547,6 @@ static void cmd_spt_set_action(struct cli_conn *conn, const char *s)
 
 	if (spt)
 		parse_enum(conn, s, "action", &spt->action);
-	sendcrlf(conn);
 }
 
 static void ip4addr_print(char *buf, int maxlen, uint32_t addr)
@@ -653,7 +624,6 @@ static void cmd_show_sat(struct cli_conn *conn, const char *s)
 			show_sat_params(conn, &sa_templates[n]);
 		}
 	}
-	sendcrlf(conn);
 }
 
 static void cmd_show_spt(struct cli_conn *conn, const char *s)
@@ -668,7 +638,6 @@ static void cmd_show_spt(struct cli_conn *conn, const char *s)
 			show_spt_params(conn, &sp_templates[n]);
 		}
 	}
-	sendcrlf(conn);
 }
 
 static void cmd_sa_add(struct cli_conn *conn, const char *s)
@@ -682,14 +651,12 @@ static void cmd_sa_add(struct cli_conn *conn, const char *s)
 
 	if (sscanf(s, "%"SCNu32 "%"SCNu32"%"SCNs, &id, &spi, template) != 3) {
 		ofp_sendf(conn->fd, "Syntax error\r\n");
-		sendcrlf(conn);
 		return;
 	}
 
 	sat = find_sat(template);
 	if (sat == NULL) {
 		ofp_sendf(conn->fd, "Template not found\r\n");
-		sendcrlf(conn);
 		return;
 	}
 
@@ -722,7 +689,6 @@ static void cmd_sa_add(struct cli_conn *conn, const char *s)
 	ofp_ipsec_sa_unref(sa); /* forget the returned handle */
 	if (sa == NULL)
 		ofp_sendf(conn->fd, "SA creation failed\r\n");
-	sendcrlf(conn);
 }
 
 static void cmd_sp_add(struct cli_conn *conn, const char *s)
@@ -736,13 +702,11 @@ static void cmd_sp_add(struct cli_conn *conn, const char *s)
 
 	if (sscanf(s, "%"SCNu32 "%"SCNu32"%"SCNs, &id, &prio, template) != 3) {
 		ofp_sendf(conn->fd, "Syntax error\r\n");
-		sendcrlf(conn);
 		return;
 	}
 	spt = find_spt(template);
 	if (spt == NULL) {
 		ofp_sendf(conn->fd, "Template not found\r\n");
-		sendcrlf(conn);
 		return;
 	}
 
@@ -763,7 +727,6 @@ static void cmd_sp_add(struct cli_conn *conn, const char *s)
 	ofp_ipsec_sp_unref(sp); /* forget the returned handle */
 	if (sp == NULL)
 		ofp_sendf(conn->fd, "SP creation failed\r\n");
-	sendcrlf(conn);
 }
 
 static void cmd_sa_del(struct cli_conn *conn, const char *s)
@@ -773,19 +736,16 @@ static void cmd_sa_del(struct cli_conn *conn, const char *s)
 
 	if (sscanf(s, "%"SCNu32, &id) != 1) {
 		ofp_sendf(conn->fd, "Syntax error\r\n");
-		sendcrlf(conn);
 		return;
 	}
 	sa = ofp_ipsec_sa_find_by_id(id);
 	if (!sa) {
 		ofp_sendf(conn->fd, "SA not found\r\n");
-		sendcrlf(conn);
 		return;
 	}
 	if (ofp_ipsec_sa_destroy(sa))
 		ofp_sendf(conn->fd, "SA deletion failed\r\n");
 	ofp_ipsec_sa_unref(sa);
-	sendcrlf(conn);
 }
 
 static void cmd_sp_del(struct cli_conn *conn, const char *s)
@@ -795,19 +755,16 @@ static void cmd_sp_del(struct cli_conn *conn, const char *s)
 
 	if (sscanf(s, "%"SCNu32, &id) != 1) {
 		ofp_sendf(conn->fd, "Syntax error\r\n");
-		sendcrlf(conn);
 		return;
 	}
 	sp = ofp_ipsec_sp_find_by_id(id);
 	if (!sp) {
 		ofp_sendf(conn->fd, "SP not found\r\n");
-		sendcrlf(conn);
 		return;
 	}
 	if (ofp_ipsec_sp_destroy(sp))
 		ofp_sendf(conn->fd, "SP deletion failed\r\n");
 	ofp_ipsec_sp_unref(sp);
-	sendcrlf(conn);
 }
 
 static void cmd_sp_bind(struct cli_conn *conn, const char *s)
@@ -818,19 +775,16 @@ static void cmd_sp_bind(struct cli_conn *conn, const char *s)
 
 	if (sscanf(s, "%"SCNu32"%"SCNu32, &sp_id, &sa_id) != 2) {
 		ofp_sendf(conn->fd, "Syntax error\r\n");
-		sendcrlf(conn);
 		return;
 	}
 	sp = ofp_ipsec_sp_find_by_id(sp_id);
 	if (sp == NULL) {
 		ofp_sendf(conn->fd, "SP not found\r\n");
-		sendcrlf(conn);
 		return;
 	}
 	sa = ofp_ipsec_sa_find_by_id(sa_id);
 	if (sa == NULL) {
 		ofp_sendf(conn->fd, "SA not found\r\n");
-		sendcrlf(conn);
 		ofp_ipsec_sp_unref(sp);
 		return;
 	}
@@ -838,7 +792,6 @@ static void cmd_sp_bind(struct cli_conn *conn, const char *s)
 		ofp_sendf(conn->fd, "Binding SA to SP failed\r\n");
 	ofp_ipsec_sp_unref(sp);
 	ofp_ipsec_sa_unref(sa);
-	sendcrlf(conn);
 }
 
 static void cmd_sp_unbind(struct cli_conn *conn, const char *s)
@@ -848,19 +801,16 @@ static void cmd_sp_unbind(struct cli_conn *conn, const char *s)
 
 	if (sscanf(s, "%"SCNu32, &id) != 1) {
 		ofp_sendf(conn->fd, "Syntax error\r\n");
-		sendcrlf(conn);
 		return;
 	}
 	sp = ofp_ipsec_sp_find_by_id(id);
 	if (sp == NULL) {
 		ofp_sendf(conn->fd, "SP not found\r\n");
-		sendcrlf(conn);
 		return;
 	}
 	if (ofp_ipsec_sp_bind(sp, OFP_IPSEC_SA_INVALID))
 		ofp_sendf(conn->fd, "Unbinding SA from SP failed\r\n");
 	ofp_ipsec_sp_unref(sp);
-	sendcrlf(conn);
 }
 
 static void show_sa(struct cli_conn *conn, ofp_ipsec_sa_handle sa)
@@ -956,7 +906,6 @@ static void cmd_show_sa(struct cli_conn *conn, const char *s)
 		show_sa(conn, sa);
 		sa = ofp_ipsec_sa_next(sa);
 	}
-	sendcrlf(conn);
 }
 
 static void cmd_show_sp(struct cli_conn *conn, const char *s)
@@ -969,7 +918,6 @@ static void cmd_show_sp(struct cli_conn *conn, const char *s)
 		show_sp(conn, sp);
 		sp = ofp_ipsec_sp_next(sp);
 	}
-	sendcrlf(conn);
 }
 
 static void cmd_show_ipsec(struct cli_conn *conn, const char *s)
@@ -1030,7 +978,6 @@ static void cmd_help(struct cli_conn *conn, const char *s)
 		ofp_sendf(conn->fd, "\r\n");
 		line++;
 	}
-	sendcrlf(conn);
 }
 
 static struct cli_command commands[] = {

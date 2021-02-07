@@ -38,15 +38,12 @@ void f_help_sysctl(struct cli_conn *conn, const char *s)
 
 	ofp_sendf(conn->fd, "Show (this) help:\r\n"
 				"  sysctl help\r\n\r\n");
-
-	sendcrlf(conn);
 }
 
 void f_sysctl_dump(struct cli_conn *conn, const char *s)
 {
 	(void)s;
 	ofp_sysctl_write_tree(conn->fd);
-	sendcrlf(conn);
 }
 
 #define SYSCTL_BUFF 1024
@@ -62,7 +59,6 @@ void f_sysctl_read(struct cli_conn *conn, const char *s)
 			 s, strlen(s), NULL);
 	if (ret != 0) {
 		ofp_sendf(conn->fd, "Variable's type not found: error %d", ret);
-		sendcrlf(conn);
 		return;
 	}
 
@@ -71,7 +67,6 @@ void f_sysctl_read(struct cli_conn *conn, const char *s)
 		ofp_sendf(conn->fd,
 			  "Variable not found or type not supported: error %d",
 			  ret);
-		sendcrlf(conn);
 		return;
 	}
 
@@ -138,8 +133,6 @@ void f_sysctl_read(struct cli_conn *conn, const char *s)
 	default:
 		ofp_sendf(conn->fd, "unknown type\r\n");
 	}
-
-	sendcrlf(conn);
 }
 
 void f_sysctl_write(struct cli_conn *conn, const char *s)
@@ -159,7 +152,6 @@ void f_sysctl_write(struct cli_conn *conn, const char *s)
 			 var_name, strlen(var_name), NULL);
 	if (ret != 0) {
 		ofp_sendf(conn->fd, "Variable's type not found: error %d", ret);
-		sendcrlf(conn);
 		return;
 	}
 
@@ -204,16 +196,12 @@ void f_sysctl_write(struct cli_conn *conn, const char *s)
 	}
 	default:
 		ofp_sendf(conn->fd, "unsupported type for writing\r\n");
-		sendcrlf(conn);
 		return;
 	}
 
 	ret = ofp_sysctl(var_name, NULL, NULL, val, val_len, NULL);
 	if (ret != 0) {
 		ofp_sendf(conn->fd,	"Error %d", ret);
-		sendcrlf(conn);
 		return;
 	}
-
-	sendcrlf(conn);
 }

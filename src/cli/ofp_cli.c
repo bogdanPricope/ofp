@@ -212,7 +212,6 @@ static void cli_send_welcome_banner(struct cli_conn *conn)
 		"-- WELCOME to OFP CLI --\r\n"
 		"--==--==--==--==--==--==--\r\n"
 		);
-	sendcrlf(conn);
 }
 
 static void cli_send_goodbye_banner(struct cli_conn *conn)
@@ -223,7 +222,6 @@ static void cli_send_goodbye_banner(struct cli_conn *conn)
 		"-- Goodbye! --\r\n"
 		"--==--==--==--\r\n"
 		);
-	sendcrlf(conn);
 }
 
 /***********************************************
@@ -236,7 +234,6 @@ static void f_exit(struct cli_conn *conn, const char *s)
 	if (conn->status & ENABLED_OK) {
 		conn->status &= ~ENABLED_OK;
 		cli_send_goodbye_banner(conn);
-		sendcrlf(conn);
 		return;
 	}
 
@@ -252,7 +249,6 @@ static void f_help(struct cli_conn *conn, const char *s)
 		"    command: alias, address, arp, debug, exit, ifconfig, ");
 	ofp_sendf(conn->fd, "ipsec, loglevel, netstat, route, show, shutdown,");
 	ofp_sendf(conn->fd, " stat, sysctl\r\n\r\n");
-	sendcrlf(conn);
 }
 
 static void f_help_exit(struct cli_conn *conn, const char *s)
@@ -260,7 +256,6 @@ static void f_help_exit(struct cli_conn *conn, const char *s)
 	(void)s;
 	sendstr(conn, "Exit closes the current connection.\r\n"
 		"You can type ctl-D, too.");
-	sendcrlf(conn);
 }
 
 
@@ -271,7 +266,6 @@ static void f_help_show(struct cli_conn *conn, const char *s)
 		"  show <command>\r\n"
 		"    command: alias, address, arp, debug, ifconfig, ipsec, ");
 	ofp_sendf(conn->fd, "loglevel, netstat, route, stat, sysctl\r\n\r\n");
-	sendcrlf(conn);
 }
 
 static int authenticate(const char *user, const char *passwd)
@@ -1081,11 +1075,14 @@ struct cli_conn *cli_conn_accept(int fd)
 	conn = &connection;
 	bzero(conn, sizeof(*conn));
 	conn->fd = fd;
+	conn->status = 0;
 	sendbuf(conn, telnet_echo_off, sizeof(telnet_echo_off));
 
 	OFP_DBG("new sock %d opened\r\n", conn->fd);
 
 	cli_send_welcome_banner(conn);
+
+	sendcrlf(conn);
 
 	return conn;
 }

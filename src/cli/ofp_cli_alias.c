@@ -20,8 +20,9 @@ void f_alias_set(struct cli_conn *conn, const char *s)
 	const char *name;
 	int name_len;
 	const char *line;
-
 	int i;
+
+	(void)conn;
 
 	name = s;
 	while ((*s != ' ') && (*s != 0))
@@ -52,8 +53,6 @@ void f_alias_set(struct cli_conn *conn, const char *s)
 			}
 		}
 	}
-
-	sendcrlf(conn);
 }
 
 void f_alias_show(struct cli_conn *conn, const char *s)
@@ -70,7 +69,6 @@ void f_alias_show(struct cli_conn *conn, const char *s)
 		} else
 			break;
 	}
-	sendcrlf(conn);
 }
 
 void f_help_alias(struct cli_conn *conn, const char *s)
@@ -89,5 +87,4 @@ void f_help_alias(struct cli_conn *conn, const char *s)
 	ofp_sendf(conn->fd,
 		"Show (this) help:\r\n"
 		"  alias help\r\n\r\n");
-	sendcrlf(conn);
 }

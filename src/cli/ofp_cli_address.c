@@ -39,10 +39,9 @@ void f_address_show(struct cli_conn *conn, const char *s)
 {
 	/* addressr [show] */
 	(void)s;
+	(void)conn;
 
 	ofp_show_ifnet_ip_addrs(conn->fd);
-
-	sendcrlf(conn);
 }
 
 
@@ -74,8 +73,6 @@ void f_address_add(struct cli_conn *conn, const char *s)
 						 addr, m);
 	if (err != NULL)
 		ofp_sendf(conn->fd, err);
-
-	sendcrlf(conn);
 }
 
 void f_address_del(struct cli_conn *conn, const char *s)
@@ -99,6 +96,4 @@ void f_address_del(struct cli_conn *conn, const char *s)
 
 	if (err != NULL)
 		ofp_sendf(conn->fd, err);
-
-	sendcrlf(conn);
 }

@@ -37,8 +37,6 @@ void f_help_loglevel(struct cli_conn *conn, const char *s)
 		"    loglevel set warning\r\n\r\n");
 	ofp_sendf(conn->fd, "Show log level help (this help)\r\n"
 		"  loglevel help\r\n");
-
-	sendcrlf(conn);
 }
 
 /* loglevel */
@@ -48,8 +46,6 @@ void f_loglevel_show(struct cli_conn *conn, const char *s)
 	(void)s;
 	ofp_sendf(conn->fd, "Log level: %s\r\n",
 		loglevel_descript[ofp_loglevel_get()]);
-
-	sendcrlf(conn);
 }
 
 /* loglevel set */
@@ -61,7 +57,6 @@ void f_loglevel(struct cli_conn *conn, const char *s)
 		if (strncmp(loglevel_descript[i], s,
 			strlen(loglevel_descript[i])) == 0) {
 			ofp_loglevel_set(i);
-			sendcrlf(conn);
 			return;
 		}
 	}
