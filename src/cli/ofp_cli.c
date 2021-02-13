@@ -27,6 +27,7 @@
 #include "ofpi.h"
 #include "ofpi_pkt_processing.h"
 #include "ofpi_cli.h"
+#include "ofpi_cli_shm.h"
 #include "ofpi_log.h"
 #include "ofpi_util.h"
 #include "ofpi_portconf.h"
@@ -34,12 +35,6 @@
 /*
  * Only core 0 runs this.
  */
-
-int cli_display_width = 80, cli_display_height = 24;
-int cli_curses = 0;
-int cli_display_row = 2, cli_display_col = 5;
-int cli_display_rows = 10, cli_display_cols = 30;
-
 
 /* status bits */
 #define CONNECTION_ON		1
@@ -55,7 +50,7 @@ int cli_display_rows = 10, cli_display_cols = 30;
 
 static struct cli_conn connection;
 
-int run_alias = -1;
+static __thread int ofp_run_alias = -1;
 
 static uint8_t txt_to_hex(char val)
 {
@@ -755,70 +750,63 @@ struct cli_command commands[] = {
 
 void f_run_alias(ofp_print_t *pr, const char *s)
 {
-	int i;
+	uint32_t i;
 
 	(void)pr;
 
-	for (i = 0; i < ALIAS_TABLE_LEN; i++) {
-		if (alias_table[i].name == 0 || alias_table[i].cmd == 0)
+	for (i = 0; i < V_cli_alias_table_size; i++) {
+		if (V_cli_alias_table[i].name[0] == 0 ||
+		    V_cli_alias_table[i].cmd[0] == 0)
 			continue;
-		if (strncmp(s, alias_table[i].name,
-			    strlen(alias_table[i].name)) == 0) {
-			run_alias = i;
+		if (strncmp(s, V_cli_alias_table[i].name,
+			    strlen(V_cli_alias_table[i].name)) == 0) {
+			ofp_run_alias = i;
 			return;
 		}
 	}
 }
 
-void f_add_alias_command(const char *name)
+int f_add_alias_command(const char *name)
 {
 	struct cli_command a;
 
 	a.command = name;
 	a.help = "Alias command";
 	a.func = f_run_alias;
-	ofp_cli_parser_add_command(&a);
+	return ofp_cli_parser_add_command(&a);
 }
 
-void ofp_cli_add_command_imp(const char *cmd, const char *help,
-			     ofp_cli_cb_func func)
+int ofp_cli_add_command_imp(const char *cmd, const char *help,
+			    ofp_cli_cb_func func)
 {
+	int ret = 0;
 	struct cli_command a;
 
 	a.command = cmd;
 	a.help = help;
 	a.func = (void (*)(ofp_print_t *, const char *))func;
-	ofp_cli_parser_add_command(&a);
+
+	odp_rwlock_write_lock(&V_cli_lock);
+	ret = ofp_cli_parser_add_command(&a);
+	odp_rwlock_write_unlock(&V_cli_lock);
+
+	return ret;
 }
 
-int ofp_cli_get_fd_imp(void *handle)
-{
-	struct cli_conn *conn = handle;
-	return conn->fd;
-}
-
-void cli_init_commands(void)
+int cli_init_commands(void)
 {
 	unsigned i = 0;
-	static int initialized = 0;
 
-	if (initialized)
-		return;
-
-	initialized = 1;
-
-	/* Initalize alias table*/
-	for (i = 0; i < ALIAS_TABLE_LEN; i++) {
-		alias_table[i].name = NULL;
-		alias_table[i].cmd = NULL;
-	}
+	ofp_cli_parser_init();
 
 	/* Add regular commands */
 	for (i = 0; commands[i].command; i++)
-		ofp_cli_parser_add_command(&commands[i]);
+		if (ofp_cli_parser_add_command(&commands[i]))
+			return -1;
 
 	/* Add IPsec commands */
-	ofpcli_ipsec_init();
+	if (ofpcli_ipsec_init())
+		return -1;
 
 	/* Print nodes */
 	if (ofp_debug_logging_enabled()) {
@@ -829,6 +817,8 @@ void cli_init_commands(void)
 	    ofp_print(&pr, "CLI Command nodes:\n");
 		ofp_cli_parser_print_nodes(&pr);
 	}
+
+	return 0;
 }
 
 void cli_process_file(char *file_name)
@@ -893,33 +883,31 @@ int cli_conn_recv(struct cli_conn *conn, unsigned char c)
 		conn->status |= WAITING_TELNET_2;
 		return 0;
 	} else if (conn->status & WAITING_TELNET_2) {
-	static int num_dsp_chars = 0;
-	static char dsp_chars[8];
-
-	if (num_dsp_chars) {
-		dsp_chars[6 - num_dsp_chars--] = c;
-		if (num_dsp_chars == 0) {
-			conn->status &= ~WAITING_TELNET_2;
-			cli_display_width = dsp_chars[1];
-			cli_display_height = dsp_chars[3];
+		if (conn->num_dsp_chars) {
+			conn->num_dsp_chars--;
+			if (conn->num_dsp_chars == 0)
+				conn->status &= ~WAITING_TELNET_2;
+			return 0;
 		}
-		return 0;
-	}
 
-	if      (conn->ch1 == 0xfd && c == 0x01) conn->status |= DO_ECHO;
-	else if (conn->ch1 == 0xfd && c == 0x03) conn->status |= DO_SUPPRESS;
-	else if (conn->ch1 == 0xfb && c == 0x03) {
-		conn->status |= WILL_SUPPRESS;
-		// ask for display size
-		char com[] = {255, 253, 31};
-		ofp_print_buffer(&conn->pr, com, sizeof(com));
-	} else if (conn->ch1 == (unsigned char)0x251 && c == 31) {
-		// IAC WILL NAWS (display size)
-	} else if (conn->ch1 == 250 && c == 31) {  // (display size info)
-		num_dsp_chars = 6;
-		return 0;
-	}
-	conn->status &= ~WAITING_TELNET_2;
+		if (conn->ch1 == 0xfd && c == 0x01) {
+			conn->status |= DO_ECHO;
+		} else if (conn->ch1 == 0xfd && c == 0x03) {
+			conn->status |= DO_SUPPRESS;
+		} else if (conn->ch1 == 0xfb && c == 0x03) {
+			conn->status |= WILL_SUPPRESS;
+			// ask for display size
+			char com[] = {255, 253, 31};
+
+			ofp_print_buffer(&conn->pr, com, sizeof(com));
+		} else if (conn->ch1 == (unsigned char)0x251 && c == 31) {
+			// IAC WILL NAWS (display size)
+		} else if (conn->ch1 == 250 && c == 31) {
+			// (display size info)
+			conn->num_dsp_chars = 6;
+			return 0;
+		}
+		conn->status &= ~WAITING_TELNET_2;
 		return 0;
 	} else if (conn->status & WAITING_ESC_1) {
 		conn->ch1 = c;
@@ -942,8 +930,6 @@ int cli_conn_recv(struct cli_conn *conn, unsigned char c)
 			c = 8;    /* arrow left = backspace */
 			break;
 		case 0x31: // home
-			cli_curses = !cli_curses;
-			return 0;
 		case 0x32: // ins
 		case 0x33: // delete
 		case 0x34: // end
@@ -1007,9 +993,10 @@ int cli_conn_recv(struct cli_conn *conn, unsigned char c)
 	if (conn->pos) {
 		ofp_cli_parser_parse(conn, 0);
 
-		if (run_alias >= 0) {
-			strcpy(conn->inbuf, alias_table[run_alias].cmd);
-			run_alias = -1;
+		if (ofp_run_alias >= 0) {
+			strcpy(conn->inbuf,
+			       V_cli_alias_table[ofp_run_alias].cmd);
+			ofp_run_alias = -1;
 			ofp_cli_parser_parse(conn, 0);
 		}
 	} else
@@ -1041,19 +1028,42 @@ int cli_conn_recv(struct cli_conn *conn, unsigned char c)
 	return 0;
 }
 
-struct cli_conn *cli_conn_accept(int fd)
+static struct cli_conn *init_connection(ofpcli_connection_type_t type, int fd)
 {
-	struct cli_conn *conn;
+	struct cli_conn *conn = NULL;
+	enum ofp_print_type print_type = OFP_PRINT_LINUX_SOCK;
 
-	conn = &connection;
-	bzero(conn, sizeof(*conn));
+	if (type == OFPCLI_CONN_TYPE_SOCKET_OS) {
+		conn = &V_cli_connections[OFPCLI_CONN_TYPE_SOCKET_OS];
+		print_type = OFP_PRINT_LINUX_SOCK;
+	} else if (type == OFPCLI_CONN_TYPE_SOCKET_OFP) {
+		conn = &V_cli_connections[OFPCLI_CONN_TYPE_SOCKET_OFP];
+		print_type = OFP_PRINT_OFP_SOCK;
+	} else {
+		OFP_ERR("Error: Invalid connection type %d!\r\n", type);
+		return NULL;
+	}
+
+	odp_memset(conn, 0, sizeof(*conn));
+
 	conn->fd = fd;
 	conn->status = 0;
-	ofp_print_init(&conn->pr, fd, OFP_PRINT_LINUX_SOCK);
+	ofp_print_init(&conn->pr, fd, print_type);
+
+	return conn;
+}
+
+struct cli_conn *cli_conn_accept(int fd, ofpcli_connection_type_t type)
+{
+	struct cli_conn *conn = NULL;
+
+	conn = init_connection(type, fd);
+	if (!conn) {
+		OFP_ERR("Failed to initialize the CLI connection\r\n");
+		return NULL;
+	}
 
 	ofp_print_buffer(&conn->pr, telnet_echo_off, sizeof(telnet_echo_off));
-
-	OFP_DBG("new sock %d opened\r\n", conn->fd);
 
 	cli_send_welcome_banner(&conn->pr);
 

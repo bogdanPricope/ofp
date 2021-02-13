@@ -102,9 +102,12 @@ typedef void (*ofp_cli_cb_func)(void *handle, const char *args);
  * @param  cmd   Command line.
  * @param  help  Help text for the command.
  * @param  func  Function to call when CLI command is executed.
+ * @retval 0 Success.
+ * @retval -1 Failure.
+ * @retval OFP_ENOTSUP OFP has been compiled without CLI support.
  */
-void ofp_cli_add_command(const char *cmd, const char *help,
-			 ofp_cli_cb_func func);
+int ofp_cli_add_command(const char *cmd, const char *help,
+			ofp_cli_cb_func func);
 
 /**
  * Print the output of the CLI command

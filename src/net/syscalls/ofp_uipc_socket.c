@@ -174,8 +174,7 @@ void ofp_print_sockets(void)
 	print_open_conns();
 }
 
-struct cli_conn;
-void f_sockets(struct cli_conn *conn, const char *s)
+void f_sockets(ofp_print_t *pr, const char *s)
 {
 	ofp_print_sockets();
 }

@@ -5,19 +5,10 @@
  */
 #include "string.h"
 #include "ofpi_cli.h"
+#include "ofpi_cli_shm.h"
 #include "ofpi_portconf.h"
 #include "ofpi_util.h"
 
-/** CLI Commands node
- */
-struct cli_node {
-	void (*func)(ofp_print_t *pr, const char *s);
-	struct cli_node *nextword;
-	struct cli_node *nextpossibility;
-	const char *word;
-	const char *help;
-	char type;
-};
 
 /**< Special Parameter keywords in commands */
 static const char NUMBER[]  = "<number>";
@@ -30,8 +21,7 @@ static const char IP6ADDR[] = "<a:b:c:d:e:f:g:h>";
 static const char IP6NET[] = "<a:b:c:d:e:f:g:h/n>";
 static const char MAC[] = "<a:b:c:d:e:f>";
 
-static struct cli_node end = {0, 0, 0, 0, 0, 0};
-static struct cli_node *start = &end;
+static void ofp_cli_parser_parse_imp(struct cli_conn *conn, int extra);
 
 static struct cli_node *find_next_vertical(struct cli_node *s, char *word);
 static int is_parameter(struct cli_node *s);
@@ -252,18 +242,12 @@ static int ip6net_ok(char *val)
 	return 1;
 }
 
-/** ofp_cli_parser_parse(): parse a Command line
- *
- * @param conn struct cli_conn*
- * @param extra int
- * @return void
- *
- */
-void ofp_cli_parser_parse(struct cli_conn *conn, int extra)
+static void ofp_cli_parser_parse_imp(struct cli_conn *conn, int extra)
 {
 	char **ap, *argv[50], **token, *msg, *lasttoken = 0;
 	char b[sizeof(conn->inbuf)];
-	struct cli_node *p = start, *horpos = &end, *lastok = 0;
+	struct cli_node *p = V_cli_node_start, *horpos = V_cli_node_end;
+	struct cli_node *lastok = 0;
 	int paramlen;
 	char paramlist[100];
 	char *line = conn->inbuf;
@@ -305,7 +289,7 @@ void ofp_cli_parser_parse(struct cli_conn *conn, int extra)
 	paramlen = 0;
 	paramlist[0] = 0;
 
-	while (*token && p != &end) {
+	while (*token && p != V_cli_node_end) {
 		struct cli_node *found;
 
 		found = find_next_vertical(p, *token);
@@ -328,11 +312,11 @@ void ofp_cli_parser_parse(struct cli_conn *conn, int extra)
 			}
 			token++;
 		} else {
-			p = &end;
+			p = V_cli_node_end;
 		}
 	}
 
-	if (extra && p == &end && *token == 0) {
+	if (extra && p == V_cli_node_end && *token == 0) {
 		if (is_parameter(lastok) ||
 		    strlen(lastok->word) == strlen(lasttoken)) {
 			ofp_print(&conn->pr, "\r\n <cr>");
@@ -354,6 +338,7 @@ void ofp_cli_parser_parse(struct cli_conn *conn, int extra)
 			func_arg = conn->inbuf;
 
 		lastok->func(&conn->pr, func_arg);
+
 		if (f_exit == lastok->func)
 			close_connection(conn);
 
@@ -403,7 +388,7 @@ static struct cli_node *find_next_vertical(struct cli_node *s, char *word)
 	size_t len = strlen(word);
 	struct cli_node *found = 0;
 
-	while (s != &end) {
+	while (s != V_cli_node_end) {
 		if ((strncmp(s->word, word, len) == 0 &&
 		     strlen(s->word) == len) ||
 		    (s->word == NUMBER && int_ok(word)) ||
@@ -486,11 +471,11 @@ static void print_q(struct cli_conn *conn, struct cli_node *s,
 {
 	char sendbuf[200];
 
-	if (s == &end || (ok && ok->func)) {
+	if (s == V_cli_node_end || (ok && ok->func)) {
 		ofp_print(&conn->pr, "\r\n <cr>");
 		//return;
 	}
-	while (s != &end) {
+	while (s != V_cli_node_end) {
 		if (s->help)
 			sprintf(sendbuf, "\r\n %-20s(%.158s)",
 				s->word, s->help);
@@ -502,11 +487,10 @@ static void print_q(struct cli_conn *conn, struct cli_node *s,
 	sendcrlf(conn);
 }
 
-static struct cli_node *add_command_in_list(struct cli_node *root,
-					    struct cli_command *cc)
+static int add_command_in_list(struct cli_command *cc)
 {
 	struct cli_node *s;
-	struct cli_node *cn = root;
+	struct cli_node *cn = V_cli_node_start;
 	struct cli_node *new_node;
 	struct cli_node *n;
 	int nextpossibility = 0;
@@ -519,7 +503,7 @@ static struct cli_node *add_command_in_list(struct cli_node *root,
 	w = cc->command;
 
 	s = cn;
-	while (cn != &end) {
+	while (cn != V_cli_node_end) {
 		nw = strchr(w, ' ');
 
 		str = get_param_string(w);
@@ -533,13 +517,14 @@ static struct cli_node *add_command_in_list(struct cli_node *root,
 			len = strlen(str);
 		}
 
-		while (cn != &end && (strncmp(str, cn->word, len) ||
-				      len != strlen(cn->word))) {
+		while (cn != V_cli_node_end &&
+		       (strncmp(str, cn->word, len) ||
+			len != strlen(cn->word))) {
 			s = cn;
 			cn = cn->nextpossibility;
 		}
 
-		if (cn == &end) {
+		if (cn == V_cli_node_end) {
 			nextpossibility = 1;
 		} else {
 			if (!nw)
@@ -553,11 +538,15 @@ static struct cli_node *add_command_in_list(struct cli_node *root,
 	new_node = NULL;
 	cn = NULL;
 	while (w) {
-		n = malloc(sizeof(*cn));
+		n = ofp_alloc_node();
+
+		if (!n)
+			return -1;
+
 		n->help = NULL;
 		n->func = NULL;
-		n->nextword = &end;
-		n->nextpossibility = &end;
+		n->nextword = V_cli_node_end;
+		n->nextpossibility = V_cli_node_end;
 
 		if (!new_node)
 			new_node = n;
@@ -593,19 +582,14 @@ static struct cli_node *add_command_in_list(struct cli_node *root,
 	cn->func = cc->func;
 	cn->help = cc->help;
 
-	if (root == &end)
-		root = new_node;
+	if (V_cli_node_start == V_cli_node_end)
+		V_cli_node_start = new_node;
 	else if (nextpossibility)
 		s->nextpossibility = new_node;
 	else
 		s->nextword = new_node;
 
-	return root;
-}
-
-void ofp_cli_parser_add_command(struct cli_command *cc)
-{
-	start = add_command_in_list(start, cc);
+	return 0;
 }
 
 static void print_nodes(ofp_print_t *pr, struct cli_node *node)
@@ -616,12 +600,12 @@ static void print_nodes(ofp_print_t *pr, struct cli_node *node)
 	int ni = 0;
 	struct cli_node *stack[100];
 
-	if (node == &end)
+	if (node == V_cli_node_end)
 		return;
 
 	for (i = 0; i < depth; i++)
 		ofp_print(pr, " ");
-	for (n = node; n != &end; n = n->nextword) {
+	for (n = node; n != V_cli_node_end; n = n->nextword) {
 		depth += strlen(n->word) + 1;
 		stack[ni++] = n;
 		ofp_print(pr, "%s ", n->word);
@@ -635,7 +619,40 @@ static void print_nodes(ofp_print_t *pr, struct cli_node *node)
 	}
 }
 
+int ofp_cli_parser_init(void)
+{
+	V_cli_node_end = ofp_alloc_node();
+	if (V_cli_node_end == NULL)
+		return -1;
+
+	V_cli_node_start = V_cli_node_end;
+
+	return 0;
+}
+
+/** ofp_cli_parser_parse(): parse a Command line
+ *
+ * @param conn struct cli_conn*
+ * @param extra int
+ * @return void
+ *
+ */
+void ofp_cli_parser_parse(struct cli_conn *conn, int extra)
+{
+	odp_rwlock_read_lock(&V_cli_lock);
+	ofp_cli_parser_parse_imp(conn, extra);
+	odp_rwlock_read_unlock(&V_cli_lock);
+}
+
+int ofp_cli_parser_add_command(struct cli_command *cc)
+{
+	/* No locks: is called from parser for alias cmd */
+	return add_command_in_list(cc);
+}
+
 void ofp_cli_parser_print_nodes(ofp_print_t *pr)
 {
-	print_nodes(pr, start);
+	odp_rwlock_read_lock(&V_cli_lock);
+	print_nodes(pr, V_cli_node_start);
+	odp_rwlock_read_unlock(&V_cli_lock);
 }

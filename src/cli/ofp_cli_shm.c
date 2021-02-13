@@ -55,13 +55,32 @@ void ofp_cli_init_prepare(void)
 
 int ofp_cli_init_global(void)
 {
+	uint32_t i;
+
 	HANDLE_ERROR(ofp_cli_alloc_shared_memory());
 
 	memset(shm_cli, 0, sizeof(*shm_cli));
 
 	V_cli_os_thread_is_running = 0;
 
-	cli_init_commands();
+	odp_rwlock_init(&V_cli_lock);
+
+	/* Alias table */
+	V_cli_alias_table_size = sizeof(V_cli_alias_table) /
+		sizeof(V_cli_alias_table[0]);
+
+	/* Node table */
+	V_cli_node_table_size = sizeof(V_cli_node_table) /
+		sizeof(V_cli_node_table[0]);
+
+	for (i = 0; i < V_cli_node_table_size - 1; i++)
+		V_cli_node_table[i].next = &V_cli_node_table[i + 1];
+	V_cli_node_table[V_cli_node_table_size - 1].next = NULL;
+
+	V_cli_node_free_list = &V_cli_node_table[0];
+
+	if (cli_init_commands())
+		return -1;
 
 	return 0;
 }
@@ -85,3 +104,14 @@ int ofp_cli_init_local(void)
 
 	return 0;
 }
+
+struct cli_node *ofp_alloc_node(void)
+{
+	struct cli_node *p = V_cli_node_free_list;
+
+	if (V_cli_node_free_list)
+		V_cli_node_free_list = V_cli_node_free_list->next;
+
+	return p;
+}
+

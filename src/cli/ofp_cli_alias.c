@@ -11,16 +11,16 @@
 
 #include "ofpi_log.h"
 #include "ofpi_cli.h"
+#include "ofpi_cli_shm.h"
 #include "ofpi_util.h"
-
-struct alias_table_s alias_table[ALIAS_TABLE_LEN];
 
 void f_alias_set(ofp_print_t *pr, const char *s)
 {
 	const char *name;
 	int name_len;
 	const char *line;
-	int i;
+	uint32_t i;
+	size_t len_max = 0;
 
 	(void)pr;
 
@@ -37,18 +37,39 @@ void f_alias_set(ofp_print_t *pr, const char *s)
 			line  = s;
 	}
 
-	for (i = 0; i < ALIAS_TABLE_LEN; i++) {
-		if (alias_table[i].name == 0) {
+	for (i = 0; i < V_cli_alias_table_size; i++) {
+		if (V_cli_alias_table[i].name[0] == 0) {
+			/* alias name*/
+			len_max = name_len;
+			if (name_len > ALIAS_TABLE_NAME_LEN - 1)
+				len_max = ALIAS_TABLE_NAME_LEN - 1;
+			strncpy(V_cli_alias_table[i].name, name, len_max);
+			V_cli_alias_table[i].name[len_max] = 0;
 
-			alias_table[i].name = strndup(name, name_len);
-			alias_table[i].cmd = strdup(line);
-			f_add_alias_command(alias_table[i].name);
+			/* alias cmd*/
+			len_max = strlen(line);
+			if (len_max > ALIAS_TABLE_CMD_LEN - 1)
+				len_max = ALIAS_TABLE_CMD_LEN - 1;
+			strncpy(V_cli_alias_table[i].cmd, line, len_max);
+			V_cli_alias_table[i].cmd[len_max] = 0;
+
+			/*Add command*/
+			if (f_add_alias_command(V_cli_alias_table[i].name)) {
+				V_cli_alias_table[i].name[0] = 0;
+				V_cli_alias_table[i].cmd[0] = 0;
+
+				ofp_print(pr, "Error: Failed to add alias");
+			}
 			break;
 		} else {
-			if (strncmp(alias_table[i].name, name, name_len) == 0) {
-				if (alias_table[i].cmd)
-					free(alias_table[i].cmd);
-				alias_table[i].cmd = strdup(line);
+			if (strncmp(V_cli_alias_table[i].name,
+				    name, name_len) == 0) {
+				len_max = strlen(line);
+				if (len_max > ALIAS_TABLE_CMD_LEN - 1)
+					len_max = ALIAS_TABLE_CMD_LEN - 1;
+				strncpy(V_cli_alias_table[i].cmd,
+					line, len_max);
+				V_cli_alias_table[i].cmd[len_max] = 0;
 				break;
 			}
 		}
@@ -57,16 +78,17 @@ void f_alias_set(ofp_print_t *pr, const char *s)
 
 void f_alias_show(ofp_print_t *pr, const char *s)
 {
-	int i;
+	uint32_t i;
 
 	(void)s;
 	ofp_print(pr, "Alias      Command\r\n");
-	for (i = 0; i < ALIAS_TABLE_LEN; i++) {
-		if (alias_table[i].name != 0) {
-			ofp_print(pr, "%-10s %s\r\n", alias_table[i].name,
-				  alias_table[i].cmd);
-		} else
+	for (i = 0; i < V_cli_alias_table_size; i++) {
+		if (V_cli_alias_table[i].name[0] != 0) {
+			ofp_print(pr, "%-10s %s\r\n", V_cli_alias_table[i].name,
+				  V_cli_alias_table[i].cmd);
+		} else {
 			break;
+		}
 	}
 }
 

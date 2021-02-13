@@ -29,15 +29,17 @@ int ofp_stop_cli_thread(void)
 #endif /* CLI */
 }
 
-void ofp_cli_add_command(const char *cmd, const char *help,
-			 ofp_cli_cb_func func)
+int ofp_cli_add_command(const char *cmd, const char *help,
+			ofp_cli_cb_func func)
 {
 #ifdef CLI
-	ofp_cli_add_command_imp(cmd, help, func);
+	return ofp_cli_add_command_imp(cmd, help, func);
 #else
 	(void)cmd;
 	(void)help;
 	(void)func;
+
+	return OFP_ENOTSUP;
 #endif /* CLI */
 }
 

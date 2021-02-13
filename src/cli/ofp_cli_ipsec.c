@@ -1176,17 +1176,20 @@ static struct cli_command commands[] = {
 	{ NULL, NULL, NULL }
 };
 
-void ofpcli_ipsec_init(void)
+int ofpcli_ipsec_init(void)
 {
 	struct cli_command *cmd = commands;
 	static int initialized = 0;
 
 	if (initialized)
-		return;
+		return 0;
 	initialized = 1;
 
 	while (cmd->command) {
-		ofp_cli_parser_add_command(cmd);
+		if (ofp_cli_parser_add_command(cmd))
+			return -1;
 		cmd++;
 	}
+
+	return 0;
 }

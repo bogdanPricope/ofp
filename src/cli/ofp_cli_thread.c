@@ -115,8 +115,15 @@ static int cli_server(void *arg)
 				OFP_ERR("cli serv accept");
 				continue;
 			}
-			conn = cli_conn_accept(cli_conn_fd);
-			OFP_DBG("CLI connection established\r\n");
+			conn = cli_conn_accept(cli_conn_fd,
+					       OFPCLI_CONN_TYPE_SOCKET_OS);
+			if (conn == NULL) {
+				close(cli_conn_fd);
+				continue;
+			}
+
+			OFP_DBG("CLI connection established (%d)\r\n",
+				cli_conn_fd);
 		}
 
 		if (cli_conn_fd > 0 && FD_ISSET(cli_conn_fd, &fds)) {

@@ -12,11 +12,15 @@
 #include "ofpi_api_cli.h"
 #include "ofpi_print.h"
 
-void ofpcli_ipsec_init(void);
-
 #define PASSWORD_LEN 32
 
 #define NUM_OLD_BUFS 8
+
+typedef enum {
+	OFPCLI_CONN_TYPE_SOCKET_OS = 0,
+	OFPCLI_CONN_TYPE_SOCKET_OFP,
+	OFPCLI_CONN_TYPE_CNT
+} ofpcli_connection_type_t;
 
 /** cli_conn: CLI connection context
  */
@@ -32,6 +36,7 @@ struct cli_conn {
 	unsigned char ch1;
 	char          passwd[PASSWORD_LEN + 1];
 	int           close_cli;
+	int           num_dsp_chars;
 };
 
 /** CLI Command descriptor
@@ -45,15 +50,28 @@ struct cli_command {
 /* API implementation */
 int ofp_start_cli_thread_imp(int core_id, char *cli_file);
 int ofp_stop_cli_thread_imp(void);
-void ofp_cli_add_command_imp(const char *cmd, const char *help,
-			     ofp_cli_cb_func func);
-int ofp_cli_get_fd_imp(void *handle);
+int ofp_cli_add_command_imp(const char *cmd, const char *help,
+			    ofp_cli_cb_func func);
 
 /** CLI parser
  */
+int ofp_cli_parser_init(void);
 void ofp_cli_parser_parse(struct cli_conn *conn, int extra);
-void ofp_cli_parser_add_command(struct cli_command *cc);
+int ofp_cli_parser_add_command(struct cli_command *cc);
 void ofp_cli_parser_print_nodes(ofp_print_t *pr);
+
+/** CLI IPsec
+ */
+int ofpcli_ipsec_init(void);
+
+/** CLI operations
+ */
+int cli_init_commands(void);
+void cli_process_file(char *file_name);
+void close_connection(struct cli_conn *conn);
+void close_connections(void);
+struct cli_conn *cli_conn_accept(int fd, ofpcli_connection_type_t type);
+int cli_conn_recv(struct cli_conn *conn, unsigned char c);
 
 /** utils
  */
@@ -61,13 +79,6 @@ void sendcrlf(struct cli_conn *conn);
 int ip4addr_get(const char *tk, uint32_t *addr);
 int ip4net_get(const char *tk, uint32_t *addr, int *mask);
 int ip6addr_get(const char *tk, int tk_len, uint8_t *addr);
-
-void cli_init_commands(void);
-void cli_process_file(char *file_name);
-void close_connection(struct cli_conn *conn);
-void close_connections(void);
-struct cli_conn *cli_conn_accept(int fd);
-int cli_conn_recv(struct cli_conn *conn, unsigned char c);
 
 /** commands
  */
@@ -100,19 +111,11 @@ void f_arp_cleanup(ofp_print_t *pr, const char *s);
 void f_arp_add(ofp_print_t *pr, const char *s);
 void f_help_arp(ofp_print_t *pr, const char *s);
 
-#define ALIAS_TABLE_LEN 16
-
-struct alias_table_s {
-	char *name;
-	char *cmd;
-};
-
-extern struct alias_table_s alias_table[];
 void f_alias_set(ofp_print_t *pr, const char *s);
 void f_alias_show(ofp_print_t *pr, const char *s);
 void f_help_alias(ofp_print_t *pr, const char *s);
 void f_run_alias(ofp_print_t *pr, const char *s);
-void f_add_alias_command(const char *name);
+int f_add_alias_command(const char *name);
 
 void f_stat_show(ofp_print_t *pr, const char *s);
 void f_stat_set(ofp_print_t *pr, const char *s);

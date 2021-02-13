@@ -13,4 +13,10 @@
  * Used to define the size of internal structures. */
 #define OFP_MAX_NUM_CPU 64
 
+/**Maximum number of nodes in the CLI parser tree.
+ * Contains the number of nodes for regular commands (263 to date)
+ * plus nodes for alias and custom commands
+*/
+#define OFP_CLI_NODE_MAX (263 + 100)
+
 #endif
