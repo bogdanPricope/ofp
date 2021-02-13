@@ -48,7 +48,7 @@ static int cli_server(void *arg)
 
 	cli_serv_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (cli_serv_fd < 0) {
-		OFP_ERR("cli serv socket\n");
+		OFP_ERR("Error: fail to create socket.\n");
 		return -1;
 	}
 
