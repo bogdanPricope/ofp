@@ -171,4 +171,10 @@
 /** Maximum size of the thread or process description */
 #define OFP_THREAD_DESCR_SIZE_MAX  8
 
+/** OFP default CLI port */
+#define OFP_CLI_PORT_DFLT 2345
+
+/** OFP default CLI address */
+#define OFP_CLI_ADDR_DFLT "0.0.0.0"
+
 #endif

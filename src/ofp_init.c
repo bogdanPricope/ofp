@@ -252,6 +252,16 @@ static void read_conf_file(ofp_initialize_param_t *params, const char *filename)
 	GET_CONF_INT(int, debug.capture_ports);
 	GET_CONF_STRING(debug.capture_filename);
 
+	GET_CONF_INT(bool, cli.os_thread.start_on_init);
+	GET_CONF_INT(int, cli.os_thread.port);
+	GET_CONF_STRING(cli.os_thread.addr);
+	GET_CONF_INT(int, cli.os_thread.core_id);
+
+	GET_CONF_INT(bool, cli.ofp_thread.start_on_init);
+	GET_CONF_INT(int, cli.ofp_thread.port);
+	GET_CONF_STRING(cli.ofp_thread.addr);
+	GET_CONF_INT(int, cli.ofp_thread.core_id);
+
 	GET_CONF_INT(bool, cli.enable_shutdown_cmd);
 done:
 	config_destroy(&conf);
@@ -322,6 +332,16 @@ void ofp_initialize_param_from_file(ofp_initialize_param_t *params,
 	params->debug.capture_ports = 0;
 	params->debug.capture_filename[0] = 0;
 
+	params->cli.os_thread.start_on_init = 0;
+	params->cli.os_thread.port = OFP_CLI_PORT_DFLT;
+	strcpy(params->cli.os_thread.addr, OFP_CLI_ADDR_DFLT);
+	params->cli.os_thread.core_id = OFP_CONTROL_CORE;
+
+	params->cli.ofp_thread.start_on_init = 0;
+	params->cli.ofp_thread.port = OFP_CLI_PORT_DFLT;
+	strcpy(params->cli.ofp_thread.addr, OFP_CLI_ADDR_DFLT);
+	params->cli.ofp_thread.core_id = OFP_CONTROL_CORE;
+
 	params->cli.enable_shutdown_cmd = 1;
 
 	read_conf_file(params, filename);
@@ -365,6 +385,12 @@ void ofp_initialize_param_from_file(ofp_initialize_param_t *params,
 
 	if (!params->tcp.sackhole_max)
 		params->tcp.sackhole_max = 4 * params->tcp.pcb_tcp_max;
+
+	if (params->cli.os_thread.core_id == OFP_CONTROL_CORE)
+		params->cli.os_thread.core_id = params->linux_core_id;
+
+	if (params->cli.ofp_thread.core_id == OFP_CONTROL_CORE)
+		params->cli.ofp_thread.core_id = params->linux_core_id;
 }
 
 void ofp_initialize_param(ofp_initialize_param_t *params)

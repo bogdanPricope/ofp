@@ -8,13 +8,12 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
 #include "ofpi_cli.h"
 #include "ofpi_global_param_shm.h"
 #include "ofpi_cli_shm.h"
-
-#define OFP_SERVER_PORT 2345
 
 /** CLI server thread
  *
@@ -31,6 +30,7 @@ static int cli_server(void *arg)
 	fd_set read_fd, fds;
 	char *file_name;
 	int select_nfds;
+	struct in_addr laddr_lin = {0};
 	struct cli_conn *conn = NULL;
 	odp_bool_t *is_running = NULL;
 
@@ -41,6 +41,12 @@ static int cli_server(void *arg)
 	is_running = ofp_get_processing_state();
 	if (is_running == NULL) {
 		OFP_ERR("Error: Failed to get processing state.");
+		return -1;
+	}
+
+	if (inet_aton(V_global_param.cli.os_thread.addr, &laddr_lin) == 0) {
+		OFP_ERR("Error: Invalid address (%s).\n",
+			V_global_param.cli.os_thread.addr);
 		return -1;
 	}
 
@@ -58,8 +64,8 @@ static int cli_server(void *arg)
 
 	memset(&my_addr, 0, sizeof(my_addr));
 	my_addr.sin_family = AF_INET;
-	my_addr.sin_port = odp_cpu_to_be_16(OFP_SERVER_PORT);
-	my_addr.sin_addr.s_addr = odp_cpu_to_be_32(INADDR_ANY);
+	my_addr.sin_port = odp_cpu_to_be_16(V_global_param.cli.os_thread.port);
+	my_addr.sin_addr.s_addr = laddr_lin.s_addr;
 
 	if (bind(cli_serv_fd, (struct sockaddr *)&my_addr,
 		 sizeof(struct sockaddr)) < 0) {

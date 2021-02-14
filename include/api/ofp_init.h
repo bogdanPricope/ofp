@@ -33,6 +33,10 @@
 
 #define OFP_ODP_INSTANCE_INVALID ((odp_instance_t)(uintptr_t)(-1))
 
+#define OFP_CLI_ADDR_TXT_SIZE 16	/* IPv4 address*/
+
+#define OFP_CONTROL_CORE (-1)	/* Use the value if 'linux_core_id'*/
+
 /**
  * Checksum offloading configuration options bit field
  *
@@ -68,6 +72,29 @@ typedef struct ofp_chksum_offload_config_t {
 	/** Enable TCP checksum insertion offload */
 	uint16_t tcp_tx_ena  : 1;
 } ofp_chksum_offload_config_t;
+
+/** OFP CLI thread configuration parameters */
+typedef struct ofp_cli_thread_config_s {
+	/** Start thread on OFP initialization
+	 * Default value is 0
+	*/
+	odp_bool_t start_on_init;
+
+	/** Port where CLI connections are waited.
+	 * Default value is OFP_CLI_PORT_DFLT
+	*/
+	uint16_t port;
+
+	/** Address where CLI connections are waited.
+	 * Default value is OFP_CLI_ADDR_DFLT
+	*/
+	char addr[OFP_CLI_ADDR_TXT_SIZE];
+
+	/** CPU core where CLI thread is pinned.
+	 *  Default value is the value of 'linux_core_id'.
+	*/
+	int core_id;
+} ofp_cli_thread_config_t;
 
 /**
  * OFP API initialization data
@@ -373,6 +400,14 @@ typedef struct ofp_initialize_param_t {
 	 * CLI parameters
 	*/
 	struct cli_s {
+		/** Parameters coresponding to the CLI thread using OS sockets
+		 * and bound address */
+		ofp_cli_thread_config_t os_thread;
+
+		/** Parameters coresponding to the CLI thread using OFP sockets
+		 * and bound address */
+		ofp_cli_thread_config_t ofp_thread;
+
 		/**
 		 * Enable execution of shutdown command.
 		 * If set to true, the command will stop the execution of OFP

@@ -114,6 +114,20 @@ ofp_global_param: {
 	}
 
 	cli: {
+		os_thread: {
+			start_on_init = boolean
+			port = integer
+			addr = string
+			core_id = integer
+		}
+
+		ofp_thread: {
+			start_on_init = boolean
+			port = integer
+			addr = string
+			core_id = integer
+		}
+
 		enable_shutdown_cmd = boolean
 	}
 }
@@ -310,6 +324,30 @@ debug.capture_ports: Bitmask of the ports for which the packets are captures
 debug.capture_filename: Name of the file where the packets are captured (pcap format)
 	Default value is empty - value of DEFAULT_DEBUG_PCAP_FILE_NAME is used.
 	Example: "/tmp/pkt.pcap"
+
+cli.os_thread.start_on_init: Start the thread on OFP initialization (OS thread).
+	Default value is 0.
+
+cli.os_thread.port: Port where CLI connections are waited (OS thread).
+	Default value is OFP_CLI_PORT_DFLT.
+
+cli.os_thread.addr: Address where CLI connections are waited (OS thread).
+	Default value is OFP_CLI_ADDR_DFLT.
+
+cli.os_thread.core_id: CPU core where CLI thread is pinned (OS thread).
+	Default value is the value of 'linux_core_id'.
+
+cli.ofp_thread.start_on_init: See cli.os_thread.start_on_init but applied for
+	the CLI thread using OFP sockets API.
+
+cli.ofp_thread.port: See cli.os_thread.port but applied for the CLI thread
+	using OFP sockets API.
+
+cli.ofp_thread.addr: See cli.os_thread.addr but applied for the CLI thread
+	using OFP sockets API.
+
+cli.ofp_thread.core_id: See cli.os_thread.core_id but applied for the CLI thread
+	using OFP sockets API.
 
 cli.enable_shutdown_cmd: Enable execution of shutdown command. If set to true,
 	the command will stop the execution of OFP internal threads and also
