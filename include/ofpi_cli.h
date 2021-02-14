@@ -76,9 +76,6 @@ int cli_conn_recv(struct cli_conn *conn, unsigned char c);
 /** utils
  */
 void sendcrlf(struct cli_conn *conn);
-int ip4addr_get(const char *tk, uint32_t *addr);
-int ip4net_get(const char *tk, uint32_t *addr, int *mask);
-int ip6addr_get(const char *tk, int tk_len, uint8_t *addr);
 
 /** commands
  */

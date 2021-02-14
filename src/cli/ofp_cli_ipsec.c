@@ -452,7 +452,7 @@ static void cmd_sat_set_tun_src(ofp_print_t *pr, const char *s)
 	if (sat) {
 		if (sscanf(s, "%*s %"SCNs, addr) != 1) {
 			ofp_print(pr, "Syntax error\r\n");
-		} else if (!ip4addr_get(addr, &sat->tun_src)) {
+		} else if (!ofp_parse_ip_addr(addr, &sat->tun_src)) {
 			ofp_print(pr, "Invalid address\r\n");
 		}
 	}
@@ -466,7 +466,7 @@ static void cmd_sat_set_tun_dst(ofp_print_t *pr, const char *s)
 	if (sat) {
 		if (sscanf(s, "%*s %"SCNs, addr) != 1) {
 			ofp_print(pr, "Syntax error\r\n");
-		} else if (!ip4addr_get(addr, &sat->tun_dst)) {
+		} else if (!ofp_parse_ip_addr(addr, &sat->tun_dst)) {
 			ofp_print(pr, "Invalid address\r\n");
 		}
 	}
@@ -502,8 +502,8 @@ static void parse_addr_range(ofp_print_t *pr, const char *s,
 
 	if (sscanf(s, "%*s%"SCNs"%"SCNs, start_str, end_str) != 2) {
 		ofp_print(pr, "Syntax error\r\n");
-	} else if (!ip4addr_get(start_str, &start_bin) ||
-		   !ip4addr_get(end_str, &end_bin)) {
+	} else if (!ofp_parse_ip_addr(start_str, &start_bin) ||
+		   !ofp_parse_ip_addr(end_str, &end_bin)) {
 		ofp_print(pr, "Invalid address\r\n");
 	} else {
 		*start = start_bin;

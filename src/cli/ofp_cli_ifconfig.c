@@ -137,13 +137,13 @@ void f_ifconfig_tun(ofp_print_t *pr, const char *s)
 		return;
 	}
 
-	if (!ip4addr_get(loc, &tun_loc))
+	if (!ofp_parse_ip_addr(loc, &tun_loc))
 		return;
-	if (!ip4addr_get(rem, &tun_rem))
+	if (!ofp_parse_ip_addr(rem, &tun_rem))
 		return;
-	if (!ip4addr_get(peer, &p2p))
+	if (!ofp_parse_ip_addr(peer, &p2p))
 		return;
-	if (!ip4addr_get(ip, &addr))
+	if (!ofp_parse_ip_addr(ip, &addr))
 		return;
 
 
@@ -177,7 +177,7 @@ void f_ifconfig_vxlan(ofp_print_t *pr, const char *s)
 
 	physport = ofp_name_to_port_vlan(physdev, &physvlan);
 
-	if (!ip4addr_get(group, &vxlan_group)) {
+	if (!ofp_parse_ip_addr(group, &vxlan_group)) {
 		ofp_print(pr, "Invalid group address.\r\n");
 		return;
 	}
@@ -226,7 +226,7 @@ void f_ifconfig_v6(ofp_print_t *pr, const char *s)
 		return;
 	}
 
-	if (!ip6addr_get(tk, tk_end - tk, addr6)) {
+	if (!ofp_parse_ip6_addr(tk, tk_end - tk, addr6)) {
 		ofp_print(pr, "Invalid IP6NET address.\r\n");
 		return;
 	}

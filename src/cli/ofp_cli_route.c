@@ -95,7 +95,7 @@ void f_route_add_v6(ofp_print_t *pr, const char *s)
 		return;
 	}
 
-	if (!ip6addr_get(tk, tk_end - tk, dst6)) {
+	if (!ofp_parse_ip6_addr(tk, tk_end - tk, dst6)) {
 		ofp_print(pr, "Invalid IP6NET\r\n");
 		return;
 	}
@@ -127,7 +127,7 @@ void f_route_add_v6(ofp_print_t *pr, const char *s)
 		return;
 	}
 
-	if (!ip6addr_get(tk, tk_end - tk, gw6)) {
+	if (!ofp_parse_ip6_addr(tk, tk_end - tk, gw6)) {
 		ofp_print(pr, "Invalid IP6NET\r\n");
 		return;
 	}
@@ -207,7 +207,7 @@ void f_route_del_v6(ofp_print_t *pr, const char *s)
 		return;
 	}
 
-	if (!ip6addr_get(tk, tk_end - tk, dst6)) {
+	if (!ofp_parse_ip6_addr(tk, tk_end - tk, dst6)) {
 		ofp_print(pr, "Invalid IP6NET\r\n");
 		return;
 	}
