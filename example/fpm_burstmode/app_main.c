@@ -244,6 +244,7 @@ int main(int argc, char *argv[])
 	/* Initialize OFP*/
 	ofp_initialize_param(&app_init_params);
 	app_init_params.linux_core_id = linux_sp_core;
+	app_init_params.cli.os_thread.start_on_init = 1;
 
 	if (ofp_initialize(&app_init_params)) {
 		OFP_ERR("Error: OFP global init failed.\n");
@@ -302,9 +303,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	/* Start CLI */
-	ofp_start_cli_thread(app_init_params.linux_core_id,
-			     params.cli_file);
+	/* Process CLI file */
+	ofp_cli_process_file(params.cli_file);
 
 	ofp_thread_join(thread_tbl, num_workers);
 

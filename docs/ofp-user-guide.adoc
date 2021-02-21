@@ -216,7 +216,7 @@ debugging OFP. Basic CLI commands provide following functions:
 - showing and configuring routes
 - showing and clearing statistics
 
-Once an OFP application has started its CLI thread with ofp_start_cli_thread()
+Once an OFP application has started its CLI thread with ofp_cli_start_os_thread()
 routine, it starts to listen on port 2345 and the CLI can be accessed locally
 with `telnet 127.0.0.1 2345` (or `telnet 0 2345` for short) command:
 
@@ -598,11 +598,10 @@ incoming packets and events.
 Now when dispatcher threads are running, further application logic can be
 launched. In order to enable OFP CLI, dedicated CLI thread should be started on
 the management core (not competing for CPU cycles with the worker threads) by
-calling ofp_start_cli_thread() function. In addition to OFP instance handle and
-processor core number, this function takes OFP CLI file name as an
-argument. This text file (named in examples as ofp.cli) contains OFP
-CLI commands which will be executed by the client thread after
-starting.
+calling ofp_cli_start_os_thread() function. In addition to the CLI threads,
+the ofp_cli_process_file() function can be used to process CLI commands.
+It takes as argument a text file (named in examples as ofp.cli) that contains
+OFP CLI commands which will be executed in the context of the caller's thread.
 
 Below is an example of OFP CLI file (from example/webserver/ofp.cli):
 
@@ -611,8 +610,8 @@ Below is an example of OFP CLI file (from example/webserver/ofp.cli):
  ifconfig fp0 192.168.56.33/24
 
 ofp_cli_add_command() function can be used by an OFP application in order to add
-customized CLI commands. ofp_stop_cli_thread() function is used for termination
-of the CLI thread.
+customized CLI commands. ofp_cli_stop_os_thread() function is used for
+termination of the CLI thread.
 
 === Synchronization issues
 

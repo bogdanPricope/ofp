@@ -321,6 +321,7 @@ int main(int argc, char *argv[])
 
 	/* Initialize OFP*/
 	ofp_initialize_param(&app_init_params);
+	app_init_params.cli.os_thread.start_on_init = 1;
 	app_init_params.linux_core_id = linux_sp_core;
 	if (params.mode == EXEC_MODE_SCHEDULER) {
 		app_init_params.if_count = params.if_count;
@@ -409,8 +410,8 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	/* Start CLI */
-	ofp_start_cli_thread(app_init_params.linux_core_id, params.cli_file);
+	/* Process CLI file */
+	ofp_cli_process_file(params.cli_file);
 	sleep(2);
 
 	/* webserver */

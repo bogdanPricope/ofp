@@ -73,7 +73,7 @@ test_global_init_cleanup(void)
 	oig.instance = instance;
 	CU_ASSERT_EQUAL(ofp_initialize(&oig), 0);
 
-	ofp_start_cli_thread(oig.linux_core_id, NULL);
+	ofp_cli_start_os_thread(oig.linux_core_id);
 
 	CU_ASSERT_EQUAL(ofp_terminate(), 0);
 }
@@ -96,7 +96,7 @@ test_global_init_from_file_cleanup(void)
 
 	oig.instance = instance;
 	CU_ASSERT_EQUAL(ofp_initialize(&oig), 0);
-	ofp_start_cli_thread(oig.linux_core_id, NULL);
+	ofp_cli_start_os_thread(oig.linux_core_id);
 
 	CU_ASSERT_EQUAL(ofp_terminate(), 0);
 }

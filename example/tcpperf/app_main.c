@@ -991,7 +991,7 @@ int main(int argc, char *argv[])
 	printf("First worker:    %i\n\n", next_worker);
 
 	ofp_initialize_param(&app_init_params);
-
+	app_init_params.cli.os_thread.start_on_init = 1;
 	app_init_params.instance = instance;
 	if (ofp_initialize(&app_init_params)) {
 		OFP_ERR("Error: OFP global init failed\n");
@@ -1052,9 +1052,8 @@ int main(int argc, char *argv[])
 
 	thr_args.pktin = pktin;
 
-	/* Start CLI */
-	ofp_start_cli_thread(app_init_params.linux_core_id,
-			     gbl_args->appl.cli_file);
+	/* Process CLI file */
+	ofp_cli_process_file(gbl_args->appl.cli_file);
 
 	/** Wait for the stack to create the FP interface. Otherwise ofp_bind()
 	 *  call will fail.

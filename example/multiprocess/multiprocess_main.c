@@ -80,6 +80,7 @@ int main(int argc, char *argv[])
 
 	ofp_initialize_param(&app_init_params);
 	app_init_params.linux_core_id = LINUX_CONTROL_CPU;
+	app_init_params.cli.os_thread.start_on_init = 1;
 	app_init_params.if_count = params.if_count;
 	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
 		strncpy(app_init_params.if_names[i], params.if_names[i],
@@ -144,9 +145,9 @@ int main(int argc, char *argv[])
 		exit(0);
 	}
 
-	if (ofp_start_cli_thread(app_init_params.linux_core_id,
-				 params.cli_file) < 0) {
-		OFP_ERR("Error: Failed to init CLI thread");
+	if (ofp_cli_process_file(params.cli_file)) {
+		OFP_ERR("Error: Failed to process CLI file");
+		exit(0);
 	}
 
 	if (params.mode == APP_MODE_UDP)

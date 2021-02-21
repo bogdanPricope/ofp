@@ -78,6 +78,7 @@ int main(int argc, char *argv[])
 	 * processing threads (workers).
 	 */
 	ofp_initialize_param(&app_init_params);
+	app_init_params.cli.os_thread.start_on_init = 1;
 	app_init_params.if_count = params.if_count;
 	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
 		strncpy(app_init_params.if_names[i], params.if_names[i],
@@ -127,8 +128,8 @@ int main(int argc, char *argv[])
 	}
 
 	/* other app code here.*/
-	/* Start CLI */
-	ofp_start_cli_thread(app_init_params.linux_core_id, params.cli_file);
+	/* Process CLI file */
+	ofp_cli_process_file(params.cli_file);
 
 	/* webserver */
 	webserver_pthread_arg.root_dir = params.root_dir;

@@ -48,8 +48,6 @@
 #define WAITING_PASSWD		256
 #define ENABLED_OK		512
 
-static struct cli_conn connection;
-
 static __thread int ofp_run_alias = -1;
 
 void sendcrlf(struct cli_conn *conn)
@@ -710,7 +708,7 @@ int cli_init_commands(void)
 	return 0;
 }
 
-void cli_process_file(char *file_name)
+int ofp_cli_process_file_imp(char *file_name)
 {
 	FILE *f;
 	struct cli_conn conn;
@@ -725,7 +723,7 @@ void cli_process_file(char *file_name)
 		f = fopen(file_name, "r");
 		if (!f) {
 			OFP_ERR("OFP CLI file not found.\n");
-			return;
+			return -1;
 		}
 
 		while (fgets(conn.inbuf, sizeof(conn.inbuf), f)) {
@@ -740,6 +738,15 @@ void cli_process_file(char *file_name)
 	else {
 		OFP_DBG("OFP CLI file not set.\n");
 	}
+
+	return 0;
+}
+
+int ofp_cli_stop_threads_imp(void)
+{
+	ofp_cli_stop_os_thread_imp();
+
+	return 0;
 }
 
 static char telnet_echo_off[] = {
@@ -748,7 +755,7 @@ static char telnet_echo_off[] = {
 	0xff, 0xfd, 0x03, /* IAC DO SUPPRESS_GO_AHEAD */
 };
 
-int cli_conn_recv(struct cli_conn *conn, unsigned char c)
+int cli_conn_process(struct cli_conn *conn, unsigned char c)
 {
 	if (conn->status & WAITING_PASSWD) {
 		unsigned int plen = strlen(conn->passwd);
@@ -967,9 +974,9 @@ void close_connection(struct cli_conn *conn)
 	OFP_DBG("Closing connection...\r\n");
 }
 
-void close_connections(void)
+void cli_conn_close(ofpcli_connection_type_t type)
 {
-	struct cli_conn *conn = &connection;
+	struct cli_conn *conn = &V_cli_connections[type];
 
 	close_connection(conn);
 }

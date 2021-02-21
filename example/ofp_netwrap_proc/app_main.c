@@ -101,6 +101,7 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 	 * addition will fast path interface configuration.
 	 */
 	ofp_initialize_param(&app_init_params);
+	app_init_params.cli.os_thread.start_on_init = 1;
 	app_init_params.if_count = params.if_count;
 	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
 		strncpy(app_init_params.if_names[i], params.if_names[i],
@@ -167,13 +168,10 @@ __attribute__((constructor)) static void ofp_netwrap_main_ctor(void)
 
 	/*
 	 * Now when the ODP dispatcher threads are running, further applications
-	 * can be launched, in this case, we will start the OFP CLI thread on
-	 * the management core, i.e. not competing for cpu cycles with the
-	 * worker threads
+	 * can be launched, in this case, we will process the CLI commands file
 	 */
-	if (ofp_start_cli_thread(app_init_params.linux_core_id,
-				 params.cli_file) < 0) {
-		OFP_ERR("Error: Failed to init CLI thread");
+	if (ofp_cli_process_file(params.cli_file)) {
+		OFP_ERR("Error: Failed to process CLI file");
 		ofp_netwrap_main_dtor();
 		return;
 	}

@@ -8,22 +8,21 @@
 #include "ofpi_cli.h"
 #include "ofpi_global_param_shm.h"
 
-int ofp_start_cli_thread(int core_id, char *cli_file)
+int ofp_cli_start_os_thread(int core_id)
 {
 #ifdef CLI
-	return ofp_start_cli_thread_imp(core_id, cli_file);
+	return ofp_cli_start_os_thread_imp(core_id);
 #else
 	(void)core_id;
-	(void)cli_file;
 
 	return OFP_ENOTSUP;
 #endif /* CLI */
 }
 
-int ofp_stop_cli_thread(void)
+int ofp_cli_stop_os_thread(void)
 {
 #ifdef CLI
-	return ofp_stop_cli_thread_imp();
+	return ofp_cli_stop_os_thread_imp();
 #else
 	return OFP_ENOTSUP;
 #endif /* CLI */
@@ -46,4 +45,15 @@ int ofp_cli_add_command(const char *cmd, const char *help,
 int ofp_cli_print(void *handle, char *buf, size_t buf_size)
 {
 	return ofp_print_buffer((ofp_print_t *)handle, buf, buf_size);
+}
+
+int ofp_cli_process_file(char *cli_file)
+{
+#ifdef CLI
+	return ofp_cli_process_file_imp(cli_file);
+#else
+	(void)cli_file;
+
+	return OFP_ENOTSUP;
+#endif /* CLI */
 }

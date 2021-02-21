@@ -48,10 +48,12 @@ struct cli_command {
 };
 
 /* API implementation */
-int ofp_start_cli_thread_imp(int core_id, char *cli_file);
-int ofp_stop_cli_thread_imp(void);
+int ofp_cli_start_os_thread_imp(int core_id);
+int ofp_cli_stop_os_thread_imp(void);
+int ofp_cli_stop_threads_imp(void);
 int ofp_cli_add_command_imp(const char *cmd, const char *help,
 			    ofp_cli_cb_func func);
+int ofp_cli_process_file_imp(char *cli_file);
 
 /** CLI parser
  */
@@ -67,11 +69,10 @@ int ofpcli_ipsec_init(void);
 /** CLI operations
  */
 int cli_init_commands(void);
-void cli_process_file(char *file_name);
 void close_connection(struct cli_conn *conn);
-void close_connections(void);
+void cli_conn_close(ofpcli_connection_type_t type);
 struct cli_conn *cli_conn_accept(int fd, ofpcli_connection_type_t type);
-int cli_conn_recv(struct cli_conn *conn, unsigned char c);
+int cli_conn_process(struct cli_conn *conn, unsigned char c);
 
 /** utils
  */

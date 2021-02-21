@@ -62,6 +62,7 @@ int ofp_cli_init_global(void)
 	memset(shm_cli, 0, sizeof(*shm_cli));
 
 	V_cli_os_thread_is_running = 0;
+	V_cli_os_thread_is_stopping = 0;
 
 	odp_rwlock_init(&V_cli_lock);
 

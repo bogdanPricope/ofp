@@ -532,7 +532,8 @@ enum ofp_init_state {
 	OFP_INIT_STATE_INTERFACES_INIT,
 	OFP_INIT_STATE_NL_INIT,
 	OFP_INIT_STATE_LOOPBACK_INIT,
-	OFP_INIT_STATE_OFP_LOCAL_INIT
+	OFP_INIT_STATE_OFP_LOCAL_INIT,
+	OFP_INIT_STATE_CLI_INIT
 };
 
 int ofp_initialize(ofp_initialize_param_t *params)
@@ -643,10 +644,23 @@ int ofp_initialize(ofp_initialize_param_t *params)
 		goto init_error;
 	}
 
+	state = OFP_INIT_STATE_CLI_INIT;
+#ifdef CLI
+	if (params->cli.os_thread.start_on_init &&
+	    ofp_cli_start_os_thread_imp(params->cli.os_thread.core_id)) {
+		OFP_ERR("Failed to start OS CLI thread.");
+		goto init_error;
+	}
+#endif /* CLI */
 	return 0;
 
 init_error:
 	switch (state) {
+	case OFP_INIT_STATE_CLI_INIT:
+#ifdef CLI
+		ofp_cli_stop_threads_imp();
+#endif /* CLI */
+		/* Fallthrough */
 	case OFP_INIT_STATE_OFP_LOCAL_INIT:
 		ofp_term_local_resources();
 		/* Fallthrough */
@@ -778,7 +792,7 @@ int ofp_terminate(void)
 	ofp_stop_processing();
 #ifdef CLI
 	/* Terminate CLI thread*/
-	CHECK_ERROR(ofp_stop_cli_thread(), rc);
+	CHECK_ERROR(ofp_cli_stop_threads_imp(), rc);
 #endif
 
 #ifdef SP

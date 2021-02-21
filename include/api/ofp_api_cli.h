@@ -9,32 +9,35 @@
 #define __OFP_API_CLI_H__
 
 #include <odp_api.h>
+#include "ofp_init.h"
 
 #if __GNUC__ >= 4
 #pragma GCC visibility push(default)
 #endif
 
 /**
- * Start CLI server thread.
+ * Start OS CLI thread.
  *
  * Called by Application code to start the CLI server if needed.
  *
  * @param core_id The core on which the CLI server thread is started.
- * @param cli_file Name of the CLI file to process.
+ * Use OFP_CONTROL_CORE to start the thread on the 'linux_core_id'
+ * configured at OFP initialization time.
  * @retval 0 Success.
  * @retval -1 Failure.
  * @retval OFP_ENOTSUP OFP has been compiled without CLI support.
  */
-int ofp_start_cli_thread(int core_id, char *cli_file);
+
+int ofp_cli_start_os_thread(int core_id);
 
 /**
- * Stop CLI server thread.
+ * Stop OS CLI server thread.
  *
  * @retval 0 Success.
  * @retval -1 Failure.
  * @retval OFP_ENOTSUP OFP has been compiled without CLI support.
  */
-int ofp_stop_cli_thread(void);
+int ofp_cli_stop_os_thread(void);
 
 /**
  * @page customCliCmd Customized CLI commands.
@@ -120,6 +123,15 @@ int ofp_cli_add_command(const char *cmd, const char *help,
  */
 int ofp_cli_print(void *handle, char *buf, size_t buf_size);
 
+/**
+ * Process the CLI commands from the file
+ *
+ * @param cli_file Name of the CLI file to process.
+ * @retval 0 Success.
+ * @retval -1 Failure.
+ * @retval OFP_ENOTSUP OFP has been compiled without CLI support.
+ */
+int ofp_cli_process_file(char *cli_file);
 #if __GNUC__ >= 4
 #pragma GCC visibility pop
 #endif
