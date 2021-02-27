@@ -36,6 +36,10 @@ struct ofp_cli_mem {
 	VNET_DEFINE(odp_bool_t, os_thread_is_running);
 	VNET_DEFINE(odp_bool_t, os_thread_is_stopping);
 
+	VNET_DEFINE(ofp_thread_t, ofp_thread);
+	VNET_DEFINE(odp_bool_t, ofp_thread_is_running);
+	VNET_DEFINE(odp_bool_t, ofp_thread_is_stopping);
+
 	VNET_DEFINE(odp_rwlock_t, rwlock);
 
 	struct alias_table_s alias_table[ALIAS_TABLE_SIZE];
@@ -58,6 +62,11 @@ extern __thread struct ofp_cli_mem *shm_cli;
 #define	V_cli_os_thread             VNET(shm_cli->os_thread)
 #define	V_cli_os_thread_is_running  VNET(shm_cli->os_thread_is_running)
 #define	V_cli_os_thread_is_stopping VNET(shm_cli->os_thread_is_stopping)
+
+#define	V_cli_ofp_thread             VNET(shm_cli->ofp_thread)
+#define	V_cli_ofp_thread_is_running  VNET(shm_cli->ofp_thread_is_running)
+#define	V_cli_ofp_thread_is_stopping VNET(shm_cli->ofp_thread_is_stopping)
+
 #define	V_cli_lock                  VNET(shm_cli->rwlock)
 #define	V_cli_alias_table           VNET(shm_cli->alias_table)
 #define	V_cli_alias_table_size      VNET(shm_cli->alias_table_size)

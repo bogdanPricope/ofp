@@ -64,6 +64,9 @@ int ofp_cli_init_global(void)
 	V_cli_os_thread_is_running = 0;
 	V_cli_os_thread_is_stopping = 0;
 
+	V_cli_ofp_thread_is_running = 0;
+	V_cli_ofp_thread_is_stopping = 0;
+
 	odp_rwlock_init(&V_cli_lock);
 
 	/* Alias table */

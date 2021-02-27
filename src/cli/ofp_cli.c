@@ -746,6 +746,8 @@ int ofp_cli_stop_threads_imp(void)
 {
 	ofp_cli_stop_os_thread_imp();
 
+	ofp_cli_stop_ofp_thread_imp();
+
 	return 0;
 }
 

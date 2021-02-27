@@ -385,12 +385,6 @@ void ofp_initialize_param_from_file(ofp_initialize_param_t *params,
 
 	if (!params->tcp.sackhole_max)
 		params->tcp.sackhole_max = 4 * params->tcp.pcb_tcp_max;
-
-	if (params->cli.os_thread.core_id == OFP_CONTROL_CORE)
-		params->cli.os_thread.core_id = params->linux_core_id;
-
-	if (params->cli.ofp_thread.core_id == OFP_CONTROL_CORE)
-		params->cli.ofp_thread.core_id = params->linux_core_id;
 }
 
 void ofp_initialize_param(ofp_initialize_param_t *params)
@@ -649,6 +643,12 @@ int ofp_initialize(ofp_initialize_param_t *params)
 	if (params->cli.os_thread.start_on_init &&
 	    ofp_cli_start_os_thread_imp(params->cli.os_thread.core_id)) {
 		OFP_ERR("Failed to start OS CLI thread.");
+		goto init_error;
+	}
+
+	if (params->cli.ofp_thread.start_on_init &&
+	    ofp_cli_start_ofp_thread_imp(params->cli.ofp_thread.core_id)) {
+		OFP_ERR("Failed to start OFP CLI thread.");
 		goto init_error;
 	}
 #endif /* CLI */

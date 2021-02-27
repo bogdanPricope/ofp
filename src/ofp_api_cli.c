@@ -28,6 +28,26 @@ int ofp_cli_stop_os_thread(void)
 #endif /* CLI */
 }
 
+int ofp_cli_start_ofp_thread(int core_id)
+{
+#ifdef CLI
+	return ofp_cli_start_ofp_thread_imp(core_id);
+#else
+	(void)core_id;
+
+	return OFP_ENOTSUP;
+#endif /* CLI */
+}
+
+int ofp_cli_stop_ofp_thread(void)
+{
+#ifdef CLI
+	return ofp_cli_stop_ofp_thread_imp();
+#else
+	return OFP_ENOTSUP;
+#endif /* CLI */
+}
+
 int ofp_cli_add_command(const char *cmd, const char *help,
 			ofp_cli_cb_func func)
 {

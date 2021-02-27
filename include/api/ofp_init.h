@@ -35,7 +35,9 @@
 
 #define OFP_CLI_ADDR_TXT_SIZE 16	/* IPv4 address*/
 
-#define OFP_CONTROL_CORE (-1)	/* Use the value if 'linux_core_id'*/
+#define OFP_CONTROL_CORE (-1)	/* Use the value of 'linux_core_id'*/
+#define OFP_DFLT_CLI_CORE (-2)	/* Use the value of
+				'ofp_cli_thread_config_t.core_id' */
 
 /**
  * Checksum offloading configuration options bit field

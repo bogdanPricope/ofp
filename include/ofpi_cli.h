@@ -50,6 +50,8 @@ struct cli_command {
 /* API implementation */
 int ofp_cli_start_os_thread_imp(int core_id);
 int ofp_cli_stop_os_thread_imp(void);
+int ofp_cli_start_ofp_thread_imp(int core_id);
+int ofp_cli_stop_ofp_thread_imp(void);
 int ofp_cli_stop_threads_imp(void);
 int ofp_cli_add_command_imp(const char *cmd, const char *help,
 			    ofp_cli_cb_func func);

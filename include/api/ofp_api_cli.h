@@ -16,13 +16,16 @@
 #endif
 
 /**
- * Start OS CLI thread.
+ * Start CLI thread.
  *
- * Called by Application code to start the CLI server if needed.
+ * Called by Application code to start the CLI thread that uses
+ * OS socket API.
  *
  * @param core_id The core on which the CLI server thread is started.
  * Use OFP_CONTROL_CORE to start the thread on the 'linux_core_id'
  * configured at OFP initialization time.
+ * Use OFP_DFLT_CLI_CORE to start the thread on the
+ * 'cli.os_thread.core_id' configured at OFP initialization time.
  * @retval 0 Success.
  * @retval -1 Failure.
  * @retval OFP_ENOTSUP OFP has been compiled without CLI support.
@@ -31,13 +34,39 @@
 int ofp_cli_start_os_thread(int core_id);
 
 /**
- * Stop OS CLI server thread.
+ * Stop CLI server thread that uses OS socket API.
  *
  * @retval 0 Success.
  * @retval -1 Failure.
  * @retval OFP_ENOTSUP OFP has been compiled without CLI support.
  */
 int ofp_cli_stop_os_thread(void);
+
+/**
+ * Start OFP CLI thread.
+ *
+ * Called by Application code to start the CLI thread that uses
+ * OFP socket API.
+ *
+ * @param core_id The core on which the CLI server thread is started.
+ * Use OFP_CONTROL_CORE to start the thread on the 'linux_core_id'
+ * configured at OFP initialization time.
+ * Use OFP_DFLT_CLI_CORE to start the thread on the
+ * 'cli.ofp_thread.core_id' configured at OFP initialization time.
+ * @retval 0 Success.
+ * @retval -1 Failure.
+ * @retval OFP_ENOTSUP OFP has been compiled without CLI support.
+ */
+int ofp_cli_start_ofp_thread(int core_id);
+
+/**
+ * Stop CLI server thread that uses OFP socket API.
+ *
+ * @retval 0 Success.
+ * @retval -1 Failure.
+ * @retval OFP_ENOTSUP OFP has been compiled without CLI support.
+ */
+int ofp_cli_stop_ofp_thread(void);
 
 /**
  * @page customCliCmd Customized CLI commands.
