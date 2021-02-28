@@ -15,10 +15,14 @@ int _ofp_epoll_create(int size, int(*create_socket)(void));
 int _ofp_epoll_ctl(struct socket *epoll, int op, int fd, struct ofp_epoll_event *event);
 
 int _ofp_epoll_wait(struct socket *epoll, struct ofp_epoll_event *events, int maxevents, int timeout,
-		    int(*msleep)(int timeout));
+		    int (*msleep)(void *channel, int timeout));
 
 void ofp_set_socket_getter(struct socket*(*socket_getter)(int fd));
 
 void ofp_set_is_readable_checker(int(*is_readable_checker)(int fd));
+
+void ofp_set_channel_setter(void (*set_channel)(struct socket *epoll,
+						void *channel));
+void ofp_set_channel_clearer(void (*clr_channel)(struct socket *epoll));
 
 #endif

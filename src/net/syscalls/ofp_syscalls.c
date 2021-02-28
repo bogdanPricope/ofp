@@ -362,6 +362,26 @@ none_of_ready(int nfds, ofp_fd_set *fd_set, int (*is_ready)(int fd))
 	return 1;
 }
 
+static void
+fdset_set_rselect_channel(int nfds, ofp_fd_set *fd_set, void *channel)
+{
+	int fd;
+
+	for (fd = global_param->socket.sd_offset; fd < nfds && fd_set; ++fd)
+		if (OFP_FD_ISSET(fd, fd_set))
+			set_rselect_channel(fd, channel);
+}
+
+static void
+fdset_clr_rselect_channel(int nfds, ofp_fd_set *fd_set)
+{
+	int fd;
+
+	for (fd = global_param->socket.sd_offset; fd < nfds && fd_set; ++fd)
+		if (OFP_FD_ISSET(fd, fd_set))
+			clr_rselect_channel(fd);
+}
+
 static inline int
 is_blocking(struct ofp_timeval *timeout)
 {
@@ -374,11 +394,16 @@ _ofp_select(int nfds, ofp_fd_set *readfds, ofp_fd_set *writefds,
 	    int (*sleeper)(void *channel, odp_rwlock_t *mtx, int priority,
 			   const char *wmesg, uint32_t timeout))
 {
+	int channel_key = 0;
+
 	(void)writefds;
 	(void)exceptfds;
 
-	if (is_blocking(timeout) && none_of_ready(nfds, readfds, is_readable))
-		sleeper(NULL, NULL, 0, "select", to_usec(timeout));
+	if (is_blocking(timeout) && none_of_ready(nfds, readfds, is_readable)) {
+		fdset_set_rselect_channel(nfds, readfds, &channel_key);
+		sleeper(&channel_key, NULL, 0, "select", to_usec(timeout));
+		fdset_clr_rselect_channel(nfds, readfds);
+	}
 
 	return set_ready_fds(nfds, readfds, is_readable);
 }

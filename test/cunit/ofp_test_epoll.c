@@ -203,7 +203,7 @@ static void test_add_past_limit(void)
 
 	fill_epoll_set();
 
-	CU_ASSERT_EQUAL(add_fd(fd), -1);
+	CU_ASSERT_EQUAL(add_fd(fd + 1), -1);
 	CU_ASSERT_EQUAL(ofp_errno, OFP_ENOSPC);
 }
 
@@ -528,14 +528,29 @@ int fd_is_readable(int fd)
 	return 1;
 }
 
-static int sleeper_spy(int timeout)
+static int sleeper_spy(void *channel, int timeout)
 {
+	(void)channel;
 	(void)timeout;
 	sleeper_called = 1;
 	return 0;
 }
 
+static void null_set_channel(struct socket *epoll, void *channel)
+{
+	(void)epoll;
+	(void)channel;
+}
+
+static void null_clr_channel(struct socket *epoll)
+{
+	(void)epoll;
+}
+
 int epoll_wait_with_timeout(int maxevents, int timeout)
 {
+	ofp_set_channel_setter(null_set_channel);
+	ofp_set_channel_clearer(null_clr_channel);
+
 	return _ofp_epoll_wait(&epoll, events, maxevents, timeout, sleeper_spy);
 }

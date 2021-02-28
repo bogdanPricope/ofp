@@ -434,4 +434,7 @@ int ofp_send_sock_event(struct socket *head, struct socket *so, int event);
 
 int is_readable(int fd);
 
+void set_rselect_channel(int fd, void *channel);
+void clr_rselect_channel(int fd);
+
 #endif /* !_SYS_SOCKETVAR_H_ */

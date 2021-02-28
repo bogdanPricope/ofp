@@ -2585,6 +2585,7 @@ static void
 sleep_timeout(void *arg)
 {
 	struct voidarg *arg1 = arg;
+
 	_ofp_wakeup(arg1->p, 1, 1);
 }
 
@@ -2682,18 +2683,12 @@ _ofp_wakeup(void *channel, int one, int tmo)
 int
 ofp_wakeup_one(void *channel)
 {
-	/* wake up selects */
-	if (channel)
-		_ofp_wakeup(NULL, 0, 0);
 	return _ofp_wakeup(channel, 1, 0);
 }
 
 int
 ofp_wakeup(void *channel)
 {
-	/* wake up selects */
-	if (channel)
-		_ofp_wakeup(NULL, 0, 0);
 	return _ofp_wakeup(channel, 0, 0);
 }
 
@@ -2924,4 +2919,20 @@ is_readable(int fd)
 		return is_accepting_socket_readable(so);
 
 	return is_listening_socket_readable(so);
+}
+
+void set_rselect_channel(int fd, void *channel)
+{
+	struct socket *so = ofp_get_sock_by_fd(fd);
+
+	so->so_rcv.sb_sel.si_wakeup_channel = channel;
+	so->so_rcv.sb_flags |= SB_SEL;
+}
+
+void clr_rselect_channel(int fd)
+{
+	struct socket *so = ofp_get_sock_by_fd(fd);
+
+	so->so_rcv.sb_sel.si_wakeup_channel = NULL;
+	so->so_rcv.sb_flags &= ~SB_SEL;
 }

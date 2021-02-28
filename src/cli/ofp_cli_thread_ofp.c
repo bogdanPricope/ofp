@@ -123,7 +123,7 @@ static int cli_server(void *arg)
 				select_nfds = conn->fd + 1;
 		}
 
-		timeout.tv_sec = 0;
+		timeout.tv_sec = 1;
 		timeout.tv_usec = 0;
 
 		r = ofp_select(select_nfds, &fds, NULL, NULL, &timeout);

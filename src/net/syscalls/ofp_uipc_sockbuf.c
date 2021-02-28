@@ -441,7 +441,12 @@ ofp_sowakeup(struct socket *so, struct sockbuf *sb)
 	SOCKBUF_LOCK_ASSERT(sb);
 
 	/*HJo selwakeuppri(&sb->sb_sel, PSOCK);*/
-	ofp_wakeup(NULL);
+
+	if (sb->sb_sel.si_wakeup_channel) {
+		ofp_wakeup(sb->sb_sel.si_wakeup_channel);
+		sb->sb_flags &= ~SB_SEL;
+	}
+
 #if 0
 	if (!SEL_WAITING(&sb->sb_sel))
 		sb->sb_flags &= ~SB_SEL;

@@ -157,9 +157,9 @@ int _ofp_epoll_ctl(struct socket *epoll, int op, int fd, struct ofp_epoll_event 
 	return -1;
 }
 
-static int sleeper(int timeout)
+static int sleeper(void *channel, int timeout)
 {
-	return ofp_msleep(NULL, NULL, 0, "epoll", timeout * 1000);
+	return ofp_msleep(channel, NULL, 0, "epoll", timeout * 1000);
 }
 
 int ofp_epoll_wait(int epfd, struct ofp_epoll_event *events, int maxevents, int timeout)
@@ -215,9 +215,42 @@ static int available_events(struct socket *epoll, struct ofp_epoll_event *events
 	return ready;
 }
 
-int _ofp_epoll_wait(struct socket *epoll, struct ofp_epoll_event *events, int maxevents, int timeout,
-		    int(*msleep)(int timeout))
+static void epoll_set_channel(struct socket *epoll, void *channel)
 {
+	struct epoll_set *epoll_set;
+
+	FOREACH(epoll_set, epoll->epoll_set) {
+		if (!is_fd_set(epoll_set))
+			continue;
+
+		if (is_waiting_read_event(epoll_set))
+			set_rselect_channel(get_fd(epoll_set), channel);
+	}
+}
+
+static void epoll_clr_channel(struct socket *epoll)
+{
+	struct epoll_set *epoll_set;
+
+	FOREACH(epoll_set, epoll->epoll_set) {
+		if (!is_fd_set(epoll_set))
+			continue;
+
+		if (is_waiting_read_event(epoll_set))
+			clr_rselect_channel(get_fd(epoll_set));
+	}
+}
+
+static void (*ep_set_channel)(struct socket *epoll,
+			      void *channel) = epoll_set_channel;
+static void (*ep_clr_channel)(struct socket *epoll) = epoll_clr_channel;
+
+int _ofp_epoll_wait(struct socket *epoll, struct ofp_epoll_event *events,
+		    int maxevents, int timeout,
+		    int (*msleep)(void *channel, int timeout))
+{
+	int channel_key = 0;
+
 	if (!epoll)
 		return failure(OFP_EBADF);
 
@@ -233,7 +266,9 @@ int _ofp_epoll_wait(struct socket *epoll, struct ofp_epoll_event *events, int ma
 	if (timeout && none_of_ready(epoll)) {
 		if (timeout == -1)
 			timeout = 0; /* wait forver */
-		msleep(timeout);
+		ep_set_channel(epoll, &channel_key);
+		msleep(&channel_key, timeout);
+		ep_clr_channel(epoll);
 	}
 
 	return available_events(epoll, events, maxevents);
@@ -248,3 +283,15 @@ void ofp_set_is_readable_checker(int(*is_readable_checker)(int fd))
 {
 	is_fd_readable = is_readable_checker;
 }
+
+void ofp_set_channel_setter(void (*set_channel)(struct socket *epoll,
+						void *channel))
+{
+	ep_set_channel = set_channel;
+}
+
+void ofp_set_channel_clearer(void (*clr_channel)(struct socket *epoll))
+{
+	ep_clr_channel = clr_channel;
+}
+
