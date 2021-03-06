@@ -24,6 +24,17 @@ make config T=${TARGET} O=${TARGET}
 pushd ${TARGET}
 #To use I/O without DPDK supported NIC's enable pcap pmd:
 sed -ri 's,(CONFIG_RTE_LIBRTE_PMD_PCAP=).*,\1y,' .config
+
+#Disable modules affected by the fact that kernel does not support PIC mode.
+sed -ri 's,(CONFIG_RTE_EAL_IGB_UIO=).*,\1n,' .config
+
+sed -ri 's,(CONFIG_RTE_LIBRTE_KNI=).*,\1n,' .config
+sed -ri 's,(CONFIG_RTE_LIBRTE_PMD_KNI=).*,\1n,' .config
+sed -ri 's,(CONFIG_RTE_KNI_KMOD=).*,\1n,' .config
+sed -ri 's,(CONFIG_RTE_KNI_KMOD_ETHTOOL=).*,\1n,' .config
+sed -ri 's,(CONFIG_RTE_KNI_PREEMPT_DEFAULT=).*,\1n,' .config
+
+
 popd
 
 #Build DPDK
@@ -33,14 +44,15 @@ popd
 # Clone odp-dpdk
 git clone -q https://github.com/OpenDataPlane/odp-dpdk
 pushd odp-dpdk
-git checkout -b v1.23.1 d25d47b3c5b1dcde440960c259d5066c2dec0a2d
+git checkout -b local_v1.25.2 v1.25.2.0_DPDK_19.11
 
 export CONFIGURE_FLAGS="--enable-shared=yes --enable-helper-linux"
 
 #Build ODP
 ./bootstrap
 ./configure  --enable-debug --enable-debug-print \
-	     --with-dpdk-path=`pwd`/../dpdk/install --prefix=$(pwd)/install
+	     --with-dpdk-path=`pwd`/../dpdk/install --prefix=$(pwd)/install \
+		 --with-platform=linux-generic
 make -j${JOBS} install
 popd
 
