@@ -103,9 +103,10 @@ Building OFPgen2:
     make install 
 
 Alternatively, a script can be used to generate a DPDK/ODP-DPDK/OFPgen2 build:
+
     git clone https://github.com/bogdanPricope/ofp
     cd ofp/scripts
-	./devbuild_ofp_odp_dpdk.sh
+    ./devbuild_ofp_odp_dpdk.sh
 
 
 OFPgen2 example applications:
@@ -122,7 +123,7 @@ OFPgen2 supports a wider variety of ODP and DPDK versions but recommended
 (tested) versions are:
  - ODP-DPDK (https://github.com/OpenDataPlane/odp-dpdk) version 1.25.2,
  platform 'linux-generic'
-  - DPDK version v18.11.
+ - DPDK version v18.11.
 
 
 Tools
