@@ -21,7 +21,7 @@
 #include "ofpi_sysctl.h"
 #include "ofpi_util.h"
 #include "ofpi_stat.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_route.h"
 #include "ofpi_rt_lookup.h"
 #include "ofpi_arp.h"
@@ -587,8 +587,9 @@ int ofp_initialize(ofp_initialize_param_t *params)
 				   params->sched_group);
 
 	for (i = 0; i < params->if_count; ++i) {
-		if (ofp_ifnet_create(params->if_names[i],
-				     &pktio_param, &pktin_param, NULL)) {
+		if (ofp_ifport_net_create(params->if_names[i],
+					  &pktio_param, &pktin_param, NULL,
+					  NULL, NULL)) {
 			OFP_LOG_NO_CTX_NO_LEVEL("Error: failed to create "
 					"interface %s.\n", params->if_names[i]);
 			goto init_error;
@@ -622,7 +623,7 @@ int ofp_initialize(ofp_initialize_param_t *params)
 	if (params->if_loopback) {
 		uint32_t loop_addr = odp_cpu_to_be_32(OFP_INADDR_LOOPBACK);
 
-		err = ofp_config_interface_up_local(0, 0, loop_addr, 8);
+		err = ofp_ifport_local_ipv4_up(0, 0, loop_addr, 8);
 		if (err != NULL) {
 			OFP_ERR("Failed to create the interface: %s.", err);
 			state = OFP_INIT_STATE_LOOPBACK_INIT;
@@ -683,7 +684,7 @@ init_error:
 
 			ofp_stop_processing();
 
-			for (i = 0; PHYS_PORT(i); i++) {
+			for (i = 0; OFP_IFPORT_IS_NET(i); i++) {
 				ifnet = ofp_get_ifnet((uint16_t)i, 0);
 				if (!ifnet)
 					continue;
@@ -804,7 +805,7 @@ int ofp_terminate(void)
 #endif /* SP */
 
 	/* Cleanup interfaces: queues and pktios*/
-	for (i = 0; PHYS_PORT(i); i++) {
+	for (i = 0; OFP_IFPORT_IS_NET_U(i); i++) {
 		ifnet = ofp_get_ifnet((uint16_t)i, 0);
 		if (!ifnet) {
 			OFP_ERR("Failed to locate interface for port %d", i);

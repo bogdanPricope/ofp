@@ -34,7 +34,7 @@
 
 #include "ofpi.h"
 #include "ofpi_pkt_processing.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_rt_lookup.h"
 #include "ofpi_route.h"
 #include "ofpi_util.h"

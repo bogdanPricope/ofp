@@ -23,7 +23,7 @@
 #include <odp_api.h>
 #include <ofpi.h>
 #include <ofpi_log.h>
-#include <ofpi_portconf.h>
+#include <ofpi_ifnet_portconf.h>
 #include <ofpi_route.h>
 #include <ofpi_rt_lookup.h>
 #include <ofpi_avl.h>
@@ -112,7 +112,7 @@ static void init_ifnet(void)
 {
 	char str[256];
 
-	ofp_config_interface_up_v4(port, vlan, vrf, dev_ip, 24);
+	ofp_ifport_net_ipv4_up(port, vlan, vrf, dev_ip, 24);
 
 	/* port 0 */
 	dev = ofp_get_ifnet(port, vlan);
@@ -136,7 +136,7 @@ static void init_ifnet(void)
 	dev->out_queue_type = OFP_OUT_QUEUE_TYPE_QUEUE;
 
 	/* port 0 vlan 1 */
-	ofp_config_interface_up_v4(port, vlan + 1, vrf, dev_ip + 1, 24);
+	ofp_ifport_net_ipv4_up(port, vlan + 1, vrf, dev_ip + 1, 24);
 
 	dev_vlan = ofp_get_ifnet(port, vlan + 1);
 	memcpy(dev_vlan->mac, dev_vlan_mac, OFP_ETHER_ADDR_LEN);
@@ -156,12 +156,12 @@ static void init_ifnet(void)
 	}
 
 	/* Tunnels */
-	ofp_config_interface_up_tun(GRE_PORTS, 100, 0, dev_ip, tun_rem_ip,
-				      tun_p2p, tun_addr, tun_mask);
+	ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, 100, 0, dev_ip, tun_rem_ip,
+			       tun_p2p, tun_addr, tun_mask);
 
 	/* No nexthop for tunnel remote address */
-	ofp_config_interface_up_tun(GRE_PORTS, 200, 0, dev_ip, 0x08070605,
-				      tun_p2p + 1, tun_addr + 1, tun_mask);
+	ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, 200, 0, dev_ip, 0x08070605,
+			       tun_p2p + 1, tun_addr + 1, tun_mask);
 }
 
 static enum ofp_return_code fastpath_hook_out_IPv4(odp_packet_t pkt,
@@ -430,7 +430,8 @@ test_packet_output_ipv6_to_gre(void)
 
 	ip6 = odp_packet_l3_ptr(pkt, NULL);
 
-	ofp_set_route6_params(OFP_ROUTE6_ADD, 0 /*vrf*/, 100 /*vlan*/, GRE_PORTS,
+	ofp_set_route6_params(OFP_ROUTE6_ADD, 0 /*vrf*/, 100 /*vlan*/,
+			      OFP_IFPORT_GRE,
 			      ip6->ip6_dst.__u6_addr.__u6_addr8, 64 /*masklen*/,
 			      0 /*gw*/, OFP_RTF_NET /* flags */);
 

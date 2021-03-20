@@ -349,7 +349,7 @@ typedef struct ofp_initialize_param_t {
 	/**
 	 * Create default loopback interface lo0, 127.0.0.1/8.
 	 * Interface can also be created with CLI or
-	 * ofp_config_interface_up_local() API.
+	 * ofp_ifport_local_ipv4_up() API.
 	 */
 	odp_bool_t if_loopback;
 

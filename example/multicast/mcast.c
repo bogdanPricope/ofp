@@ -21,6 +21,7 @@ static int mcasttest(void *arg)
 	int fd;
 	struct ofp_sockaddr_in my_addr;
 	struct ofp_ip_mreq mreq;
+	ofp_ifnet_t ifnet = OFP_IFNET_INVALID;
 	odp_bool_t *is_running = NULL;
 
 	(void)arg;
@@ -35,8 +36,18 @@ static int mcasttest(void *arg)
 
 	sleep(1);
 
+	ifnet = ofp_ifport_ifnet_get(0, OFP_IFPORT_NET_SUBPORT_ITF);
+	if (ifnet == OFP_IFNET_INVALID) {
+		OFP_ERR("Interface not found.");
+		return -1;
+	}
+
 	while (myaddr == 0) {
-		myaddr = ofp_port_get_ipv4_addr(0, 0, OFP_PORTCONF_IP_TYPE_IP_ADDR);
+		if (ofp_ifnet_ipv4_addr_get(ifnet, OFP_IFNET_IP_TYPE_IP_ADDR,
+					    &myaddr)) {
+			OFP_ERR("Faile to get IP address.");
+			return -1;
+		}
 		sleep(1);
 	}
 

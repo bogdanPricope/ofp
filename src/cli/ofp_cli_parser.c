@@ -6,7 +6,7 @@
 #include "string.h"
 #include "ofpi_cli.h"
 #include "ofpi_cli_shm.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_util.h"
 
 
@@ -96,7 +96,7 @@ static int dev_ok(char *val)
 	int port, vlan;
 
 	port = ofp_name_to_port_vlan(val, &vlan);
-	return (port >= 0 && port < ofp_get_num_ports());
+	return (port >= 0 && port < ofp_ifport_count());
 }
 
 static int ip4net_ok(char *val)

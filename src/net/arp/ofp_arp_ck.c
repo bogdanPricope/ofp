@@ -20,7 +20,7 @@
 #include <odp_api.h>
 
 #include "api/ofp_types.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_arp.h"
 #include "ofpi_hash.h"
 #include "ofpi_log.h"

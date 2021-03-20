@@ -17,7 +17,7 @@
 #include "ofpi_pkt_processing.h"
 #include "ofpi_arp.h"
 #include "ofpi_avl.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_log.h"
 
 #define SHM_NAME_ROUTE "OfpRouteShMem"

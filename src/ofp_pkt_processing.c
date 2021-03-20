@@ -34,7 +34,7 @@
 
 #include "ofpi.h"
 #include "ofpi_pkt_processing.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_rt_lookup.h"
 #include "ofpi_route.h"
 #include "ofpi_util.h"
@@ -321,7 +321,7 @@ enum ofp_return_code ofp_ipv4_processing(odp_packet_t *pkt)
 
 		/* Look for the correct device. */
 		ua = ofp_packet_user_area(*pkt);
-		dev = ofp_get_ifnet(VXLAN_PORTS, ua->vxlan.vni);
+		dev = ofp_get_ifnet(OFP_IFPORT_VXLAN, ua->vxlan.vni);
 		if (!dev)
 			return OFP_PKT_DROP;
 	}
@@ -543,7 +543,7 @@ enum ofp_return_code ofp_gre_processing(odp_packet_t *pkt)
 enum ofp_return_code send_pkt_loop(struct ofp_ifnet *dev,
 	odp_packet_t pkt)
 {
-	if (dev->port != LOCAL_PORTS)
+	if (dev->port != OFP_IFPORT_LOCAL)
 		dev = ofp_get_ifnet(dev->port, 0);
 
 	if (odp_queue_enq(dev->loopq_def, odp_packet_to_event(pkt)))
@@ -654,7 +654,7 @@ enum ofp_return_code ofp_arp_processing(odp_packet_t *pkt)
 	return OFP_PKT_CONTINUE;
 }
 
-#define ETH_WITH_VLAN(dev) ((dev)->vlan && ofp_if_type(dev) != VXLAN_PORTS)
+#define ETH_WITH_VLAN(dev) ((dev)->vlan && ofp_if_type(dev) != OFP_IFPORT_VXLAN)
 
 static void send_arp_request(struct ofp_ifnet *dev, uint32_t gw)
 {

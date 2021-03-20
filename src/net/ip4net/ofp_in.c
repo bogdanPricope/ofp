@@ -40,7 +40,7 @@
 #include "ofpi_socketvar.h"
 #include "ofpi_sockstate.h"
 #include "ofpi_errno.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_socket.h"
 #include "ofpi_ioctl.h"
 
@@ -214,20 +214,20 @@ ofp_in_control(struct socket *so, uint32_t cmd, char *data, struct ofp_ifnet *if
 	case OFP_SIOCSIFNETMASK:
 	case OFP_SIOCSIFFIB:
 		if (ofp_if_type(ifp) == OFP_IFT_GRE) {
-			ofp_config_interface_up_tun
+			ofp_ifport_tun_ipv4_up
 				(ifp->port, ifp->vlan,
 				 vrf, ifp->ip_local,
 				 ifp->ip_remote, if_p2p,
 				 if_addr, if_masklen);
 		} else {
-			ofp_config_interface_down(ifp->port, ifp->vlan);
-			ofp_config_interface_up_v4(ifp->port, ifp->vlan, vrf,
-						     if_addr, if_masklen);
+			ofp_ifport_ifnet_down(ifp->port, ifp->vlan);
+			ofp_ifport_net_ipv4_up(ifp->port, ifp->vlan, vrf,
+					       if_addr, if_masklen);
 		}
 		break;
 	case OFP_SIOCDIFADDR:
 		if (ifra->ifra_addr.sin_family == OFP_AF_INET) {
-			ofp_config_interface_down(ifp->port, ifp->vlan);
+			ofp_ifport_ifnet_down(ifp->port, ifp->vlan);
 		}
 		break;
 	case OFP_SIOCSIFDSTADDR:

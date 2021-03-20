@@ -427,12 +427,23 @@ int udp_test(appl_args_t *arg)
 
 	laddr.sin_family = OFP_AF_INET;
 	laddr.sin_port = odp_cpu_to_be_16((uint16_t)arg->lport);
-	if (arg->laddr)
+	if (arg->laddr) {
 		my_ip_addr = inet_addr(arg->laddr);
-	else
-		my_ip_addr =
-			ofp_port_get_ipv4_addr(0, 0,
-					       OFP_PORTCONF_IP_TYPE_IP_ADDR);
+	} else {
+		ofp_ifnet_t ifnet = OFP_IFNET_INVALID;
+
+		ifnet = ofp_ifport_ifnet_get(0, OFP_IFPORT_NET_SUBPORT_ITF);
+		if (ifnet == OFP_IFNET_INVALID) {
+			OFP_ERR("Interface not found.");
+			return -1;
+		}
+
+		if (ofp_ifnet_ipv4_addr_get(ifnet, OFP_IFNET_IP_TYPE_IP_ADDR,
+					    &my_ip_addr)) {
+			OFP_ERR("Faile to get IP address.");
+			return -1;
+		}
+	}
 	laddr.sin_addr.s_addr = my_ip_addr;
 	laddr.sin_len = sizeof(laddr);
 
@@ -488,12 +499,23 @@ int tcp_test(appl_args_t *arg)
 
 	laddr.sin_family = OFP_AF_INET;
 	laddr.sin_port = odp_cpu_to_be_16((uint16_t)arg->lport);
-	if (arg->laddr)
+	if (arg->laddr) {
 		my_ip_addr = inet_addr(arg->laddr);
-	else
-		my_ip_addr =
-			ofp_port_get_ipv4_addr(0, 0,
-					       OFP_PORTCONF_IP_TYPE_IP_ADDR);
+	} else {
+		ofp_ifnet_t ifnet = OFP_IFNET_INVALID;
+
+		ifnet = ofp_ifport_ifnet_get(0, OFP_IFPORT_NET_SUBPORT_ITF);
+		if (ifnet == OFP_IFNET_INVALID) {
+			OFP_ERR("Interface not found.");
+			return -1;
+		}
+
+		if (ofp_ifnet_ipv4_addr_get(ifnet, OFP_IFNET_IP_TYPE_IP_ADDR,
+					    &my_ip_addr)) {
+			OFP_ERR("Faile to get IP address.");
+			return -1;
+		}
+	}
 	laddr.sin_addr.s_addr = my_ip_addr;
 	laddr.sin_len = sizeof(laddr);
 

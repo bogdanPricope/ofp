@@ -8,7 +8,7 @@
 #include <arpa/inet.h>
 #include <CUnit/Basic.h>
 
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "api/ofp_in.h"
 #include "api/ofp_sysctl.h"
 #include "ofpi_tree.h"

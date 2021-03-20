@@ -68,7 +68,7 @@ void f_arp_add(ofp_print_t *pr, const char *s)
 	mac[5] = j;
 
 	port = ofp_name_to_port_vlan(dev, &vlan);
-	if (port == -1 || !PHYS_PORT(port)) {
+	if (port == -1 || !OFP_IFPORT_IS_NET(port)) {
 		ofp_print(pr, "Invalid device name.\r\n");
 		return;
 	}

@@ -16,7 +16,7 @@
 static __thread struct burst_send {
 	odp_packet_t *pkt_tbl;
 	uint32_t pkt_tbl_cnt;
-} send_pkt_tbl[NUM_PORTS] __attribute__((__aligned__(ODP_CACHE_LINE_SIZE)));
+} send_pkt_tbl[OFP_IFPORT_NUM] __attribute__((__aligned__(ODP_CACHE_LINE_SIZE)));
 
 static __thread uint32_t tx_burst;
 
@@ -71,7 +71,7 @@ static void ofp_send_pending_pkt_nocheck(void)
 	uint32_t *pkt_tbl_cnt;
 	odp_packet_t *pkt_tbl;
 
-	for (i = 0; i < NUM_PORTS; i++) {
+	for (i = 0; i < OFP_IFPORT_NUM; i++) {
 		pkt_tbl_cnt = &send_pkt_tbl[i].pkt_tbl_cnt;
 
 		if  (!(*pkt_tbl_cnt))
@@ -98,15 +98,16 @@ int ofp_send_pkt_out_init_local(void)
 
 	tx_burst = global_param->pkt_tx_burst_size;
 
-	pkt_tbl = malloc(global_param->pkt_tx_burst_size
-			 * sizeof(odp_packet_t) * NUM_PORTS + ODP_CACHE_LINE_SIZE);
+	pkt_tbl = malloc(global_param->pkt_tx_burst_size *
+			 sizeof(odp_packet_t) * OFP_IFPORT_NUM +
+			 ODP_CACHE_LINE_SIZE);
 	if (!pkt_tbl) {
 		OFP_ERR("Packet table allocation failed\n");
 		ofp_send_pkt_out_term_local();
 		return -1;
 	}
 
-	for (i = 0; i < NUM_PORTS; i++) {
+	for (i = 0; i < OFP_IFPORT_NUM; i++) {
 		send_pkt_tbl[i].pkt_tbl_cnt = 0;
 		if (!i) {
 			const uint64_t mask = ODP_CACHE_LINE_SIZE - 1;
@@ -127,7 +128,7 @@ int ofp_send_pkt_out_term_local(void)
 {
 	uint32_t i, j;
 
-	for (i = 0; i < NUM_PORTS; i++) {
+	for (i = 0; i < OFP_IFPORT_NUM; i++) {
 
 		for (j = 0; j < send_pkt_tbl[i].pkt_tbl_cnt; j++)
 			odp_packet_free(send_pkt_tbl[i].pkt_tbl[j]);

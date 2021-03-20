@@ -608,7 +608,7 @@ static int get_port_vlan_by_name(const char *name, int *port, int *vlan)
 		return 0;
 	} else if (strncmp(name, OFP_GRE_IFNAME_PREFIX,
 			   strlen(OFP_GRE_IFNAME_PREFIX)) == 0) {
-		*port = GRE_PORTS;
+		*port = OFP_IFPORT_GRE;
 		*vlan = atoi(name + strlen(OFP_GRE_IFNAME_PREFIX));
 		return 0;
 	}
@@ -646,7 +646,7 @@ int ofp_ioctl(int sockfd, int request, ...)
 		if (request == (int)(OFP_SIOCSIFTUN)) {
 			struct ofp_in_tunreq *treq = data;
 			const char *retstr =
-				ofp_config_interface_up_tun
+				ofp_ifport_tun_ipv4_up
 				(port, vlan, treq->iftun_vrf,
 				 treq->iftun_local_addr.sin_addr.s_addr,
 				 treq->iftun_remote_addr.sin_addr.s_addr,

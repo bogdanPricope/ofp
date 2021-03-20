@@ -84,6 +84,7 @@ static void notify(union ofp_sigval *sv)
 
 int udpecho_config(void *arg)
 {
+	ofp_ifnet_t ifnet = OFP_IFNET_INVALID;
 	struct ofp_sigevent ev = {0};
 	struct ofp_sockaddr_in my_addr;
 	uint32_t my_ip_addr;
@@ -104,7 +105,19 @@ int udpecho_config(void *arg)
 	}
 
 	/* Bind it to the address from first interface, port 2048 */
-	my_ip_addr = ofp_port_get_ipv4_addr(0, 0, OFP_PORTCONF_IP_TYPE_IP_ADDR);
+	ifnet = ofp_ifport_ifnet_get(0, OFP_IFPORT_NET_SUBPORT_ITF);
+	if (ifnet == OFP_IFNET_INVALID) {
+		OFP_ERR("Interface not found.");
+		ofp_close(udp_echo_cfg.sd);
+		return -1;
+	}
+
+	if (ofp_ifnet_ipv4_addr_get(ifnet, OFP_IFNET_IP_TYPE_IP_ADDR,
+				    &my_ip_addr)) {
+		OFP_ERR("Faile to get IP address.");
+		ofp_close(udp_echo_cfg.sd);
+		return -1;
+	}
 
 	memset(&my_addr, 0, sizeof(my_addr));
 	my_addr.sin_family = OFP_AF_INET;

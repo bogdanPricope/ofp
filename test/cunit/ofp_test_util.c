@@ -157,7 +157,7 @@ test_ofp_name_to_port_vlan(void)
 	strcpy(devname, "gre101");
 	port = ofp_name_to_port_vlan(devname, &vlan);
 
-	CU_ASSERT_EQUAL(port, GRE_PORTS);
+	CU_ASSERT_EQUAL(port, OFP_IFPORT_GRE);
 	CU_ASSERT_EQUAL(vlan, 101);
 
 }

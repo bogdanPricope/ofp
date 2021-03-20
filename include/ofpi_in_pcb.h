@@ -46,7 +46,7 @@
 #include "ofpi_in.h"
 #include "ofpi_queue.h"
 #include "ofpi_socket.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_udp_var.h"
 #include "ofpi_systm.h"
 #include "ofpi_uma.h"

@@ -14,7 +14,7 @@
 #include "ofpi_if_vxlan.h"
 #include "ofpi_if_vlan.h"
 #include "ofpi_ethernet.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_log.h"
 #include "ofpi_hook.h"
 #include "ofpi_util.h"
@@ -185,7 +185,7 @@ enum ofp_return_code ofp_vxlan_input(odp_packet_t pkt)
 
 	vxlan = (struct ofp_vxlan_h *)(udp + 1);
 	vni = odp_be_to_cpu_32(vxlan->vni) >> 8;
-	dev = ofp_get_ifnet(VXLAN_PORTS, vni);
+	dev = ofp_get_ifnet(OFP_IFPORT_VXLAN, vni);
 	if (!dev)
 		return OFP_PKT_CONTINUE;
 
@@ -215,7 +215,7 @@ enum ofp_return_code ofp_vxlan_input(odp_packet_t pkt)
 	ofp_vxlan_set_mac_dst(eth->ether_shost, from);
 	odp_packet_user_ptr_set(pkt, dev);
 	ofp_ipsec_flags_set(pkt, 0);
-	dev0 = ofp_get_ifnet(VXLAN_PORTS, 0);
+	dev0 = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0);
 	odp_event_t ev = odp_packet_to_event(pkt);
 	if (odp_queue_enq(dev0->loopq_def, ev) < 0) {
 		OFP_ERR("odp_queue_enq");
@@ -368,7 +368,7 @@ int ofp_vxlan_lookup_shared_memory(void)
 int ofp_set_vxlan_interface_queue(void)
 {
 	odp_queue_param_t qparam;
-	struct ofp_ifnet *ifnet = ofp_get_ifnet(VXLAN_PORTS, 0);
+	struct ofp_ifnet *ifnet = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0);
 
 	/* VXLAN interface queue */
 	odp_queue_param_init(&qparam);
@@ -391,7 +391,7 @@ int ofp_set_vxlan_interface_queue(void)
 
 int ofp_clean_vxlan_interface_queue(void)
 {
-	struct ofp_ifnet *ifnet = ofp_get_ifnet(VXLAN_PORTS, 0);
+	struct ofp_ifnet *ifnet = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0);
 
 	if (ifnet == NULL) {
 		OFP_ERR("Error: Failed to locate VXLAN port");
@@ -425,7 +425,7 @@ void ofp_vxlan_update_devices(odp_packet_t pkt, struct ofp_arphdr *arp, uint16_t
 {
 	/* Find the vxlan device this message is destined to. */
 	struct vxlan_user_data *saved = &ofp_packet_user_area(pkt)->vxlan;
-	struct ofp_ifnet *vxdev = ofp_get_ifnet(VXLAN_PORTS, saved->vni);
+	struct ofp_ifnet *vxdev = ofp_get_ifnet(OFP_IFPORT_VXLAN, saved->vni);
 
 	/* Sanity check. */
 	if (vxdev && ofp_if_type(vxdev) == OFP_IFT_VXLAN) {

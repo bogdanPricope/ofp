@@ -20,7 +20,6 @@ include_HEADERS = \
 		$(top_srcdir)/include/api/ofp_errno.h \
 		$(top_srcdir)/include/api/ofp_hook.h \
 		$(top_srcdir)/include/api/ofp_route_arp.h \
-		$(top_srcdir)/include/api/ofp_portconf.h \
 		$(top_srcdir)/include/api/ofp_debug.h \
 		$(top_srcdir)/include/api/ofp_stat.h \
 		$(top_srcdir)/include/api/ofp_ioctl.h \
@@ -33,6 +32,7 @@ include_HEADERS = \
 		$(top_srcdir)/include/api/ofp_icmp.h \
 		$(top_srcdir)/include/api/ofp_icmp6.h \
 		$(top_srcdir)/include/api/ofp_ifnet.h \
+		$(top_srcdir)/include/api/ofp_ifnet_portconf.h \
 		$(top_srcdir)/include/api/ofp_if_vlan.h \
 		$(top_srcdir)/include/api/ofp_udp.h \
 		$(top_srcdir)/include/api/ofp_ip_var.h \
@@ -71,6 +71,7 @@ noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_if_vlan.h \
 		  $(top_srcdir)/include/ofpi_if_vxlan.h \
 		  $(top_srcdir)/include/ofpi_ifnet.h \
+		  $(top_srcdir)/include/ofpi_ifnet_portconf.h \
 		  $(top_srcdir)/include/ofpi_inet.h \
 		  $(top_srcdir)/include/ofpi_in6.h \
 		  $(top_srcdir)/include/ofpi_in6_pcb.h \
@@ -88,7 +89,6 @@ noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_ip_var.h \
 		  $(top_srcdir)/include/ofpi_log.h \
 		  $(top_srcdir)/include/ofpi_md5.h \
-		  $(top_srcdir)/include/ofpi_portconf.h \
 		  $(top_srcdir)/include/ofpi_protosw.h \
 		  $(top_srcdir)/include/ofpi_queue.h \
 		  $(top_srcdir)/include/ofpi_reass.h \

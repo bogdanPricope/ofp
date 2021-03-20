@@ -162,10 +162,9 @@ static int create_interfaces_direct_rss(int if_count, char **if_names,
 	pktout_param.num_queues = tx_queues;
 
 	for (i = 0; i < if_count; i++)
-		if (ofp_ifnet_create(if_names[i],
-				     &pktio_param,
-				     &pktin_param,
-				     &pktout_param) < 0) {
+		if (ofp_ifport_net_create(if_names[i], &pktio_param,
+					  &pktin_param, &pktout_param,
+					  NULL, NULL) < 0) {
 			OFP_ERR("Failed to init interface %s",
 				if_names[i]);
 			return -1;
@@ -262,10 +261,9 @@ static int create_interfaces_sched_rss(int if_count, char **if_names,
 	pktout_param.num_queues = tx_queues;
 
 	for (i = 0; i < if_count; i++)
-		if (ofp_ifnet_create(if_names[i],
-				     &pktio_param,
-				     &pktin_param,
-				     &pktout_param) < 0) {
+		if (ofp_ifport_net_create(if_names[i], &pktio_param,
+					  &pktin_param, &pktout_param,
+					  NULL, NULL) < 0) {
 			OFP_ERR("Failed to init interface %s",
 				if_names[i]);
 			return -1;

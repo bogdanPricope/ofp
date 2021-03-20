@@ -12,7 +12,7 @@
 
 #include <odp_api.h>
 #include "api/ofp_route_arp.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 
 #define OFP_LOCK_READ(name)       odp_rwlock_read_lock(&ofp_locks_shm->lock_##name##_rw)
 #define OFP_UNLOCK_READ(name)     odp_rwlock_read_unlock(&ofp_locks_shm->lock_##name##_rw)

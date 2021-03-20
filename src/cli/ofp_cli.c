@@ -30,7 +30,7 @@
 #include "ofpi_cli_shm.h"
 #include "ofpi_log.h"
 #include "ofpi_util.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 
 /*
  * Only core 0 runs this.

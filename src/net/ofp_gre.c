@@ -17,7 +17,7 @@
 #include "ofpi_if_gre.h"
 #include "ofpi_if_vlan.h"
 #include "ofpi_ethernet.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_log.h"
 #include "ofpi_hook.h"
 #include "ofpi_util.h"

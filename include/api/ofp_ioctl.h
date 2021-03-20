@@ -37,7 +37,7 @@
 
 #include <stddef.h>
 #include "ofp_in.h"
-#include "ofp_portconf.h"
+#include "ofp_ifnet_portconf.h"
 #include "ofp_socket.h"
 
 #if __GNUC__ >= 4

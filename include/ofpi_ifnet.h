@@ -8,7 +8,13 @@
 #define __OFPI_IFNET_H__
 
 #include "api/ofp_ifnet.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
+
+int ofp_ifnet_create(char *if_name,
+		     odp_pktio_param_t *pktio_param,
+		     odp_pktin_queue_param_t *pktin_param,
+		     odp_pktout_queue_param_t *pktout_param,
+			 struct ofp_ifnet *ifnet);
 
 /* Open a packet IO instance for this ifnet device. */
 int ofp_pktio_open(struct ofp_ifnet *ifnet, odp_pktio_param_t *pktio_param);

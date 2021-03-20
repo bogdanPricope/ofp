@@ -353,8 +353,7 @@ OFP public API header files can be found from ./include/api/ folder at the
 OFP provides following user application APIs:
 
 - initiation and termination OpenFastPath (ofp_init.h)
-- creating packet IO interfaces (ofp_ifnet.h)
-- creating, configuration and deleting interfaces (ofp_portconf.h)
+- creating, configuration and deleting interfaces (ofp_ifnet_portconf.h)
 - handling routing and ARP tables (ofp_route_arp.h)
 - packet Ingress and Egress processing (ofp_pkt_processing.h)
 - hooks for IP local, IP forwarding and GRE (ofp_hook.h)
@@ -469,7 +468,7 @@ ofp_initialize().
 If an OFP application needs packet IO configuration that is not possible through
 ofp_initialize() (e.g. enabling multiple input or output queues per interface),
 it must create respective packet IO instances after OFP initialization through
-the ofp_ifnet_create() function. This will require the following steps:
+the ofp_ifport_net_create() function. This will require the following steps:
 
 - initializing default packet IO parameter values by calling
   odp_pktio_param_init(), odp_pktin_queue_param_init() and
@@ -477,7 +476,7 @@ the ofp_ifnet_create() function. This will require the following steps:
 
 - setting non-default values for the parameters
 
-- calling ofp_ifnet_create() function for each interface
+- calling ofp_ifport_net_create() function for each interface
 
 For example, following function from example/webserver2/app_main.c will set some
 non-default parameters and create packet IO objects:
@@ -519,10 +518,11 @@ non-default parameters and create packet IO objects:
          pktout_param.num_queues = tx_queues;
 
          for (i = 0; i < if_count; i++)
-                 if (ofp_ifnet_create(if_names[i],
+                 if (ofp_ifport_net_create(if_names[i],
                                  &pktio_param,
                                  &pktin_param,
-                                 &pktout_param) < 0) {
+                                 &pktout_param,
+								 NULL, NULL) < 0) {
                          OFP_ERR("Failed to init interface %s",
                                  if_names[i]);
                          return -1;
@@ -539,7 +539,7 @@ received by the NIC to be assigned to one of its receive queues. Maximum number
 of input/output queues available in used NICs can be checked with ODP function
 odp_pktio_capability(). Desired number of input/output queues can then be
 provided as a part of odp_pktin_queue_param_t and odp_pktout_queue_param_t
-parameter structures to ofp_ifnet_create() function (see the example in the
+parameter structures to ofp_ifport_net_create() function (see the example in the
 previous chapter).
 
 More than one input queue require input hashing or classifier setup. In the

@@ -14,7 +14,7 @@
 #include <odp_api.h>
 
 #include "ofpi_config.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_timer.h"
 #include "ofpi_arp.h"
 #include "ofpi_hash.h"

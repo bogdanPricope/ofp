@@ -23,7 +23,7 @@
 #include <odp_api.h>
 #include <ofpi.h>
 #include <ofpi_log.h>
-#include <ofpi_portconf.h>
+#include <ofpi_ifnet_portconf.h>
 #include <ofpi_route.h>
 #include <ofpi_rt_lookup.h>
 #include <ofpi_avl.h>
@@ -127,7 +127,7 @@ test_single_port_basic(void)
 	struct ofp_nh_entry *nh;
 	const char *res;
 
-	res = ofp_config_interface_up_v4(port, vlan, vrf, ifaddr, masklen);
+	res = ofp_ifport_net_ipv4_up(port, vlan, vrf, ifaddr, masklen);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
 	dev = ofp_get_ifnet(port, vlan);
@@ -136,7 +136,7 @@ test_single_port_basic(void)
 	nh = ofp_get_next_hop(vrf, ifaddr, NULL);
 	assert_next_hop(nh, 0, port, vlan);
 
-	res = ofp_config_interface_down(port, vlan);
+	res = ofp_ifport_ifnet_down(port, vlan);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
 	dev = ofp_get_ifnet(port, vlan);
@@ -160,9 +160,9 @@ test_two_ports_vlan(void)
 	struct ofp_nh_entry *nh;
 	const char *res;
 
-	res = ofp_config_interface_up_v4(port, vlan, vrf, ifaddr, masklen);
+	res = ofp_ifport_net_ipv4_up(port, vlan, vrf, ifaddr, masklen);
 	CU_ASSERT_PTR_NULL_FATAL(res);
-	res = ofp_config_interface_up_v4(port, vlan1, vrf1, ifaddr1, masklen1);
+	res = ofp_ifport_net_ipv4_up(port, vlan1, vrf1, ifaddr1, masklen1);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
 	dev = ofp_get_ifnet(port, vlan);
@@ -178,9 +178,9 @@ test_two_ports_vlan(void)
 	nh = ofp_get_next_hop(vrf1, ifaddr1, NULL);
 	assert_next_hop(nh, 0, port, vlan1);
 
-	res = ofp_config_interface_down(port, vlan);
+	res = ofp_ifport_ifnet_down(port, vlan);
 	CU_ASSERT_PTR_NULL_FATAL(res);
-	res = ofp_config_interface_down(port, vlan1);
+	res = ofp_ifport_ifnet_down(port, vlan1);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
 	dev = ofp_get_ifnet(port, vlan);
@@ -209,23 +209,21 @@ test_gre_port(void)
 	struct ofp_nh_entry *nh;
 	const char *res;
 
-	res = ofp_config_interface_up_v4(port, vlan, vrf, ifaddr, masklen);
+	res = ofp_ifport_net_ipv4_up(port, vlan, vrf, ifaddr, masklen);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
 	/* Non-existent endpoint in vrf */
-	res = ofp_config_interface_up_tun(GRE_PORTS, greid, vrf + 1, ifaddr,
-					    ifaddr + 1, greaddr, grep2p,
-					    gre_ml);
+	res = ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, greid, vrf + 1, ifaddr,
+				     ifaddr + 1, greaddr, grep2p, gre_ml);
 	CU_ASSERT_PTR_NOT_NULL_FATAL(res);
-	dev = ofp_get_ifnet(GRE_PORTS, greid);
+	dev = ofp_get_ifnet(OFP_IFPORT_GRE, greid);
 	CU_ASSERT_PTR_NULL_FATAL(dev);
 
 	/* Successful test */
-	res = ofp_config_interface_up_tun(GRE_PORTS, greid, vrf, ifaddr,
-					    ifaddr + 1, grep2p, greaddr,
-					    gre_ml);
+	res = ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, greid, vrf, ifaddr,
+				     ifaddr + 1, grep2p, greaddr, gre_ml);
 	CU_ASSERT_PTR_NULL_FATAL(res);
-	dev = ofp_get_ifnet(GRE_PORTS, greid);
+	dev = ofp_get_ifnet(OFP_IFPORT_GRE, greid);
 	CU_ASSERT_PTR_NOT_NULL_FATAL(dev);
 	CU_ASSERT_EQUAL(dev->ip_local, ifaddr);
 	CU_ASSERT_EQUAL(dev->ip_remote, ifaddr + 1);
@@ -235,13 +233,13 @@ test_gre_port(void)
 	CU_ASSERT_EQUAL(dev->if_mtu, ifmtu - 24);
 
 	nh = ofp_get_next_hop(vrf, grep2p, NULL);
-	assert_next_hop(nh, 0, GRE_PORTS, greid);
+	assert_next_hop(nh, 0, OFP_IFPORT_GRE, greid);
 
-	res = ofp_config_interface_down(port, vlan);
+	res = ofp_ifport_ifnet_down(port, vlan);
 	CU_ASSERT_PTR_NULL_FATAL(res);
-	res = ofp_config_interface_down(GRE_PORTS, greid);
+	res = ofp_ifport_ifnet_down(OFP_IFPORT_GRE, greid);
 	CU_ASSERT_PTR_NULL_FATAL(res);
-	dev = ofp_get_ifnet(GRE_PORTS, greid);
+	dev = ofp_get_ifnet(OFP_IFPORT_GRE, greid);
 	CU_ASSERT_PTR_NULL_FATAL(dev);
 }
 
@@ -257,7 +255,7 @@ static void test_queue(void)
 	ifq.ifq_len = 0;
 	e.next = NULL;
 
-	odp_packet_t m = odp_packet_alloc(ofp_get_packet_pool(), 0);
+	odp_packet_t m = odp_packet_alloc(ofp_get_packet_pool(), 1000);
 
 	IF_ENQUEUE(&ifq, m);
 	CU_ASSERT_PTR_NOT_NULL(ifq.ifq_head);

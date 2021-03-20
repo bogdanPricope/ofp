@@ -33,7 +33,7 @@
 #include "ofpi_protosw.h"
 #include "ofpi_socket.h"
 #include "ofpi_route.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_log.h"
 #include "ofpi_util.h"
 /* ODP should have support to get time and date like gettimeofday from Linux*/

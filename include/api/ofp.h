@@ -33,7 +33,7 @@ extern "C" {
 #include "ofp_hook.h"
 #include "ofp_route_arp.h"
 #include "ofp_ifnet.h"
-#include "ofp_portconf.h"
+#include "ofp_ifnet_portconf.h"
 #include "ofp_debug.h"
 #include "ofp_stat.h"
 #include "ofp_socket_types.h"

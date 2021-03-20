@@ -343,7 +343,9 @@ int build_classifier(int if_count, char if_names[][OFP_IFNAMSIZ])
 	odp_cos_t cos_udp;
 	odp_pmr_t pmr_udp;
 	char name[80];
-	int i;
+	int i, port;
+	ofp_ifnet_t ifnet = OFP_IFNET_INVALID;
+	odp_queue_t spq = ODP_QUEUE_INVALID;
 
 	cos_udp = build_cos_w_queue("cos_udp");
 	if (cos_udp == ODP_COS_INVALID) {
@@ -352,15 +354,34 @@ int build_classifier(int if_count, char if_names[][OFP_IFNAMSIZ])
 	}
 
 	for (i = 0; i < if_count; i++) {
-		pktio = odp_pktio_lookup(if_names[i]);
+		ifnet = ofp_ifport_net_ifnet_get_by_name(if_names[i]);
+		if (ifnet == OFP_IFNET_INVALID) {
+			OFP_ERR("Failed to get OFP interface %s\n",
+				if_names[i]);
+			return -1;
+		}
+
+		if (ofp_ifnet_port_get(ifnet, &port, NULL)) {
+			OFP_ERR("Failed to get OFP interface port ID%s\n",
+				if_names[i]);
+			return -1;
+		}
+
+		pktio  = ofp_ifport_net_pktio_get(port);
 		if (pktio == ODP_PKTIO_INVALID) {
 			OFP_ERR("Failed to get pktio for interface %s\n",
 				if_names[i]);
 			return -1;
 		}
 
+		spq = ofp_ifport_net_spq_get(port);
+		if (spq == ODP_QUEUE_INVALID) {
+			OFP_ERR("Failed to get slow path queue %s\n",
+				if_names[i]);
+			return -1;
+		}
 		sprintf(name, "cos_default_%s", if_names[i]);
-		cos_def = build_cos_set_queue(name, ofp_pktio_spq_get(pktio));
+		cos_def = build_cos_set_queue(name, spq);
 		if (cos_def == ODP_COS_INVALID) {
 			OFP_ERR("Failed to create default COS "
 				"for interface %s\n", if_names[i]);
@@ -463,6 +484,7 @@ static void app_processing(void)
 	struct ofp_sockaddr_in addr = {0};
 	uint32_t ip_addr = 0;
 	odp_bool_t *is_running = NULL;
+	ofp_ifnet_t ifnet = OFP_IFNET_INVALID;
 
 	fd_rcv = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
 				OFP_IPPROTO_UDP);
@@ -473,7 +495,17 @@ static void app_processing(void)
 	}
 
 	/* Bind it to the address from first interface */
-	ip_addr = ofp_port_get_ipv4_addr(0, 0, OFP_PORTCONF_IP_TYPE_IP_ADDR);
+	ifnet = ofp_ifport_ifnet_get(0, OFP_IFPORT_NET_SUBPORT_ITF);
+	if (ifnet == OFP_IFNET_INVALID) {
+		OFP_ERR("Interface not found.");
+		return;
+	}
+
+	if (ofp_ifnet_ipv4_addr_get(ifnet, OFP_IFNET_IP_TYPE_IP_ADDR,
+				    &ip_addr)) {
+		OFP_ERR("Failed to get IP address.");
+		return;
+	}
 
 	addr.sin_len = sizeof(struct ofp_sockaddr_in);
 	addr.sin_family = OFP_AF_INET;

@@ -13,7 +13,7 @@
 
 #include <odp_api.h>
 #include "ofpi_netlink.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_route.h"
 #include "ofpi_init.h"
 #include "ofpi_log.h"
@@ -261,7 +261,8 @@ static int add_ipv4v6_addr(struct ifaddrmsg *if_entry, struct ofp_ifnet *dev,
 			ofp_ifaddr_elem_add(dev);
 
 			ofp_set_route_params(OFP_ROUTE_ADD, dev->vrf, dev->vlan,
-					     VXLAN_PORTS, *((uint32_t *)addr),
+					     OFP_IFPORT_VXLAN,
+					     *((uint32_t *)addr),
 					     masklen, 0, OFP_RTF_LOCAL);
 
 			ofp_leave_multicast_group(dev);
@@ -498,7 +499,7 @@ static int add_link(struct ifinfomsg *ifinfo_entry, int vlan, int link,
 			return -1;
 		}
 		if (ifinfo_entry->ifi_type == ARPHRD_IPGRE) {
-			dev_root = ofp_get_ifnet(GRE_PORTS, 0);
+			dev_root = ofp_get_ifnet(OFP_IFPORT_GRE, 0);
 			if (ofp_get_ifnet_by_ip(tun_loc, vrf) == NULL) {
 				OFP_DBG(" - Tunnel local IP not configured. "
 					"Interface ignored.");
@@ -507,7 +508,7 @@ static int add_link(struct ifinfomsg *ifinfo_entry, int vlan, int link,
 		} else if (ifinfo_entry->ifi_type == ARPHRD_VXLAN) {
 			OFP_DBG(" - VXLAN ADD LINK vlan=%d link=%d",
 				vlan, link);
-			dev_root = ofp_get_ifnet(VXLAN_PORTS, 0);
+			dev_root = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0);
 		} else {
 			dev_root = ofp_get_ifnet_by_linux_ifindex(link);
 		}
@@ -596,9 +597,9 @@ static int del_link(struct ifinfomsg *ifinfo_entry, int vlan, int link)
 
 	if (vlan != -1) {
 		if (ifinfo_entry->ifi_type == ARPHRD_IPGRE) {
-			dev_root = ofp_get_ifnet(GRE_PORTS, 0);
+			dev_root = ofp_get_ifnet(OFP_IFPORT_GRE, 0);
 		} else if (ifinfo_entry->ifi_type == ARPHRD_VXLAN) {
-			dev_root = ofp_get_ifnet(VXLAN_PORTS, 0);
+			dev_root = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0);
 			OFP_DBG("VXLAN DEL LINK vlan=%d", vlan);
 		} else {
 			dev_root = ofp_get_ifnet_by_linux_ifindex(link);

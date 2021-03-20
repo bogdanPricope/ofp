@@ -90,7 +90,7 @@
 #include "ofpi_tcp_offload.h"
 #include "ofpi_in_pcb.h"
 #include "ofpi_in6.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_sockbuf.h"
 #include "ofpi_domain.h"
 #include "ofpi_sockopt.h"

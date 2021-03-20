@@ -9,7 +9,7 @@
 
 #include "odp.h"
 #include "ofpi_vnet.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_igmp_var.h"
 
 struct ofp_igmp_var_mem {

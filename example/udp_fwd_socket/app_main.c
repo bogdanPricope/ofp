@@ -212,10 +212,9 @@ int main(int argc, char *argv[])
 		int j;
 		odp_pktin_queue_t pktin[num_workers];
 
-		if (ofp_ifnet_create(params.if_names[i],
-				     &pktio_param,
-				     &pktin_param,
-				     &pktout_param) < 0) {
+		if (ofp_ifport_net_create(params.if_names[i], &pktio_param,
+					  &pktin_param, &pktout_param,
+					  NULL, NULL) < 0) {
 			OFP_ERR("Failed to init interface %s",
 				params.if_names[i]);
 			ofp_terminate();

@@ -390,8 +390,19 @@ static int create_server_socket(void)
 	int serv_fd = -1;
 	uint32_t myaddr;
 	struct ofp_sockaddr_in my_addr;
+	ofp_ifnet_t ifnet = OFP_IFNET_INVALID;
 
-	myaddr = ofp_port_get_ipv4_addr(0, 0, OFP_PORTCONF_IP_TYPE_IP_ADDR);
+	ifnet = ofp_ifport_ifnet_get(0, OFP_IFPORT_NET_SUBPORT_ITF);
+	if (ifnet == OFP_IFNET_INVALID) {
+		OFP_ERR("Interface not found.");
+		return -1;
+	}
+
+	if (ofp_ifnet_ipv4_addr_get(ifnet, OFP_IFNET_IP_TYPE_IP_ADDR,
+				    &myaddr)) {
+		OFP_ERR("Faile to get IP address.");
+		return -1;
+	}
 
 	if ((serv_fd = ofp_socket(OFP_AF_INET, OFP_SOCK_STREAM, OFP_IPPROTO_TCP)) < 0) {
 		OFP_ERR("ofp_socket failed");

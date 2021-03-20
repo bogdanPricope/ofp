@@ -278,10 +278,9 @@ int ofp_sp_inq_create(struct ofp_ifnet *ifnet)
 int ofp_ifnet_create(char *if_name,
 		     odp_pktio_param_t *pktio_param,
 		     odp_pktin_queue_param_t *pktin_param,
-		     odp_pktout_queue_param_t *pktout_param)
+		     odp_pktout_queue_param_t *pktout_param,
+			 struct ofp_ifnet *ifnet)
 {
-	int port;
-	struct ofp_ifnet *ifnet;
 	odp_pktio_param_t pktio_param_local;
 	odp_pktin_queue_param_t pktin_param_local;
 	odp_pktout_queue_param_t pktout_param_local;
@@ -291,13 +290,6 @@ int ofp_ifnet_create(char *if_name,
 
 	if (!shm_global)	/* OFP not initialized */
 		return -1;
-
-	port = ofp_free_port_alloc();
-	ifnet = ofp_get_ifnet((uint16_t)port, 0);
-	if (ifnet == NULL) {
-		OFP_ERR("Got ifnet NULL");
-		return -1;
-	}
 
 	OFP_DBG("Interface '%s' becomes '%s%d', port %d",
 		if_name, OFP_IFNAME_PREFIX, port, port);
@@ -413,6 +405,53 @@ int ofp_ifnet_create(char *if_name,
 			       &V_global_linux_cpumask,
 			       &thr_params);
 #endif /* SP */
+
+	return 0;
+}
+
+int ofp_ifnet_port_get(ofp_ifnet_t _ifnet, int *port, uint16_t *subport)
+{
+	struct ofp_ifnet *ifnet = (struct ofp_ifnet *)_ifnet;
+
+	if (_ifnet == OFP_IFNET_INVALID)
+		return -1;
+
+	if (port)
+		*port = ifnet->port;
+
+	if (subport)
+		*subport = ifnet->vlan;
+
+	return 0;
+}
+
+int ofp_ifnet_ipv4_addr_get(ofp_ifnet_t _ifnet, enum ofp_ifnet_ip_type type,
+			    uint32_t *paddr)
+{
+	struct ofp_ifnet *ifnet = (struct ofp_ifnet *)_ifnet;
+	uint32_t addr = 0;
+
+	if (_ifnet == OFP_IFNET_INVALID || paddr == NULL)
+		return -1;
+
+	switch (type) {
+	case OFP_IFNET_IP_TYPE_IP_ADDR:
+		addr = ifnet->ip_addr_info[0].ip_addr;
+		break;
+	case OFP_IFNET_IP_TYPE_P2P:
+		addr = ifnet->ip_p2p;
+		break;
+	case OFP_IFNET_IP_TYPE_TUN_LOCAL:
+		addr = ifnet->ip_local;
+		break;
+	case OFP_IFNET_IP_TYPE_TUN_REM:
+		addr = ifnet->ip_remote;
+		break;
+	default:
+		return -1;
+	}
+
+	*paddr = addr;
 
 	return 0;
 }

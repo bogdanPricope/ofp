@@ -42,7 +42,7 @@
 #include "ofpi_systm.h"
 #include "ofpi_protosw.h"
 #include "ofpi_sysctl.h"
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_in_var.h"
 #include "ofpi_in_mcast.h"
 #include "ofpi_in.h"

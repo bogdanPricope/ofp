@@ -38,7 +38,7 @@
 #ifndef __OFPI_IN_H__
 #define __OFPI_IN_H__
 
-#include "ofpi_portconf.h"
+#include "ofpi_ifnet_portconf.h"
 #include "ofpi_queue.h"
 #include "api/ofp_in.h"
 

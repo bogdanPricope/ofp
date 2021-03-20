@@ -308,7 +308,7 @@ int ofp_name_to_port_vlan(const char *dev, int *vlan)
 	if (strncmp(dev, OFP_GRE_IFNAME_PREFIX,
 		    strlen(OFP_GRE_IFNAME_PREFIX)) == 0) {
 		*vlan = atoi(dev + strlen(OFP_GRE_IFNAME_PREFIX));
-		return GRE_PORTS;
+		return OFP_IFPORT_GRE;
 	}
 
 	/* vxlan */
@@ -318,7 +318,7 @@ int ofp_name_to_port_vlan(const char *dev, int *vlan)
 		if (*n < '0' || *n > '9')
 			return -1;
 		*vlan = atoi(n);
-		return VXLAN_PORTS;
+		return OFP_IFPORT_VXLAN;
 	}
 
 	/* local */
@@ -328,7 +328,7 @@ int ofp_name_to_port_vlan(const char *dev, int *vlan)
 		if (*n < '0' || *n > '9')
 			return -1;
 		*vlan = atoi(n);
-		return LOCAL_PORTS;
+		return OFP_IFPORT_LOCAL;
 	}
 
 	/* fp */
@@ -355,15 +355,15 @@ char *ofp_port_vlan_to_ifnet_name(int port, int vlan)
 	sel = sel ^ 1;
 
 	switch (port) {
-	case LOCAL_PORTS:
+	case OFP_IFPORT_LOCAL:
 		sprintf(buf[sel], "%s%d",
 			OFP_LOCAL_IFNAME_PREFIX, vlan);
 		break;
-	case GRE_PORTS:
+	case OFP_IFPORT_GRE:
 		sprintf(buf[sel], "%s%d",
 			OFP_GRE_IFNAME_PREFIX, vlan);
 		break;
-	case VXLAN_PORTS:
+	case OFP_IFPORT_VXLAN:
 		sprintf(buf[sel], "%s%d",
 			OFP_VXLAN_IFNAME_PREFIX, vlan);
 		break;

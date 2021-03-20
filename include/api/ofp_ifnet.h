@@ -5,30 +5,6 @@
  * SPDX-License-Identifier:     BSD-3-Clause
  */
 
-/**
- * Create an OFP interface with ODP ifname and packet input mode
- *
- * Open an ODP interface using its name and access type after global
- * initialization. The coresponding OFP object, ofp_ifnet is created.
- *
- * This function can be used anytime to open ODP interfaces that were not opened
- * during ofp_initialize(). One can specify no interface in ofp_initialize()
- * and open one by one using this functionality.
- *
- * @param instance ODP instance
- * @param if_name Interface name to open
- * @param pktio_param Specify packet access mode for this
- *        interface
- * @param pktin_param Specify packet input queue parameters for
- *        this interface
- * @param pktout_param Specify packet output queue parameters for
- *        this interface
- *
- * @retval 0 on success
- * @retval -1 on failure
- *
- * @see ofp_initialize() can init interfaces.
- */
 #ifndef __OFP_IFNET_H__
 #define __OFP_IFNET_H__
 
@@ -38,10 +14,39 @@
 #pragma GCC visibility push(default)
 #endif
 
-int ofp_ifnet_create(char *if_name,
-		     odp_pktio_param_t *pktio_param,
-		     odp_pktin_queue_param_t *pktin_param,
-		     odp_pktout_queue_param_t *pktout_param);
+typedef void *ofp_ifnet_t;
+#define OFP_IFNET_INVALID NULL
+
+enum ofp_ifnet_ip_type {
+	OFP_IFNET_IP_TYPE_IP_ADDR = 0,
+	OFP_IFNET_IP_TYPE_P2P,
+	OFP_IFNET_IP_TYPE_TUN_LOCAL,
+	OFP_IFNET_IP_TYPE_TUN_REM
+};
+
+/**
+ * Get interface port and subport
+ *
+ * @param ifnet Interface
+ * @param port Interface port
+ * @param subport Interface sub-port
+ * @retval -1 on error
+ * @retval 0 on success
+ */
+int ofp_ifnet_port_get(ofp_ifnet_t ifnet, int *port, uint16_t *subport);
+
+/**
+ * Get interface IPv4 address
+ *
+ * @param ifnet Interface
+ * @param type Address type to get
+ * @param addr IPv4 address
+ * @retval -1 on error
+ * @retval 0 on success
+ */
+int ofp_ifnet_ipv4_addr_get(ofp_ifnet_t ifnet, enum ofp_ifnet_ip_type type,
+			    uint32_t *addr);
+
 #if __GNUC__ >= 4
 #pragma GCC visibility pop
 #endif

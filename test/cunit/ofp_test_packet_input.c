@@ -23,7 +23,7 @@
 #include <odp_api.h>
 #include <ofpi.h>
 #include <ofpi_log.h>
-#include <ofpi_portconf.h>
+#include <ofpi_ifnet_portconf.h>
 #include <ofpi_route.h>
 #include <ofpi_rt_lookup.h>
 #include <ofpi_avl.h>
@@ -207,7 +207,7 @@ test_init_ifnet(void)
 {
 	char str[256];
 
-	ofp_config_interface_up_v4(port, vlan, vrf, local_ip, 24);
+	ofp_ifport_net_ipv4_up(port, vlan, vrf, local_ip, 24);
 
 	ifnet = ofp_get_ifnet(port, vlan);
 	ifnet->pkt_pool = odp_pool_lookup("packet_pool");
@@ -243,9 +243,8 @@ test_init_ifnet(void)
 	}
 	odp_queue_context_set(interface_queue[port], ifnet, sizeof(ifnet));
 
-	ofp_config_interface_up_tun(GRE_PORTS, 100 + port, vrf, local_ip,
-				      tun_rem_ip, tun_p2p, tun_addr,
-				      tun_mask);
+	ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, 100 + port, vrf, local_ip,
+			       tun_rem_ip, tun_p2p, tun_addr, tun_mask);
 }
 
 static int

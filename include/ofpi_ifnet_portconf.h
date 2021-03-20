@@ -13,26 +13,13 @@
 #include <odp_api.h>
 #include "odp/helper/odph_api.h"
 
-#include "api/ofp_portconf.h"
+#include "api/ofp_ifnet_portconf.h"
 #include "api/ofp_socket.h"
 
 #include "ofpi_config.h"
 #include "ofpi_ethernet.h"
 #include "ofpi_queue.h"
 
-#define NUM_PORTS (OFP_FP_INTERFACE_MAX + 3)
-
-/* GRE ports are the last port assigned in the port vector.
- * Ports start from 0, and the last value is NUM_PORTS - 1.
- */
-#define GRE_PORTS (NUM_PORTS - 1)
-
-/* VXLANs ports are the before last port assigned in the port vector.
- * Ports start from 0, and the last value is NUM_PORTS - 1.
- */
-#define VXLAN_PORTS (NUM_PORTS - 2)
-#define LOCAL_PORTS (NUM_PORTS - 3)
-#define PHYS_PORT(_port) (_port < OFP_FP_INTERFACE_MAX)
 #define OFP_IFNAME_PREFIX "fp"
 #define OFP_GRE_IFNAME_PREFIX "gre"
 #define OFP_VXLAN_IFNAME_PREFIX "vxlan"
@@ -386,6 +373,18 @@ int ofp_vlan_get_by_key(void *root, void *key, void **value_address);
 int vlan_ifnet_insert(void *root, void *elem);
 int vlan_ifnet_delete(void *root, void *elem, int (*free_key_fun)(void *arg));
 int free_key(void *key);
+struct ofp_ifnet *ofp_vlan_alloc(void);
+
+struct ofp_ifnet *ofp_get_ifnet(int port, uint16_t subport);
+struct ofp_ifnet *ofp_get_create_ifnet(int port, uint16_t subport);
+int ofp_delete_ifnet(int port, uint16_t subport);
+
+/* LINUX interface lookup table*/
+struct ofp_ifnet *ofp_get_ifnet_by_linux_ifindex(int ix);
+struct ofp_ifnet *ofp_get_ifnet_pktio(odp_pktio_t pktio);
+
+/* Finds the node interface by the local ip assigned */
+struct ofp_ifnet *ofp_get_ifnet_match(uint32_t ip, uint16_t vrf, uint16_t vlan);
 
 struct ofp_ifconf;
 void ofp_get_interfaces(struct ofp_ifconf *ifc);

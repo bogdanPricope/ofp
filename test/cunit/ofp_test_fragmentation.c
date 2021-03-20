@@ -23,7 +23,7 @@
 #include <odp_api.h>
 #include <ofpi.h>
 #include <ofpi_log.h>
-#include <ofpi_portconf.h>
+#include <ofpi_ifnet_portconf.h>
 #include <ofpi_route.h>
 #include <ofpi_rt_lookup.h>
 #include <ofpi_avl.h>
@@ -63,7 +63,7 @@ static void init_ifnet(void)
 {
 	char str[256];
 
-	ofp_config_interface_up_v4(port, vlan, vrf, dev_ip, 24);
+	ofp_ifport_net_ipv4_up(port, vlan, vrf, dev_ip, 24);
 
 	dev = ofp_get_ifnet(port, vlan);
 	memcpy(dev->mac, dev_mac, OFP_ETHER_ADDR_LEN);

@@ -40,7 +40,7 @@ void f_route_add(ofp_print_t *pr, const char *s)
 	gwaddr = odp_cpu_to_be_32((e << 24) | (f << 16) | (g << 8) | h);
 
 	port = ofp_name_to_port_vlan(dev, &vlan);
-	if (port < 0 || port >= ofp_get_num_ports()) {
+	if (port < 0 || port >= ofp_ifport_count()) {
 		ofp_print(pr, "Invalid port!\r\n");
 		return;
 	}
@@ -65,7 +65,7 @@ void f_route_add_vrf(ofp_print_t *pr, const char *s)
 	gwaddr = odp_cpu_to_be_32((e << 24) | (f << 16) | (g << 8) | h);
 
 	port = ofp_name_to_port_vlan(dev, &vlan);
-	if (port < 0 || port >= ofp_get_num_ports()) {
+	if (port < 0 || port >= ofp_ifport_count()) {
 		ofp_print(pr, "Invalid port!\r\n");
 		return;
 	}
@@ -141,7 +141,7 @@ void f_route_add_v6(ofp_print_t *pr, const char *s)
 	tk_end = last;
 
 	port = ofp_name_to_port_vlan(tk, &vlan);
-	if (port < 0 || port >= ofp_get_num_ports()) {
+	if (port < 0 || port >= ofp_ifport_count()) {
 		ofp_print(pr, "Invalid port!\r\n");
 		return;
 	}
