@@ -12,6 +12,7 @@
 
 #include "ofp.h"
 #include "linux_sigaction.h"
+#include "cli_arg_parse.h"
 
 #define MAX_WORKERS		32
 
@@ -26,8 +27,7 @@
  */
 typedef struct {
 	int core_count;
-	int if_count;		/**< Number of interfaces to be used */
-	char **if_names;	/**< Array of pointers to interface names */
+	appl_arg_ifs_t itf_param;
 	char *cli_file;
 	int perf_stat;
 } appl_args_t;
@@ -36,6 +36,8 @@ typedef struct {
  * helper funcs
  */
 static int parse_args(int argc, char *argv[], appl_args_t *appl_args);
+static void parse_args_cleanup(appl_args_t *appl_args);
+static int configure_interface_addresses(appl_arg_ifs_t *itf_param);
 static void print_info(char *progname, appl_args_t *appl_args,
 		       odp_cpumask_t *cpumask);
 static void usage(char *progname);
@@ -85,9 +87,10 @@ int main(int argc, char *argv[])
 	 */
 	ofp_initialize_param(&app_init_params);
 	app_init_params.cli.os_thread.start_on_init = 1;
-	app_init_params.if_count = params.if_count;
-	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
-		strncpy(app_init_params.if_names[i], params.if_names[i],
+	app_init_params.if_count = params.itf_param.if_count;
+	for (i = 0; i < params.itf_param.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
+		strncpy(app_init_params.if_names[i],
+			params.itf_param.if_array[i].if_name,
 			OFP_IFNAMSIZ);
 		app_init_params.if_names[i][OFP_IFNAMSIZ - 1] = '\0';
 	}
@@ -135,11 +138,12 @@ int main(int argc, char *argv[])
 	 */
 	if (ofp_initialize(&app_init_params) != 0) {
 		printf("Error: OFP global init failed.\n");
+		parse_args_cleanup(&params);
 		return EXIT_FAILURE;
 	}
 
 	/*
-	 * Get the default workers to cores distribution: one
+	 * Get the default workers-to-cores distribution: one
 	 * run-to-completion worker thread or process can be created per core.
 	 */
 	if (ofp_get_default_worker_cpumask(params.core_count, MAX_WORKERS,
@@ -147,6 +151,7 @@ int main(int argc, char *argv[])
 		OFP_ERR("Error: Failed to get the default workers to cores "
 			"distribution\n");
 		ofp_terminate();
+		parse_args_cleanup(&params);
 		return EXIT_FAILURE;
 	}
 	num_workers = odp_cpumask_count(&cpumask_workers);
@@ -183,17 +188,29 @@ int main(int argc, char *argv[])
 		if (ret_val != -1)
 			ofp_thread_join(thread_tbl, ret_val);
 		ofp_terminate();
+		parse_args_cleanup(&params);
+		return EXIT_FAILURE;
+	}
+
+	/* Configure IP addresses */
+	if (configure_interface_addresses(&params.itf_param)) {
+		OFP_ERR("Error: Failed to configure addresses");
+		ofp_terminate();
+		parse_args_cleanup(&params);
 		return EXIT_FAILURE;
 	}
 
 	/*
-	 * Further, we will process the CLI commands file
+	 * Further, we will process the CLI commands file (if defined).
+	 * This is an alternative way to set the IP addresses and other
+	 * parameters.
 	 */
 	if (ofp_cli_process_file(params.cli_file)) {
 		OFP_ERR("Error: Failed to process CLI file.");
 		ofp_stop_processing();
 		ofp_thread_join(thread_tbl, num_workers);
 		ofp_terminate();
+		parse_args_cleanup(&params);
 		return EXIT_FAILURE;
 	}
 
@@ -210,6 +227,7 @@ int main(int argc, char *argv[])
 			ofp_stop_processing();
 			ofp_thread_join(thread_tbl, num_workers);
 			ofp_terminate();
+			parse_args_cleanup(&params);
 			return EXIT_FAILURE;
 		}
 	}
@@ -225,8 +243,8 @@ int main(int argc, char *argv[])
 	if (ofp_terminate() < 0)
 		printf("Error: ofp_terminate failed\n");
 
+	parse_args_cleanup(&params);
 	printf("FPM End Main()\n");
-
 	return EXIT_SUCCESS;
 }
 
@@ -239,11 +257,9 @@ int main(int argc, char *argv[])
  */
 static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 {
-	int opt;
+	int opt, res;
 	int long_index;
-	char *names, *str, *token, *save;
 	size_t len;
-	int i;
 	static struct option longopts[] = {
 		{"count", required_argument, NULL, 'c'},
 		{"interface", required_argument, NULL, 'i'},	/* return 'i' */
@@ -269,44 +285,11 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			break;
 			/* parse packet-io interface names */
 		case 'i':
-			len = strlen(optarg);
-			if (len == 0) {
+			res = ofpexpl_parse_interfaces(optarg,
+						       &appl_args->itf_param);
+			if (res == EXIT_FAILURE) {
 				usage(argv[0]);
 				return EXIT_FAILURE;
-			}
-			len += 1;	/* add room for '\0' */
-
-			names = malloc(len);
-			if (names == NULL) {
-				usage(argv[0]);
-				return EXIT_FAILURE;
-			}
-
-			/* count the number of tokens separated by ',' */
-			strcpy(names, optarg);
-			for (str = names, i = 0;; str = NULL, i++) {
-				token = strtok_r(str, ",", &save);
-				if (token == NULL)
-					break;
-			}
-			appl_args->if_count = i;
-
-			if (appl_args->if_count == 0) {
-				usage(argv[0]);
-				return EXIT_FAILURE;
-			}
-
-			/* allocate storage for the if names */
-			appl_args->if_names =
-				calloc(appl_args->if_count, sizeof(char *));
-
-			/* store the if names (reset names string) */
-			strcpy(names, optarg);
-			for (str = names, i = 0;; str = NULL, i++) {
-				token = strtok_r(str, ",", &save);
-				if (token == NULL)
-					break;
-				appl_args->if_names[i] = token;
 			}
 			break;
 
@@ -340,7 +323,7 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		}
 	}
 
-	if (appl_args->if_count == 0) {
+	if (appl_args->itf_param.if_count == 0) {
 		usage(argv[0]);
 		return EXIT_FAILURE;
 	}
@@ -348,6 +331,14 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 	optind = 1;		/* reset 'extern optind' from the getopt lib */
 
 	return EXIT_SUCCESS;
+}
+
+/**
+ * Cleanup cli parameters
+ */
+static void parse_args_cleanup(appl_args_t *appl_args)
+{
+	ofpexpl_parse_interfaces_param_cleanup(&appl_args->itf_param);
 }
 
 /**
@@ -376,9 +367,9 @@ static void print_info(char *progname, appl_args_t *appl_args,
 		   "-----------------\n"
 		   "IF-count:        %i\n"
 		   "Using IFs:      ",
-		   progname, appl_args->if_count);
-	for (i = 0; i < appl_args->if_count; ++i)
-		printf(" %s", appl_args->if_names[i]);
+		   progname, appl_args->itf_param.if_count);
+	for (i = 0; i < appl_args->itf_param.if_count; ++i)
+		printf(" %s", appl_args->itf_param.if_array[i].if_name);
 	printf("\n\n");
 
 	/* Print worker to core distribution */
@@ -407,14 +398,78 @@ static void usage(char *progname)
 		   "ODPFastpath application.\n"
 		   "\n"
 		   "Mandatory OPTIONS:\n"
-		   "  -i, --interface Eth interfaces (comma-separated, no spaces)\n"
+		   "  -i, --interface <interfaces> Ethernet interface list"
+		   " (comma-separated, no spaces)\n"
+		   "  Example:\n"
+		   "    eth1,eth2\n"
+		   "    eth1@192.168.100.10/24,eth2@172.24.200.10/16\n"
 		   "\n"
 		   "Optional OPTIONS\n"
-		   "  -c, --count <number> Core count.\n"
-		   "  -p, --performance    Performance Statistics\n"
-		   "  -h, --help           Display help and exit.\n"
+		   "  -c, --count <number>  Core count.\n"
+		   "  -p, --performance     Performance Statistics.\n"
+		   "  -f, --cli-file <file> OFP CLI file.\n"
+		   "  -h, --help            Display help and exit.\n"
 		   "\n", NO_PATH(progname), NO_PATH(progname)
 		);
+}
+
+static int configure_interface_addresses(appl_arg_ifs_t *itf_param)
+{
+	struct appl_arg_if *ifarg = NULL;
+	ofp_ifnet_t ifnet = OFP_IFNET_INVALID;
+	uint32_t addr = 0;
+	int port = 0;
+	uint16_t subport = 0;
+	int i, ret = 0;
+
+	for (i = 0; i < itf_param->if_count && i < OFP_FP_INTERFACE_MAX; i++) {
+		ifarg = &itf_param->if_array[i];
+
+		if (!ifarg->if_name) {
+			OFP_ERR("Error: Invalid interface name: null");
+			ret = -1;
+			break;
+		}
+
+		if (!ifarg->if_address)
+			continue; /* Not set through application parameters*/
+
+		OFP_DBG("Setting %s/%d on %s", ifarg->if_address,
+			ifarg->if_address_masklen, ifarg->if_name);
+
+		ifnet = ofp_ifport_net_ifnet_get_by_name(ifarg->if_name);
+		if (ifnet == OFP_IFNET_INVALID) {
+			OFP_ERR("Error: interface not found: %s",
+				ifarg->if_name);
+			ret = -1;
+			break;
+		}
+
+		if (ofp_ifnet_port_get(ifnet, &port, &subport)) {
+			OFP_ERR("Error: Failed to get <port, sub-port>: %s",
+				ifarg->if_name);
+			ret = -1;
+			break;
+		}
+
+		if (!ofp_parse_ip_addr(ifarg->if_address, &addr)) {
+			OFP_ERR("Error: Failed to parse IPv4 address: %s",
+				ifarg->if_address);
+			ret = -1;
+			break;
+		}
+
+		if (ofp_ifport_net_ipv4_up(port, subport, 0, addr,
+					   ifarg->if_address_masklen) != NULL) {
+			OFP_ERR("Error: Failed to set IPv4 address %s "
+				"on interface %s",
+				ifarg->if_address, ifarg->if_name);
+			ret = -1;
+			break;
+		}
+	}
+
+	return ret;
 }
 
 static int perf_client(void *arg)
