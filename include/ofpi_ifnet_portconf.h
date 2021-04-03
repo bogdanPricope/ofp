@@ -106,101 +106,131 @@ struct ofp_ifnet_ipaddr {
 #define IP_ADDR_LIST_WLOCK(if)   odp_rwlock_write_lock(&(if)->ip_addr_mtx)
 #define IP_ADDR_LIST_WUNLOCK(if) odp_rwlock_write_unlock(&(if)->ip_addr_mtx)
 
-struct ODP_ALIGNED_CACHE ofp_ifnet {
-	struct ofp_ifnet_ipaddr	ip_addr_info[OFP_NUM_IFNET_IP_ADDRS];
-	odp_rwlock_t ip_addr_mtx;
-	uint16_t	port;
-	uint16_t	vlan;
-	uint16_t	vrf;
-#define OFP_IFT_STATE_FREE 0
-#define OFP_IFT_STATE_USED 1
-	uint8_t		if_state;
-#define OFP_IFT_ETHER  1
-#define OFP_IFT_LOCAL  2
-#define OFP_IFT_LOOP   3
-#define OFP_IFT_GRE    4
-#define OFP_IFT_VXLAN  5
-	uint8_t		if_type;
-#define	OFP_IFF_UP		0x1		/* (n) interface is up */
-#define	OFP_IFF_BROADCAST	0x2		/* (i) broadcast address valid */
-#define	OFP_IFF_DEBUG		0x4		/* (n) turn on debugging */
-#define	OFP_IFF_LOOPBACK	0x8		/* (i) is a loopback net */
-#define	OFP_IFF_POINTOPOINT	0x10		/* (i) is a point-to-point link */
-#define	OFP_IFF_SMART		0x20		/* (i) interface manages own routes */
-#define	OFP_IFF_DRV_RUNNING	0x40		/* (d) resources allocated */
-#define	OFP_IFF_NOARP		0x80		/* (n) no address resolution protocol */
-#define	OFP_IFF_PROMISC		0x100		/* (n) receive all packets */
-#define	OFP_IFF_ALLMULTI	0x200		/* (n) receive all multicast packets */
-#define	OFP_IFF_DRV_OACTIVE	0x400		/* (d) tx hardware queue is full */
-#define	OFP_IFF_SIMPLEX		0x800		/* (i) can't hear own transmissions */
-#define	OFP_IFF_LINK0		0x1000		/* per link layer defined bit */
-#define	OFP_IFF_LINK1		0x2000		/* per link layer defined bit */
-#define	OFP_IFF_LINK2		0x4000		/* per link layer defined bit */
-#define	OFP_IFF_ALTPHYS		OFP_IFF_LINK2	/* use alternate physical connection */
-#define	OFP_IFF_MULTICAST	0x8000		/* (i) supports multicast */
-#define	OFP_IFF_CANTCONFIG	0x10000		/* (i) unconfigurable using ioctl(2) */
-#define	OFP_IFF_PPROMISC	0x20000		/* (n) user-requested promisc mode */
-#define	OFP_IFF_MONITOR		0x40000		/* (n) user-requested monitor mode */
-#define	OFP_IFF_STATICARP	0x80000		/* (n) static ARP */
-#define	OFP_IFF_DYING		0x200000	/* (n) interface is winding down */
-#define	OFP_IFF_RENAMING	0x400000	/* (n) interface is being renamed */
-#define OFP_IFF_PROMISCINET 	0x800000	/* (n) interface is in PROMISCUOUS_INET mode */
-	uint32_t	if_flags;
+typedef enum {
+	OFP_IFT_STATE_FREE = 0,
+	OFP_IFT_STATE_USED = 1
+} ofp_itf_state_t;
 
-	uint8_t		mac[OFP_ETHER_ADDR_LEN];
-	uint16_t	if_mtu;
+typedef enum {
+	OFP_IFT_ETHER  = 1,
+	OFP_IFT_LOCAL = 2,
+	OFP_IFT_LOOP = 3,
+	OFP_IFT_GRE = 4,
+	OFP_IFT_VXLAN = 5
+} ofp_itf_type_t;
 
-	uint32_t	ip_p2p; /* network byte order */
-	uint32_t	ip_local; /* network byte order */
-	uint16_t	physport;
-	uint16_t	physvlan;
-	uint32_t	ip_remote; /* network byte order */
-#ifdef INET6
-	uint8_t		link_local[16];
-	uint8_t		ip6_addr[16];
-	uint8_t		ip6_prefix;
-#endif /* INET6 */
-	void		*vlan_structs;
+/* interface flags */
+#define	OFP_IFF_UP          0x1     /* (n) interface is up */
+#define	OFP_IFF_BROADCAST   0x2     /* (i) broadcast address valid */
+#define	OFP_IFF_DEBUG       0x4     /* (n) turn on debugging */
+#define	OFP_IFF_LOOPBACK    0x8     /* (i) is a loopback net */
+#define	OFP_IFF_POINTOPOINT 0x10    /* (i) is a point-to-point link */
+#define	OFP_IFF_SMART       0x20    /* (i) interface manages own routes */
+#define	OFP_IFF_DRV_RUNNING 0x40    /* (d) resources allocated */
+#define	OFP_IFF_NOARP       0x80    /* (n) no address resolution protocol */
+#define	OFP_IFF_PROMISC     0x100   /* (n) receive all packets */
+#define	OFP_IFF_ALLMULTI    0x200   /* (n) receive all multicast packets */
+#define	OFP_IFF_DRV_OACTIVE 0x400   /* (d) tx hardware queue is full */
+#define	OFP_IFF_SIMPLEX     0x800   /* (i) can't hear own transmissions */
+#define	OFP_IFF_LINK0       0x1000  /* per link layer defined bit */
+#define	OFP_IFF_LINK1       0x2000  /* per link layer defined bit */
+#define	OFP_IFF_LINK2       0x4000  /* per link layer defined bit */
+#define	OFP_IFF_ALTPHYS     OFP_IFF_LINK2 /* use alternate physical connection*/
+#define	OFP_IFF_MULTICAST   0x8000  /* (i) supports multicast */
+#define	OFP_IFF_CANTCONFIG  0x10000 /* (i) unconfigurable using ioctl(2) */
+#define	OFP_IFF_PPROMISC    0x20000 /* (n) user-requested promisc mode */
+#define	OFP_IFF_MONITOR     0x40000 /* (n) user-requested monitor mode */
+#define	OFP_IFF_STATICARP   0x80000 /* (n) static ARP */
+#define	OFP_IFF_DYING       0x200000 /* (n) interface is winding down */
+#define	OFP_IFF_RENAMING    0x400000 /* (n) interface is being renamed */
+#define OFP_IFF_PROMISCINET 0x800000 /* (n) interface is in PROMISCUOUS_INET
+					mode */
+typedef uint32_t ofp_itf_flag_t;
 
-	char		if_name[OFP_IFNAMSIZ];
-	odp_pktio_t	pktio;
+/* interface checksum flags */
 #define OFP_IF_IPV4_RX_CHKSUM 0x1
 #define OFP_IF_IPV4_TX_CHKSUM 0x2
 #define OFP_IF_UDP_RX_CHKSUM  0x4
 #define OFP_IF_UDP_TX_CHKSUM  0x8
 #define OFP_IF_TCP_RX_CHKSUM  0x10
 #define OFP_IF_TCP_TX_CHKSUM  0x20
-	uint32_t        chksum_offload_flags;
-	unsigned	out_queue_num;
-#define OFP_OUT_QUEUE_TYPE_PKTOUT 0
-#define OFP_OUT_QUEUE_TYPE_QUEUE 1
-	uint8_t		out_queue_type;
+typedef uint32_t ofp_itf_csum_flag_t;
 
-	odp_pktout_queue_t out_queue_pktout[OFP_PKTOUT_QUEUE_MAX];
-	odp_queue_t out_queue_queue[OFP_PKTOUT_QUEUE_MAX];
+typedef enum {
+	OFP_OUT_QUEUE_TYPE_PKTOUT = 0,
+	OFP_OUT_QUEUE_TYPE_QUEUE = 1
+} ofp_itf_out_queue_type_t;
 
-	odp_queue_t	loopq_def;
-	odp_pool_t	pkt_pool;
-#ifdef SP
-	int		linux_index;
-	int		fd;
-	odp_queue_t	spq_def;
-#define OFP_SP_DOWN 0
-#define OFP_SP_UP 1
-	int		sp_status;
-	odph_odpthread_t	rx_tbl[1];
-	odph_odpthread_t	tx_tbl[1];
-#endif /*SP */
+typedef enum {
+	OFP_SP_DOWN = 0,
+	OFP_SP_UP = 1
+} ofp_itf_sp_state_t;
+
+struct ODP_ALIGNED_CACHE ofp_ifnet {
+	struct ofp_ifnet_ipaddr	ip_addr_info[OFP_NUM_IFNET_IP_ADDRS];
+	odp_rwlock_t ip_addr_mtx;
+
+#ifdef INET6
+	uint8_t		link_local[16];
+	uint8_t		ip6_addr[16];
+	uint8_t		ip6_prefix;
+#endif /* INET6 */
 
 	OFP_LIST_ENTRY(ofp_ifnet) ia_hash; /* entry in bucket of inet addresses */
 	OFP_TAILQ_ENTRY(ofp_ifnet) ia_link; /* list of internet addresses */
 #ifdef INET6
 	OFP_TAILQ_ENTRY(ofp_ifnet) ia6_link; /* list of internet addresses */
 #endif /* INET6 */
-	odp_rwlock_t	if_addr_mtx;	/* mutex to protect address lists */
-	struct ofp_in_ifinfo ii_inet;
-	void	*if_afdata[OFP_AF_MAX];
-	struct	ofp_ifmultihead if_multiaddrs; /* multicast addresses configured */
+
+	/* multicast */
+	struct ofp_in_ifinfo    ii_inet;
+	void                    *if_afdata[OFP_AF_MAX];
+	odp_rwlock_t            if_addr_mtx; /* mutex to protect address lists */
+	struct ofp_ifmultihead  if_multiaddrs; /* multicast addresses configured */
+
+	uint16_t        port;
+	uint16_t        vlan;
+	uint16_t        vrf;
+
+	char            if_name[OFP_IFNAMSIZ];
+	ofp_itf_state_t if_state;
+	ofp_itf_type_t  if_type;
+	ofp_itf_flag_t  if_flags;
+
+	uint8_t         if_mac[OFP_ETHER_ADDR_LEN];
+	uint16_t        if_mtu;
+	ofp_itf_csum_flag_t if_csum_offload_flags;
+
+	/* IPv4 tunnel*/
+	uint32_t	ip_p2p; /* network byte order */
+	uint32_t	ip_local; /* network byte order */
+	uint16_t	physport;
+	uint16_t	physvlan;
+	uint32_t	ip_remote; /* network byte order */
+
+	void		*vlan_structs;
+
+	odp_pktio_t pktio;
+	odp_pool_t  pkt_pool;
+	odp_queue_t loopq_def;
+
+	unsigned int                out_queue_num;
+	ofp_itf_out_queue_type_t    out_queue_type;
+	union {
+		odp_pktout_queue_t      out_queue_pktout[OFP_PKTOUT_QUEUE_MAX];
+		odp_queue_t             out_queue_queue[OFP_PKTOUT_QUEUE_MAX];
+	};
+
+#ifdef SP
+	int                 linux_index;
+
+	ofp_itf_sp_state_t  sp_status;
+	int                 sp_fd;
+	odp_queue_t         spq_def;
+	odph_odpthread_t    rx_tbl[1];
+	odph_odpthread_t    tx_tbl[1];
+#endif /*SP */
+
 	struct ofp_ifnet *next;	/* next in the free list */
 };
 

@@ -39,7 +39,7 @@ static int ofp_pktio_config(struct ofp_ifnet *ifnet)
 
 	if (capa.config.pktin.bit.ipv4_chksum &
 		global_param->chksum_offload.ipv4_rx_ena) {
-		ifnet->chksum_offload_flags |= OFP_IF_IPV4_RX_CHKSUM;
+		ifnet->if_csum_offload_flags |= OFP_IF_IPV4_RX_CHKSUM;
 		config.pktin.bit.ipv4_chksum = 1;
 		config.pktin.bit.drop_ipv4_err = 1;
 		OFP_DBG("Interface '%s' supports IPv4 RX checksum offload",
@@ -48,7 +48,7 @@ static int ofp_pktio_config(struct ofp_ifnet *ifnet)
 
 	if (capa.config.pktout.bit.ipv4_chksum &
 		global_param->chksum_offload.ipv4_tx_ena) {
-		ifnet->chksum_offload_flags |= OFP_IF_IPV4_TX_CHKSUM;
+		ifnet->if_csum_offload_flags |= OFP_IF_IPV4_TX_CHKSUM;
 		config.pktout.bit.ipv4_chksum = 1;
 		config.pktout.bit.ipv4_chksum_ena = 1;
 		OFP_DBG("Interface '%s' supports IPv4 TX checksum offload",
@@ -57,7 +57,7 @@ static int ofp_pktio_config(struct ofp_ifnet *ifnet)
 
 	if (capa.config.pktin.bit.udp_chksum &
 		global_param->chksum_offload.udp_rx_ena) {
-		ifnet->chksum_offload_flags |= OFP_IF_UDP_RX_CHKSUM;
+		ifnet->if_csum_offload_flags |= OFP_IF_UDP_RX_CHKSUM;
 		config.pktin.bit.udp_chksum = 1;
 		config.pktin.bit.drop_udp_err = 0;
 		OFP_DBG("Interface '%s' supports UDP RX checksum offload",
@@ -66,7 +66,7 @@ static int ofp_pktio_config(struct ofp_ifnet *ifnet)
 
 	if (capa.config.pktout.bit.udp_chksum &
 		global_param->chksum_offload.udp_tx_ena) {
-		ifnet->chksum_offload_flags |= OFP_IF_UDP_TX_CHKSUM;
+		ifnet->if_csum_offload_flags |= OFP_IF_UDP_TX_CHKSUM;
 		/*
 		 * UDP checksum insertion will be requested explicitly
 		 * for each packet when necessary.
@@ -79,7 +79,7 @@ static int ofp_pktio_config(struct ofp_ifnet *ifnet)
 
 	if (capa.config.pktin.bit.tcp_chksum &
 		global_param->chksum_offload.tcp_rx_ena) {
-		ifnet->chksum_offload_flags |= OFP_IF_TCP_RX_CHKSUM;
+		ifnet->if_csum_offload_flags |= OFP_IF_TCP_RX_CHKSUM;
 		config.pktin.bit.tcp_chksum = 1;
 		config.pktin.bit.drop_tcp_err = 0;
 		OFP_DBG("Interface '%s' supports TCP RX checksum offload",
@@ -87,8 +87,8 @@ static int ofp_pktio_config(struct ofp_ifnet *ifnet)
         }
 
         if (capa.config.pktout.bit.tcp_chksum &
-		global_param->chksum_offload.tcp_tx_ena) {
-                ifnet->chksum_offload_flags |= OFP_IF_TCP_TX_CHKSUM;
+	    global_param->chksum_offload.tcp_tx_ena) {
+		ifnet->if_csum_offload_flags |= OFP_IF_TCP_TX_CHKSUM;
                 /*
                  * TCP checksum insertion will be requested explicitly
                  * for each packet when necessary.
@@ -203,17 +203,17 @@ int ofp_loopq_create(struct ofp_ifnet *ifnet)
 /* Set ifnet interface MAC address */
 int ofp_mac_set(struct ofp_ifnet *ifnet)
 {
-	if (odp_pktio_mac_addr(ifnet->pktio, ifnet->mac,
-		sizeof(ifnet->mac)) < 0) {
+	if (odp_pktio_mac_addr(ifnet->pktio, ifnet->if_mac,
+			       sizeof(ifnet->if_mac)) < 0) {
 		OFP_ERR("Failed to retrieve MAC address");
 		return -1;
 	}
-	if (!ofp_has_mac(ifnet->mac)) {
-		ifnet->mac[0] = ifnet->port;
+	if (!ofp_has_mac(ifnet->if_mac)) {
+		ifnet->if_mac[0] = ifnet->port;
 		OFP_ERR("MAC overwritten");
 	}
 	OFP_INFO("Device '%s' addr %s", ifnet->if_name,
-		ofp_print_mac((uint8_t *)ifnet->mac));
+		ofp_print_mac((uint8_t *)ifnet->if_mac));
 
 	return 0;
 }
@@ -351,7 +351,7 @@ int ofp_ifnet_create(char *if_name,
 	ofp_update_ifindex_lookup_tab(ifnet);
 #ifdef INET6
 	/* ifnet MAC was set in sp_setup_device() */
-	ofp_mac_to_link_local(ifnet->mac, ifnet->link_local);
+	ofp_mac_to_link_local(ifnet->if_mac, ifnet->link_local);
 #endif /* INET6 */
 
 #endif /* SP */

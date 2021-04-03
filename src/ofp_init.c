@@ -1047,14 +1047,14 @@ static int cleanup_interface(struct ofp_ifnet *ifnet)
 		return 0;
 
 	OFP_INFO("Cleaning device '%s' addr %s", ifnet->if_name,
-		 ofp_print_mac((uint8_t *)ifnet->mac));
+		 ofp_print_mac((uint8_t *)ifnet->if_mac));
 
 	CHECK_ERROR(odp_pktio_stop(ifnet->pktio), rc);
 #ifdef SP
 	odph_odpthreads_join(ifnet->rx_tbl);
 	odph_odpthreads_join(ifnet->tx_tbl);
-	close(ifnet->fd);
-	ifnet->fd = -1;
+	close(ifnet->sp_fd);
+	ifnet->sp_fd = -1;
 #endif /*SP*/
 
 	/* Multicasting. */

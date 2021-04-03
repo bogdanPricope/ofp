@@ -618,13 +618,13 @@ enum ofp_return_code ofp_arp_processing(odp_packet_t *pkt)
 #ifdef SP
 			dev->linux_index,
 #endif
-			ofp_print_mac(dev->mac),
+			ofp_print_mac(dev->if_mac),
 			ofp_print_ip_addr(arp->ip_dst));
 		tmp = *arp;
 		tmp.ip_dst = arp->ip_src;
 		tmp.ip_src = arp->ip_dst;
 		memcpy(&tmp.eth_dst, &arp->eth_src, OFP_ETHER_ADDR_LEN);
-		memcpy(&tmp.eth_src, dev->mac, OFP_ETHER_ADDR_LEN);
+		memcpy(&tmp.eth_src, dev->if_mac, OFP_ETHER_ADDR_LEN);
 		tmp.op = odp_cpu_to_be_16(OFP_ARPOP_REPLY);
 		*arp = tmp;
 
@@ -669,7 +669,7 @@ static void send_arp_request(struct ofp_ifnet *dev, uint32_t gw)
 
 	memset(buf, 0, sizeof(buf));
 	memset(e1->ether_dhost, 0xff, OFP_ETHER_ADDR_LEN);
-	memcpy(e1->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN);
+	memcpy(e1->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN);
 
 	if (ETH_WITH_VLAN(dev)) {
 		arp = (struct ofp_arphdr *) (e2 + 1);
@@ -1000,7 +1000,7 @@ static enum ofp_return_code ofp_ip_output_add_eth(odp_packet_t pkt,
 	} else if ((-1 != ofp_ifnet_ip_find(odata->dev_out, odata->ip->ip_dst.s_addr)) ||
 		ofp_if_type(odata->dev_out) == OFP_IFT_LOOP) {
 		odata->is_local_address = 1;
-		ofp_copy_mac(eth->ether_dhost, odata->dev_out->mac);
+		ofp_copy_mac(eth->ether_dhost, odata->dev_out->if_mac);
 	} else if (ofp_get_mac(odata->dev_out, odata->nh,
 			       gw, is_link_local,
 			       eth->ether_dhost) < 0) {
@@ -1008,7 +1008,7 @@ static enum ofp_return_code ofp_ip_output_add_eth(odp_packet_t pkt,
 		return ofp_arp_save_ipv4_pkt(pkt, odata->nh,
 					     gw, is_link_local, odata->dev_out);
 	}
-	ofp_copy_mac(eth->ether_shost, odata->dev_out->mac);
+	ofp_copy_mac(eth->ether_shost, odata->dev_out->if_mac);
 
 	if (!ETH_WITH_VLAN(odata->dev_out)) {
 		eth->ether_type = odp_cpu_to_be_16(OFP_ETHERTYPE_IP);
@@ -1219,7 +1219,7 @@ static inline enum ofp_return_code ofp_ip_output_continue(odp_packet_t pkt,
 
 	if (odata->insert_checksum) {
 		ofp_chksum_insert(pkt, odata->ip,
-				  odata->dev_out->chksum_offload_flags);
+				  odata->dev_out->if_csum_offload_flags);
 	}
 
 	switch (ofp_if_type(odata->dev_out)) {
@@ -1376,7 +1376,7 @@ enum ofp_return_code ofp_ip6_output(odp_packet_t pkt,
 	if (ofp_ip6_equal(dev_out->ip6_addr, ip6->ip6_dst.ofp_s6_addr) ||
 	    ofp_if_type(dev_out) == OFP_IFT_LOOP) {
 		is_local_address = 1;
-		mac = dev_out->mac;
+		mac = dev_out->if_mac;
 	} else {
 		mac = nh->mac;
 
@@ -1405,14 +1405,15 @@ enum ofp_return_code ofp_ip6_output(odp_packet_t pkt,
 			(struct ofp_ether_header *)l2_addr;
 
 		memcpy(eth->ether_dhost, mac, OFP_ETHER_ADDR_LEN);
-		memcpy(eth->ether_shost, dev_out->mac, OFP_ETHER_ADDR_LEN);
+		memcpy(eth->ether_shost, dev_out->if_mac, OFP_ETHER_ADDR_LEN);
 		eth->ether_type = odp_cpu_to_be_16(OFP_ETHERTYPE_IPV6);
 	} else {
 		struct ofp_ether_vlan_header *eth_vlan =
 			(struct ofp_ether_vlan_header *)l2_addr;
 
 		memcpy(eth_vlan->evl_dhost, mac, OFP_ETHER_ADDR_LEN);
-		memcpy(eth_vlan->evl_shost, dev_out->mac, OFP_ETHER_ADDR_LEN);
+		memcpy(eth_vlan->evl_shost, dev_out->if_mac,
+		       OFP_ETHER_ADDR_LEN);
 		eth_vlan->evl_encap_proto =
 				odp_cpu_to_be_16(OFP_ETHERTYPE_VLAN);
 		eth_vlan->evl_tag = odp_cpu_to_be_16(vlan);
@@ -1467,11 +1468,11 @@ enum ofp_return_code ofp_packet_input(odp_packet_t pkt,
 	 * the interface.
 	 */
 	if (in_queue != ifnet->loopq_def) {
-		if (ifnet->chksum_offload_flags & OFP_IF_IPV4_RX_CHKSUM)
+		if (ifnet->if_csum_offload_flags & OFP_IF_IPV4_RX_CHKSUM)
 			ofp_packet_user_area(pkt)->chksum_flags |=
 				OFP_L3_CHKSUM_STATUS_VALID;
 
-		if (ifnet->chksum_offload_flags &
+		if (ifnet->if_csum_offload_flags &
 		    (OFP_IF_UDP_RX_CHKSUM | OFP_IF_TCP_RX_CHKSUM))
 			ofp_packet_user_area(pkt)->chksum_flags |=
 				OFP_L4_CHKSUM_STATUS_VALID;

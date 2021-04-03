@@ -77,7 +77,7 @@ enum ofp_return_code ofp_nd6_ns_output(struct ofp_ifnet *dev,
 		iter += sizeof(*e2);
 
 		memset(e2->evl_dhost, 0xff, OFP_ETHER_ADDR_LEN);
-		memcpy(e2->evl_shost, dev->mac, OFP_ETHER_ADDR_LEN);
+		memcpy(e2->evl_shost, dev->if_mac, OFP_ETHER_ADDR_LEN);
 
 		e2->evl_encap_proto = odp_cpu_to_be_16(OFP_ETHERTYPE_VLAN);
 		e2->evl_tag = odp_cpu_to_be_16(dev->vlan);
@@ -87,7 +87,7 @@ enum ofp_return_code ofp_nd6_ns_output(struct ofp_ifnet *dev,
 		iter += sizeof(*e1);
 
 		memset(e1->ether_dhost, 0xff, OFP_ETHER_ADDR_LEN);
-		memcpy(e1->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN);
+		memcpy(e1->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN);
 		e1->ether_type = odp_cpu_to_be_16(OFP_ETHERTYPE_IPV6);
 	}
 	odp_packet_l3_offset_set(pkt, iter);
@@ -130,7 +130,7 @@ enum ofp_return_code ofp_nd6_ns_output(struct ofp_ifnet *dev,
 	/* Option: Source link-layer address */
 	icmp->ofp_icmp6_data8[20] = OFP_ND_OPT_SOURCE_LINKADDR;
 	icmp->ofp_icmp6_data8[21] = 1; /* 8 octets */
-	memcpy(&icmp->ofp_icmp6_data8[22], dev->mac, 6);
+	memcpy(&icmp->ofp_icmp6_data8[22], dev->if_mac, 6);
 
 	icmp->icmp6_cksum = ofp_cksum_buffer(&ip6hdr->ofp_ip6_plen, 68);
 
@@ -206,7 +206,7 @@ enum ofp_return_code ofp_nd6_na_output(struct ofp_ifnet *dev,
 		iter += sizeof(*e2);
 
 		memcpy(e2->evl_dhost, tlladdr, OFP_ETHER_ADDR_LEN);
-		memcpy(e2->evl_shost, dev->mac, OFP_ETHER_ADDR_LEN);
+		memcpy(e2->evl_shost, dev->if_mac, OFP_ETHER_ADDR_LEN);
 
 		e2->evl_encap_proto = odp_cpu_to_be_16(OFP_ETHERTYPE_VLAN);
 		e2->evl_tag = odp_cpu_to_be_16(dev->vlan);
@@ -216,7 +216,7 @@ enum ofp_return_code ofp_nd6_na_output(struct ofp_ifnet *dev,
 		iter += sizeof(*e1);
 
 		memcpy(e1->ether_dhost, tlladdr, OFP_ETHER_ADDR_LEN);
-		memcpy(e1->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN);
+		memcpy(e1->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN);
 		e1->ether_type = odp_cpu_to_be_16(OFP_ETHERTYPE_IPV6);
 	}
 	odp_packet_l3_offset_set(pkt, iter);
@@ -258,7 +258,7 @@ enum ofp_return_code ofp_nd6_na_output(struct ofp_ifnet *dev,
 	/* Option: Source link-layer address */
 	icmp->ofp_icmp6_data8[20] = OFP_ND_OPT_TARGET_LINKADDR;
 	icmp->ofp_icmp6_data8[21] = 1; /* 8 octets */
-	memcpy(&icmp->ofp_icmp6_data8[22], dev->mac, 6);
+	memcpy(&icmp->ofp_icmp6_data8[22], dev->if_mac, 6);
 
 	icmp->icmp6_cksum = ofp_cksum_buffer(&ip6hdr->ofp_ip6_plen, 68);
 

@@ -62,7 +62,7 @@ init_suite(void)
 
 	dev = ofp_get_ifnet(0, 0);
 	dev->if_mtu = ifmtu;
-	memcpy(dev->mac, ifmac, OFP_ETHER_ADDR_LEN);
+	memcpy(dev->if_mac, ifmac, OFP_ETHER_ADDR_LEN);
 	ofp_mac_to_link_local(ifmac, link_local);
 
 	return 0;

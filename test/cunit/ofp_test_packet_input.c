@@ -653,7 +653,7 @@ test_ofp_packet_input_gre_processed_inner_pkt_forwarded(void)
 
 	if (memcmp(eth->ether_dhost, dst_mac_addr, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, ifnet->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, ifnet->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 
 	CU_ASSERT_EQUAL(ip->ip_src.s_addr, ip_encap->ip_src.s_addr);

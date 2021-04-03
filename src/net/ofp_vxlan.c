@@ -455,7 +455,7 @@ void ofp_vxlan_restore_and_update_header(odp_packet_t pkt,
 
 	/* Original dst mac can be a multicast address. Use valid addresses. */
 	memcpy(eth->ether_dhost, eth->ether_shost, OFP_ETHER_ADDR_LEN);
-	memcpy(eth->ether_shost, outdev->mac, OFP_ETHER_ADDR_LEN);
+	memcpy(eth->ether_shost, outdev->if_mac, OFP_ETHER_ADDR_LEN);
 
 	/* Find ip header based on eth hdr type. */
 	if (odp_be_to_cpu_16(eth->ether_type) == OFP_ETHERTYPE_VLAN)

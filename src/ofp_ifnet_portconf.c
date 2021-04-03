@@ -366,7 +366,7 @@ static int iter_vlan(void *key, void *iter_arg)
 			  "	inet6 addr: %s\r\n"
 #endif /* INET6 */
 			  "	MTU: %d\r\n",
-			  ofp_print_mac(iface->mac),
+			  ofp_print_mac(iface->if_mac),
 			  ofp_print_ip_addr(iface->ip_addr_info[0].ip_addr),
 			  ofp_print_ip_addr(iface->ip_p2p),
 			  ofp_print_ip_addr(mask),
@@ -411,7 +411,7 @@ static int iter_vlan(void *key, void *iter_arg)
 #endif /* INET6 */
 			  "	Group:%s	Iface:%s\r\n"
 			  "	MTU: %d\r\n",
-			  ofp_print_mac(iface->mac),
+			  ofp_print_mac(iface->if_mac),
 			  ofp_print_ip_addr(iface->ip_addr_info[0].ip_addr),
 			  ofp_print_ip_addr(iface->ip_addr_info[0].bcast_addr),
 			  ofp_print_ip_addr(mask),
@@ -465,7 +465,7 @@ static int iter_vlan(void *key, void *iter_arg)
 
 	snprintf(buf, sizeof(buf), ".%d", iface->vlan);
 
-	if (ofp_has_mac(iface->mac)) {
+	if (ofp_has_mac(iface->if_mac)) {
 #ifdef SP
 		ofp_print(pr,
 			  "%s%d%s	(%d) (%s) slowpath: %s\r\n",
@@ -489,7 +489,7 @@ static int iter_vlan(void *key, void *iter_arg)
 
 		ofp_print(pr,
 			  "	Link encap:Ethernet	HWaddr: %s\r\n",
-			  ofp_print_mac(iface->mac));
+			  ofp_print_mac(iface->if_mac));
 
 		if (iface->ip_addr_info[0].ip_addr)
 			ofp_print(pr,
@@ -736,7 +736,7 @@ const char *ofp_ifport_net_ipv4_up(int port, uint16_t vlan, uint16_t vrf,
 		/* Add interface to the if_addr v4 queue */
 		ofp_ifaddr_elem_add(data);
 #ifdef INET6
-		ofp_mac_to_link_local(data->mac, data->link_local);
+		ofp_mac_to_link_local(data->if_mac, data->link_local);
 #endif /* INET6 */
 
 		ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, 0 /*vlan*/, port,
@@ -1229,7 +1229,7 @@ const char *ofp_ifport_net_ipv6_up(int port, uint16_t vlan,
 		memcpy(data->ip6_addr, addr, 16);
 		data->ip6_prefix = masklen;
 
-		ofp_mac_to_link_local(data->mac, data->link_local);
+		ofp_mac_to_link_local(data->if_mac, data->link_local);
 
 		/* Add interface to the if_addr v6 queue */
 		ofp_ifaddr6_elem_add(data);
@@ -1572,9 +1572,10 @@ struct ofp_ifnet *ofp_get_create_ifnet(int port, uint16_t vlan)
 			memset(data, 0, sizeof(*data));
 			data->port = port;
 			data->vlan = vlan;
-			memcpy(data->mac, shm->ofp_ifnet_data[port].mac, 6);
-			data->chksum_offload_flags =
-				shm->ofp_ifnet_data[port].chksum_offload_flags;
+			memcpy(data->if_mac,
+			       shm->ofp_ifnet_data[port].if_mac, 6);
+			data->if_csum_offload_flags =
+				shm->ofp_ifnet_data[port].if_csum_offload_flags;
 			data->if_mtu = shm->ofp_ifnet_data[port].if_mtu;
 #ifdef INET6
 			memcpy(data->link_local,
@@ -1965,6 +1966,7 @@ int ofp_vlan_lookup_shared_memory(void)
 int ofp_portconf_init_global(void)
 {
 	int i, j;
+	struct ofp_ifnet *ifnet = NULL;
 
 	HANDLE_ERROR(ofp_portconf_alloc_shared_memory());
 
@@ -1991,23 +1993,22 @@ int ofp_portconf_init_global(void)
 	shm->ofp_num_ports = OFP_IFPORT_NUM;
 
 	for (i = 0; i < shm->ofp_num_ports; i++) {
-		shm->ofp_ifnet_data[i].vlan_structs =
-					new_vlan(vlan_ifnet_compare, NULL);
-		if (shm->ofp_ifnet_data[i].vlan_structs == NULL) {
+		ifnet = &shm->ofp_ifnet_data[i];
+
+		ifnet->vlan_structs = new_vlan(vlan_ifnet_compare, NULL);
+		if (ifnet->vlan_structs == NULL) {
 			OFP_ERR("Failed to initialize vlan structures.");
 			return -1;
 		}
-		shm->ofp_ifnet_data[i].port = i;
-		shm->ofp_ifnet_data[i].vlan = OFP_IFPORT_NET_SUBPORT_ITF;
-		shm->ofp_ifnet_data[i].if_type = OFP_IFT_ETHER;
-		/*TODO get if_mtu from Linux/SDK*/
-		shm->ofp_ifnet_data[i].if_mtu = 1500;
-		shm->ofp_ifnet_data[i].if_state = OFP_IFT_STATE_FREE;
+		ifnet->port = i;
+		ifnet->vlan = OFP_IFPORT_NET_SUBPORT_ITF;
+		ifnet->if_type = OFP_IFT_ETHER;
+		ifnet->if_mtu = 1500;
+		ifnet->if_state = OFP_IFT_STATE_FREE;
 		/* Multicast related */
-		OFP_TAILQ_INIT(&shm->ofp_ifnet_data[i].if_multiaddrs);
-		shm->ofp_ifnet_data[i].if_flags |= OFP_IFF_MULTICAST;
-		shm->ofp_ifnet_data[i].if_afdata[OFP_AF_INET] =
-			&shm->ofp_ifnet_data[i].ii_inet;
+		OFP_TAILQ_INIT(&ifnet->if_multiaddrs);
+		ifnet->if_flags |= OFP_IFF_MULTICAST;
+		ifnet->if_afdata[OFP_AF_INET] = &ifnet->ii_inet;
 		/* TO DO:
 		   shm->ofp_ifnet_data[i].if_afdata[OFP_AF_INET6] =
 		   &shm->ofp_ifnet_data[i].ii_inet6;
@@ -2016,8 +2017,8 @@ int ofp_portconf_init_global(void)
 		   This is needed by vxlan and other
 		   virtual interfaces.
 		*/
-		if (odp_random_data((uint8_t *)shm->ofp_ifnet_data[i].mac,
-				sizeof(shm->ofp_ifnet_data[i].mac), 0) < 0) {
+		if (odp_random_data((uint8_t *)ifnet->if_mac,
+				    sizeof(ifnet->if_mac), 0) < 0) {
 			OFP_ERR("Failed to initialize default MAC address.");
 			return -1;
 		}
@@ -2025,10 +2026,10 @@ int ofp_portconf_init_global(void)
 		   are distinguished by setting the second least significant bit
 		   of the most significant byte of the address.
 		*/
-		shm->ofp_ifnet_data[i].mac[0] = 0x02;
+		ifnet->if_mac[0] = 0x02;
 		/* Port number. */
-		shm->ofp_ifnet_data[i].mac[1] = i;
-		memset(shm->ofp_ifnet_data[i].ip_addr_info, 0, sizeof(shm->ofp_ifnet_data[i].ip_addr_info));
+		ifnet->if_mac[1] = i;
+		memset(ifnet->ip_addr_info, 0, sizeof(ifnet->ip_addr_info));
 	}
 
 #ifdef SP

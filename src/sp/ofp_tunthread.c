@@ -103,7 +103,7 @@ int sp_setup_device(struct ofp_ifnet *ifnet)
 	}
 
 	hwaddr.sa_family = AF_UNIX;
-	memcpy(hwaddr.sa_data, ifnet->mac, sizeof(ifnet->mac));
+	memcpy(hwaddr.sa_data, ifnet->if_mac, sizeof(ifnet->if_mac));
 
 	/* Set the same MAC address as reported by ODP */
 	memset(&ifr, 0x0, sizeof(ifr));
@@ -175,7 +175,7 @@ int sp_setup_device(struct ofp_ifnet *ifnet)
 	/* Store ifindex in viu and create table */
 	ifnet->linux_index = ifr.ifr_ifindex;
 	ifnet->sp_status = OFP_SP_UP;
-	ifnet->fd = fd;
+	ifnet->sp_fd = fd;
 
 	close(gen_fd);
 	return 0;
@@ -242,7 +242,7 @@ int sp_rx_thread(void *ifnet_void)
 
 		OFP_UPDATE_PACKET_STAT(rx_sp, 1);
 
-		len = write(ifnet->fd,
+		len = write(ifnet->sp_fd,
 			    (void *)odp_packet_l2_ptr(pkt, NULL),
 			    (size_t)odp_packet_len(pkt));
 
@@ -294,17 +294,17 @@ int sp_tx_thread(void *ifnet_void)
 		/* Blocking read */
 drop_pkg:
 		FD_ZERO(&read_fd);
-		FD_SET(ifnet->fd, &read_fd);
+		FD_SET(ifnet->sp_fd, &read_fd);
 		timeout.tv_sec = 1;
 		timeout.tv_usec = 0;
-		r = select(ifnet->fd + 1, &read_fd, NULL, NULL, &timeout);
+		r = select(ifnet->sp_fd + 1, &read_fd, NULL, NULL, &timeout);
 		if (!ofp_global_cfg->is_running) {
 			odp_packet_free(pkt);
 			break;
 		}
 		if (r <= 0)
 			goto drop_pkg;
-		len = read(ifnet->fd, buf_pnt, odp_packet_len(pkt));
+		len = read(ifnet->sp_fd, buf_pnt, odp_packet_len(pkt));
 		if (len <= 0) {
 			OFP_ERR("read failed");
 			if (!ofp_global_cfg->is_running) {

@@ -116,7 +116,7 @@ static void init_ifnet(void)
 
 	/* port 0 */
 	dev = ofp_get_ifnet(port, vlan);
-	memcpy(dev->mac, dev_mac, OFP_ETHER_ADDR_LEN);
+	memcpy(dev->if_mac, dev_mac, OFP_ETHER_ADDR_LEN);
 	dev->if_mtu = def_mtu;
 #ifdef SP
 	dev->linux_index = port + 3; /* an if index of Linux != port val */
@@ -139,7 +139,7 @@ static void init_ifnet(void)
 	ofp_ifport_net_ipv4_up(port, vlan + 1, vrf, dev_ip + 1, 24);
 
 	dev_vlan = ofp_get_ifnet(port, vlan + 1);
-	memcpy(dev_vlan->mac, dev_vlan_mac, OFP_ETHER_ADDR_LEN);
+	memcpy(dev_vlan->if_mac, dev_vlan_mac, OFP_ETHER_ADDR_LEN);
 	dev_vlan->if_mtu = def_mtu;
 #ifdef SP
 	dev_vlan->linux_index = port + 4; /* an if index of Linux != port val */
@@ -359,7 +359,7 @@ test_packet_output_gre(void)
 	eth = odp_packet_l2_ptr(pkt, NULL);
 	if (memcmp(eth->ether_dhost, tun_rem_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 
 	ip = odp_packet_l3_ptr(pkt, NULL);
@@ -451,7 +451,7 @@ test_packet_output_ipv6_to_gre(void)
 	eth = odp_packet_l2_ptr(pkt, NULL);
 	if (memcmp(eth->ether_dhost, tun_rem_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 
 	ip = odp_packet_l3_ptr(pkt, NULL);

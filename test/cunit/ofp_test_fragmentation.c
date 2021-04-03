@@ -66,7 +66,7 @@ static void init_ifnet(void)
 	ofp_ifport_net_ipv4_up(port, vlan, vrf, dev_ip, 24);
 
 	dev = ofp_get_ifnet(port, vlan);
-	memcpy(dev->mac, dev_mac, OFP_ETHER_ADDR_LEN);
+	memcpy(dev->if_mac, dev_mac, OFP_ETHER_ADDR_LEN);
 	dev->if_mtu = def_mtu;
 #ifdef SP
 	dev->linux_index = port + 3; /* an if index of Linux != port val */
@@ -239,7 +239,7 @@ static void test_packet_size_is_less_then_mtu(void)
 	eth = odp_packet_l2_ptr(pkt_sent, NULL);
 	if (memcmp(eth->ether_dhost, dst_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 	if (memcmp(odp_packet_l3_ptr(pkt_sent, NULL),
 		   &orig_pkt_data[OFP_ETHER_HDR_LEN],
@@ -303,7 +303,7 @@ static void test_packet_to_two_fragments(void)
 	eth = odp_packet_l2_ptr(pkt_sent, NULL);
 	if (memcmp(eth->ether_dhost, dst_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 
 	ip = odp_packet_l3_ptr(pkt_sent, NULL);
@@ -334,7 +334,7 @@ static void test_packet_to_two_fragments(void)
 	eth = odp_packet_l2_ptr(pkt_sent, NULL);
 	if (memcmp(eth->ether_dhost, dst_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 
 	ip = odp_packet_l3_ptr(pkt_sent, NULL);
@@ -385,7 +385,7 @@ static void test_packet_to_many_fragments(void)
 	eth = odp_packet_l2_ptr(pkt_sent, NULL);
 	if (memcmp(eth->ether_dhost, dst_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 
 	ip = odp_packet_l3_ptr(pkt_sent, NULL);
@@ -417,7 +417,7 @@ static void test_packet_to_many_fragments(void)
 	eth = odp_packet_l2_ptr(pkt_sent, NULL);
 	if (memcmp(eth->ether_dhost, dst_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 
 	ip = odp_packet_l3_ptr(pkt_sent, NULL);
@@ -447,7 +447,7 @@ static void test_packet_to_many_fragments(void)
 	eth = odp_packet_l2_ptr(pkt_sent, NULL);
 	if (memcmp(eth->ether_dhost, dst_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 
 	ip = odp_packet_l3_ptr(pkt_sent, NULL);
@@ -477,7 +477,7 @@ static void test_packet_to_many_fragments(void)
 	eth = odp_packet_l2_ptr(pkt_sent, NULL);
 	if (memcmp(eth->ether_dhost, dst_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 
 	ip = odp_packet_l3_ptr(pkt_sent, NULL);
@@ -531,7 +531,7 @@ static void test_fragment_fragmented_to_two(void)
 	eth = odp_packet_l2_ptr(pkt_sent, NULL);
 	if (memcmp(eth->ether_dhost, dst_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 
 	ip = odp_packet_l3_ptr(pkt_sent, NULL);
@@ -563,7 +563,7 @@ static void test_fragment_fragmented_to_two(void)
 	eth = odp_packet_l2_ptr(pkt_sent, NULL);
 	if (memcmp(eth->ether_dhost, dst_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad destination mac address.");
-	if (memcmp(eth->ether_shost, dev->mac, OFP_ETHER_ADDR_LEN))
+	if (memcmp(eth->ether_shost, dev->if_mac, OFP_ETHER_ADDR_LEN))
 		CU_FAIL("Bad source mac address.");
 
 	ip = odp_packet_l3_ptr(pkt_sent, NULL);
