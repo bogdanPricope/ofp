@@ -368,7 +368,7 @@ int main(int argc, char *argv[])
 
 	vlan = arg.vlans;
 
-	ifnet = ofp_get_ifnet(C_PORT, C_VLAN);
+	ifnet = ofp_get_ifnet(C_PORT, C_VLAN, 0);
 	ASSERT((ifnet->pkt_pool = odp_pool_lookup("packet_pool")) != ODP_POOL_INVALID);
 
 	odp_queue_param_t qpar;
@@ -393,7 +393,7 @@ int main(int argc, char *argv[])
 	ASSERT((pool = odp_pool_lookup("packet_pool")) != ODP_POOL_INVALID);
 
 	for (i = 0; i < routes; i++) {
-		struct ofp_ifnet *ifnet_vlan = ofp_get_ifnet(C_PORT, vlan);
+		struct ofp_ifnet *ifnet_vlan = ofp_get_ifnet(C_PORT, vlan, 0);
 		uint32_t dst = odp_cpu_to_be_32(C_DST_ADDR + (i << (32 - arg.masklen)));
 		uint32_t gw = odp_cpu_to_be_32(C_GW_ADDR + (i & (neighbors - 1)));
 		ASSERT(!ofp_set_route_params(OFP_ROUTE_ADD, C_VRF, vlan, C_PORT,

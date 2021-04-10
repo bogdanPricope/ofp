@@ -91,7 +91,9 @@ static uint8_t test_frame_vlan[] = {
 0x02, 0x02, 0x01, 0x09, 0x00, 0x02, 0x01, 0x00
 };
 
-static uint32_t port = 0, vlan = 0, vrf = 0, def_mtu = 1500;
+static uint32_t port = 0, vrf = 0, def_mtu = 1500;
+static uint32_t subport_itf = OFP_IFPORT_NET_SUBPORT_ITF;
+static uint32_t subport_vlan = 1;
 static uint32_t dev_ip = 0x650AA8C0;   /* C0.A8.0A.65 = 192.168.10.101 */
 static uint8_t dev_mac[6] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
 static uint8_t dev_vlan_mac[6] = {0x11, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
@@ -112,10 +114,10 @@ static void init_ifnet(void)
 {
 	char str[256];
 
-	ofp_ifport_net_ipv4_up(port, vlan, vrf, dev_ip, 24);
+	ofp_ifport_net_ipv4_up(port, subport_itf, vrf, dev_ip, 24);
 
 	/* port 0 */
-	dev = ofp_get_ifnet(port, vlan);
+	dev = ofp_get_ifnet(port, subport_itf, 0);
 	memcpy(dev->if_mac, dev_mac, OFP_ETHER_ADDR_LEN);
 	dev->if_mtu = def_mtu;
 #ifdef SP
@@ -136,9 +138,9 @@ static void init_ifnet(void)
 	dev->out_queue_type = OFP_OUT_QUEUE_TYPE_QUEUE;
 
 	/* port 0 vlan 1 */
-	ofp_ifport_net_ipv4_up(port, vlan + 1, vrf, dev_ip + 1, 24);
+	ofp_ifport_net_ipv4_up(port, subport_vlan, vrf, dev_ip + 1, 24);
 
-	dev_vlan = ofp_get_ifnet(port, vlan + 1);
+	dev_vlan = ofp_get_ifnet(port, subport_vlan, 0);
 	memcpy(dev_vlan->if_mac, dev_vlan_mac, OFP_ETHER_ADDR_LEN);
 	dev_vlan->if_mtu = def_mtu;
 #ifdef SP

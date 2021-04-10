@@ -231,8 +231,10 @@ static int add_route(struct ofp_route_msg *msg)
 	OFP_DBG("route_add_success = %d ret = %d tmp.port=%d tmp.vlan = %d \n",route_add_success,ret, tmp.port,tmp.vlan);
 	if (route_add_success && !ret) {
 		if ((tmp.flags & OFP_RTF_LOCAL) && (msg->masklen == 32)) {
+			struct ofp_ifnet *ifnet = NULL;
+
 			OFP_DBG("Adding static route for %s\n", ofp_print_ip_addr(msg->dst));
-			struct ofp_ifnet *ifnet = ofp_get_create_ifnet(tmp.port, tmp.vlan);
+			ifnet = ofp_get_ifnet(tmp.port, tmp.vlan, 1);
 			if (NULL != ifnet) {
 				ofp_ifnet_ip_add(ifnet, msg->dst);
 			}
@@ -270,7 +272,7 @@ static int del_route(struct ofp_route_msg *msg)
 	if (NULL != nh_data) {
 		if (nh_data->flags & OFP_RTF_LOCAL) {
 			struct ofp_ifnet *ifnet;
-			ifnet = ofp_get_ifnet(nh_data->port, nh_data->vlan);
+			ifnet = ofp_get_ifnet(nh_data->port, nh_data->vlan, 0);
 			if (!ifnet)
 				OFP_INFO("ofp_rt_rule_remove Interface doesn't exist\n");
 			else {

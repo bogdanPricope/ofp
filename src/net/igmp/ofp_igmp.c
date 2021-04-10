@@ -187,7 +187,7 @@ static int ofp_packet_flags(odp_packet_t pkt)
 
 static struct ofp_ifnet *ifnet_byindex(int ifindex)
 {
-	return ofp_get_ifnet(ifindex & 0xf, ifindex >> 4);
+	return ofp_get_ifnet(ifindex & 0xf, ifindex >> 4, 0);
 }
 
 #define	NETISR_IGMP	2		/* IGMPv3 output queue */

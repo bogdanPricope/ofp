@@ -58,9 +58,9 @@ enum ofp_return_code send_pkt_out(struct ofp_ifnet *dev,
 	OFP_DEBUG_PACKET(OFP_DEBUG_PKT_SEND_NIC, pkt, dev->port);
 
 	if ((*pkt_tbl_cnt) == tx_burst)
-		send_table(ofp_get_ifnet(dev->port, 0),
-			   pkt_tbl,
-			   pkt_tbl_cnt);
+		send_table(ofp_get_ifnet(dev->port,
+					 OFP_IFPORT_NET_SUBPORT_ITF, 0),
+			   pkt_tbl, pkt_tbl_cnt);
 
 	return OFP_PKT_PROCESSED;
 }
@@ -79,7 +79,8 @@ static void ofp_send_pending_pkt_nocheck(void)
 
 		pkt_tbl = (odp_packet_t *)send_pkt_tbl[i].pkt_tbl;
 
-		send_table(ofp_get_ifnet(i, 0), pkt_tbl, pkt_tbl_cnt);
+		send_table(ofp_get_ifnet(i, OFP_IFPORT_NET_SUBPORT_ITF, 0),
+			   pkt_tbl, pkt_tbl_cnt);
 	}
 }
 

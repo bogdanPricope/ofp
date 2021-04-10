@@ -685,7 +685,7 @@ init_error:
 			ofp_stop_processing();
 
 			for (i = 0; OFP_IFPORT_IS_NET(i); i++) {
-				ifnet = ofp_get_ifnet((uint16_t)i, 0);
+				ifnet = ofp_get_ifnet(i, OFP_IFPORT_NET_SUBPORT_ITF, 0);
 				if (!ifnet)
 					continue;
 
@@ -806,7 +806,7 @@ int ofp_terminate(void)
 
 	/* Cleanup interfaces: queues and pktios*/
 	for (i = 0; OFP_IFPORT_IS_NET_U(i); i++) {
-		ifnet = ofp_get_ifnet((uint16_t)i, 0);
+		ifnet = ofp_get_ifnet((uint16_t)i, OFP_IFPORT_NET_SUBPORT_ITF, 0);
 		if (!ifnet) {
 			OFP_ERR("Failed to locate interface for port %d", i);
 			rc = -1;

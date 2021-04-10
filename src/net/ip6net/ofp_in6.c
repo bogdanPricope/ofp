@@ -198,7 +198,7 @@ ofp_in6_selectsrc(struct ofp_sockaddr_in6 *dstsock, void *opts,
 		return OFP_EHOSTUNREACH;
 	}
 
-	ifp = ofp_get_ifnet(nh->port, nh->vlan);
+	ifp = ofp_get_ifnet(nh->port, nh->vlan, 0);
 	if (ifp && ofp_ip6_is_set(ifp->ip6_addr)) {
 		memcpy(srcp->ofp_s6_addr, ifp->ip6_addr, 16);
 		if(ifpp)

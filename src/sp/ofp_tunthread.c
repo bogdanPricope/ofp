@@ -231,7 +231,7 @@ int sp_rx_thread(void *ifnet_void)
 			vlan = 0;
 		}
 
-		pkt_ifnet = ofp_get_ifnet(ifnet->port, vlan);
+		pkt_ifnet = ofp_get_ifnet(ifnet->port, vlan, 0);
 		if (pkt_ifnet == NULL ||
 		    pkt_ifnet->sp_status != OFP_SP_UP){
 			odp_packet_free(pkt);

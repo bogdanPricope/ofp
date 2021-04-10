@@ -1789,7 +1789,8 @@ ofp_tcp_maxmtu(struct in_conninfo *inc, int *flags)
 		uint32_t fl;
 		struct ofp_nh_entry *nh = ofp_get_next_hop(vrf,	inc->inc_faddr.s_addr, &fl);
 		if (nh) {
-			struct ofp_ifnet *ifp = ofp_get_ifnet(nh->port, nh->vlan);
+			struct ofp_ifnet *ifp = ofp_get_ifnet(nh->port,
+							      nh->vlan, 0);
 			/*
 			 * TODO: We should do min(rmx_mtu, if_mtu),
 			 * but currently there's no point digging up
@@ -1824,7 +1825,8 @@ ofp_tcp_maxmtu6(struct in_conninfo *inc, int *flags)
 		uint32_t fl;
 		struct ofp_nh6_entry *nh = ofp_get_next_hop6(vrf, inc->inc6_faddr.ofp_s6_addr, &fl);
 		if (nh) {
-			struct ofp_ifnet *ifp = ofp_get_ifnet(nh->port, nh->vlan);
+			struct ofp_ifnet *ifp = ofp_get_ifnet(nh->port,
+							      nh->vlan, 0);
 			if (ifp) maxmtu = ifp->if_mtu;
 		}
 	}

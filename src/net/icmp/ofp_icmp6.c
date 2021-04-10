@@ -2095,7 +2095,7 @@ ofp_icmp6_reflect(odp_packet_t m, size_t off)
 	if (!OFP_IN6_IS_ADDR_MULTICAST(&origdst)) {
 		nh6 = ofp_get_next_hop6(0, &ip6->ip6_dst.ofp_s6_addr[0], 0);
 		if (nh6) {
-			outif = ofp_get_ifnet(nh6->port, nh6->vlan);
+			outif = ofp_get_ifnet(nh6->port, nh6->vlan, 0);
 			memcpy(&src.ofp_s6_addr[0], outif->ip6_addr, 16);
 			srcp = &src;
 		}

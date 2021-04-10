@@ -103,7 +103,7 @@ static int if_index(struct ofp_ifnet *ifp)
 
 static struct ofp_ifnet *ifnet_byindex(int ifindex)
 {
-	return ofp_get_ifnet(ifindex & 0xf, ifindex >> 4);
+	return ofp_get_ifnet(ifindex & 0xf, ifindex >> 4, 0);
 }
 
 static int copyout(const void *src, void *dest, size_t n)

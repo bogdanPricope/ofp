@@ -209,7 +209,7 @@ test_init_ifnet(void)
 
 	ofp_ifport_net_ipv4_up(port, vlan, vrf, local_ip, 24);
 
-	ifnet = ofp_get_ifnet(port, vlan);
+	ifnet = ofp_get_ifnet(port, vlan, 0);
 	ifnet->pkt_pool = odp_pool_lookup("packet_pool");
 
 #ifdef SP
@@ -716,7 +716,7 @@ static void test_ofp_packet_input_gre_orig_pkt_to_sp(void)
 static void test_init_packet_input_basic(void)
 {
 	port = 0;
-	vlan = 0;
+	vlan = OFP_IFPORT_NET_SUBPORT_ITF;
 	vrf = 0;
 	local_ip = dst_ipaddr;
 }
@@ -724,7 +724,7 @@ static void test_init_packet_input_basic(void)
 static void test_init_packet_input_vrf(void)
 {
 	port = 1;
-	vlan = 0;
+	vlan = OFP_IFPORT_NET_SUBPORT_ITF;
 	vrf = 1;
 	local_ip = dst_ipaddr / 2;
 	tun_rem_ip += 1;

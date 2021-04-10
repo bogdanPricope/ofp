@@ -657,7 +657,7 @@ int ofp_ioctl(int sockfd, int request, ...)
 			else
 				ofp_errno = OFP_EBADMSG;
 		} else {
-			iface = ofp_get_ifnet(port, vlan);
+			iface = ofp_get_ifnet(port, vlan, 0);
 
 			if (so->so_proto->pr_usrreqs->pru_control)
 				ofp_errno = ((*so->so_proto->pr_usrreqs->pru_control)

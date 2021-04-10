@@ -249,7 +249,7 @@ static int add_ipv4v6_addr(struct ifaddrmsg *if_entry, struct ofp_ifnet *dev,
 
 		if (ofp_if_type(dev) == OFP_IFT_VXLAN) {
 			struct ofp_ifnet *dev_root =
-				ofp_get_ifnet(dev->physport, dev->physvlan);
+				ofp_get_ifnet(dev->physport, dev->physvlan, 0);
 
 			OFP_DBG(" - vrf=%d ip_addr=%x masklen=%d vlan=%d "
 				"group=%x phys=%d/%d",
@@ -278,7 +278,7 @@ static int add_ipv4v6_addr(struct ifaddrmsg *if_entry, struct ofp_ifnet *dev,
 					     dev->port,	*((uint32_t *)addr), 32,
 					     0, OFP_RTF_LOCAL);
 		}
-		dev_local = ofp_get_ifnet(dev->port, dev->vlan);
+		dev_local = ofp_get_ifnet(dev->port, dev->vlan, 0);
 		if (NULL != dev_local)
 			ofp_ifnet_ip_find_update_fields(dev_local,
 							*((uint32_t *)addr),
@@ -499,7 +499,7 @@ static int add_link(struct ifinfomsg *ifinfo_entry, int vlan, int link,
 			return -1;
 		}
 		if (ifinfo_entry->ifi_type == ARPHRD_IPGRE) {
-			dev_root = ofp_get_ifnet(OFP_IFPORT_GRE, 0);
+			dev_root = ofp_get_ifnet(OFP_IFPORT_GRE, 0, 0);
 			if (ofp_get_ifnet_by_ip(tun_loc, vrf) == NULL) {
 				OFP_DBG(" - Tunnel local IP not configured. "
 					"Interface ignored.");
@@ -508,7 +508,7 @@ static int add_link(struct ifinfomsg *ifinfo_entry, int vlan, int link,
 		} else if (ifinfo_entry->ifi_type == ARPHRD_VXLAN) {
 			OFP_DBG(" - VXLAN ADD LINK vlan=%d link=%d",
 				vlan, link);
-			dev_root = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0);
+			dev_root = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0, 0);
 		} else {
 			dev_root = ofp_get_ifnet_by_linux_ifindex(link);
 		}
@@ -597,9 +597,9 @@ static int del_link(struct ifinfomsg *ifinfo_entry, int vlan, int link)
 
 	if (vlan != -1) {
 		if (ifinfo_entry->ifi_type == ARPHRD_IPGRE) {
-			dev_root = ofp_get_ifnet(OFP_IFPORT_GRE, 0);
+			dev_root = ofp_get_ifnet(OFP_IFPORT_GRE, 0, 0);
 		} else if (ifinfo_entry->ifi_type == ARPHRD_VXLAN) {
-			dev_root = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0);
+			dev_root = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0, 0);
 			OFP_DBG("VXLAN DEL LINK vlan=%d", vlan);
 		} else {
 			dev_root = ofp_get_ifnet_by_linux_ifindex(link);
@@ -815,10 +815,6 @@ static int handle_ifinfo(struct nlmsghdr *nlh, int vrf)
 			return -1;
 		}
 		vlan = atoi(vlan_txt + 1);
-		if (vlan == 0) {
-			OFP_ERR(" ! Invalid vlan id: %d", vlan);
-			return -1;
-		}
 		OFP_DBG(" - Vlan id = %d", vlan);
 	}
 

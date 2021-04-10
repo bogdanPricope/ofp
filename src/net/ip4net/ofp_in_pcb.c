@@ -733,7 +733,7 @@ in_pcbladdr(struct inpcb *inp, struct ofp_in_addr *faddr,
 	if (!nh)
 		return OFP_ENETUNREACH;
 
-	dev_out = ofp_get_ifnet(nh->port, nh->vlan);
+	dev_out = ofp_get_ifnet(nh->port, nh->vlan, 0);
 
 	if (dev_out) {
 		laddr->s_addr = dev_out->ip_addr_info[0].ip_addr;

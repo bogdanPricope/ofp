@@ -405,8 +405,8 @@ int vlan_ifnet_delete(void *root, void *elem, int (*free_key_fun)(void *arg));
 int free_key(void *key);
 struct ofp_ifnet *ofp_vlan_alloc(void);
 
-struct ofp_ifnet *ofp_get_ifnet(int port, uint16_t subport);
-struct ofp_ifnet *ofp_get_create_ifnet(int port, uint16_t subport);
+struct ofp_ifnet *ofp_get_ifnet(int port, uint16_t subport,
+				odp_bool_t create_if_not_exist);
 int ofp_delete_ifnet(int port, uint16_t subport);
 
 /* LINUX interface lookup table*/

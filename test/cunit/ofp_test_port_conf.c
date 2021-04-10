@@ -60,7 +60,7 @@ init_suite(void)
 
 	(void)ofp_initialize(&params);
 
-	dev = ofp_get_ifnet(0, 0);
+	dev = ofp_get_ifnet(0, OFP_IFPORT_NET_SUBPORT_ITF, 0);
 	dev->if_mtu = ifmtu;
 	memcpy(dev->if_mac, ifmac, OFP_ETHER_ADDR_LEN);
 	ofp_mac_to_link_local(ifmac, link_local);
@@ -118,7 +118,7 @@ static void
 test_single_port_basic(void)
 {
 	int port = 0;
-	uint16_t vlan = 0;
+	uint16_t vlan = OFP_IFPORT_NET_SUBPORT_ITF;
 	uint16_t vrf = 1;
 	uint32_t ifaddr = 0x650AA8C0; /* C0.A8.0A.65 = 192.168.10.101 */
 	int masklen = 24;
@@ -130,7 +130,7 @@ test_single_port_basic(void)
 	res = ofp_ifport_net_ipv4_up(port, vlan, vrf, ifaddr, masklen);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
-	dev = ofp_get_ifnet(port, vlan);
+	dev = ofp_get_ifnet(port, vlan, 0);
 	assert_dev(dev, port, vlan, vrf, ifaddr, ifmtu, masklen, bcast,
 		   link_local);
 	nh = ofp_get_next_hop(vrf, ifaddr, NULL);
@@ -139,7 +139,7 @@ test_single_port_basic(void)
 	res = ofp_ifport_ifnet_down(port, vlan);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
-	dev = ofp_get_ifnet(port, vlan);
+	dev = ofp_get_ifnet(port, vlan, 0);
 	assert_dev(dev, port, vlan, vrf, 0, ifmtu, 0, 0, link_local);
 	nh = ofp_get_next_hop(vrf, ifaddr, NULL);
 	CU_ASSERT_PTR_NULL(nh);
@@ -149,7 +149,7 @@ static void
 test_two_ports_vlan(void)
 {
 	int port = 0;
-	uint16_t vlan = 0, vlan1 = 100;
+	uint16_t vlan = OFP_IFPORT_NET_SUBPORT_ITF, vlan1 = 100;
 	uint16_t vrf = 1, vrf1 = 2;
 	uint32_t ifaddr = 0x650AA8C0; /* C0.A8.0A.65 = 192.168.10.101 */
 	uint32_t ifaddr1 = 0x650AA8C1;
@@ -165,14 +165,14 @@ test_two_ports_vlan(void)
 	res = ofp_ifport_net_ipv4_up(port, vlan1, vrf1, ifaddr1, masklen1);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
-	dev = ofp_get_ifnet(port, vlan);
+	dev = ofp_get_ifnet(port, vlan, 0);
 	CU_ASSERT_PTR_NOT_NULL_FATAL(dev);
 	assert_dev(dev, port, vlan, vrf, ifaddr, ifmtu, masklen, bcast,
 		   link_local);
 	nh = ofp_get_next_hop(vrf, ifaddr, NULL);
 	assert_next_hop(nh, 0, port, vlan);
 
-	dev = ofp_get_ifnet(port, vlan1);
+	dev = ofp_get_ifnet(port, vlan1, 0);
 	assert_dev(dev, port, vlan1, vrf1, ifaddr1, ifmtu, masklen1, bcast1,
 		   link_local);
 	nh = ofp_get_next_hop(vrf1, ifaddr1, NULL);
@@ -183,12 +183,12 @@ test_two_ports_vlan(void)
 	res = ofp_ifport_ifnet_down(port, vlan1);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
-	dev = ofp_get_ifnet(port, vlan);
+	dev = ofp_get_ifnet(port, vlan, 0);
 	assert_dev(dev, port, vlan, vrf, 0, ifmtu, 0, 0, link_local);
 	nh = ofp_get_next_hop(vrf, ifaddr, NULL);
 	CU_ASSERT_PTR_NULL(nh);
 
-	dev = ofp_get_ifnet(port, vlan1);
+	dev = ofp_get_ifnet(port, vlan1, 0);
 	CU_ASSERT_PTR_NULL_FATAL(dev);
 	nh = ofp_get_next_hop(vrf1, ifaddr1, NULL);
 	CU_ASSERT_PTR_NULL(nh);
@@ -216,14 +216,14 @@ test_gre_port(void)
 	res = ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, greid, vrf + 1, ifaddr,
 				     ifaddr + 1, greaddr, grep2p, gre_ml);
 	CU_ASSERT_PTR_NOT_NULL_FATAL(res);
-	dev = ofp_get_ifnet(OFP_IFPORT_GRE, greid);
+	dev = ofp_get_ifnet(OFP_IFPORT_GRE, greid, 0);
 	CU_ASSERT_PTR_NULL_FATAL(dev);
 
 	/* Successful test */
 	res = ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, greid, vrf, ifaddr,
 				     ifaddr + 1, grep2p, greaddr, gre_ml);
 	CU_ASSERT_PTR_NULL_FATAL(res);
-	dev = ofp_get_ifnet(OFP_IFPORT_GRE, greid);
+	dev = ofp_get_ifnet(OFP_IFPORT_GRE, greid, 0);
 	CU_ASSERT_PTR_NOT_NULL_FATAL(dev);
 	CU_ASSERT_EQUAL(dev->ip_local, ifaddr);
 	CU_ASSERT_EQUAL(dev->ip_remote, ifaddr + 1);
@@ -239,7 +239,7 @@ test_gre_port(void)
 	CU_ASSERT_PTR_NULL_FATAL(res);
 	res = ofp_ifport_ifnet_down(OFP_IFPORT_GRE, greid);
 	CU_ASSERT_PTR_NULL_FATAL(res);
-	dev = ofp_get_ifnet(OFP_IFPORT_GRE, greid);
+	dev = ofp_get_ifnet(OFP_IFPORT_GRE, greid, 0);
 	CU_ASSERT_PTR_NULL_FATAL(dev);
 }
 

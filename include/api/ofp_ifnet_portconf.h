@@ -61,7 +61,7 @@ enum {
 	(_port >= OFP_IFPORT_NET_FIRST && OFP_IFPORT_IS_NET_U(_port))
 
 /* Sub-port of the network (physical or otherwise) interface */
-#define OFP_IFPORT_NET_SUBPORT_ITF 0
+#define OFP_IFPORT_NET_SUBPORT_ITF 4096
 
 /**
  * Create an OFP network interface port (ifport)

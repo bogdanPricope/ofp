@@ -41,6 +41,13 @@
 #define PORT_UNDEF 0xFFFF
 
 void ofp_ifnet_print_ip_addrs(struct ofp_ifnet *dev);
+
+static struct ofp_ifnet *ofp_create_subport(struct ofp_ifnet *ifnet_port,
+					    uint16_t subport);
+static struct ofp_ifnet *ofp_get_subport(struct ofp_ifnet *ifnet_port,
+					 uint16_t subport);
+static int ofp_del_subport(struct ofp_ifnet *ifnet_port, uint16_t subport);
+
 /*
  * Shared data
  */
@@ -90,7 +97,7 @@ int ofp_ifport_net_create(char *if_name,
 	if (port == -1)
 		return -1;
 
-	ifnet = ofp_get_ifnet(port, (uint16_t)OFP_IFPORT_NET_SUBPORT_ITF);
+	ifnet = ofp_get_ifnet(port, (uint16_t)OFP_IFPORT_NET_SUBPORT_ITF, 0);
 	if (ifnet == NULL) {
 		OFP_ERR("Got ifnet NULL");
 		return -1;
@@ -117,7 +124,7 @@ ofp_ifnet_t ofp_ifport_net_ifnet_get_by_port(int port)
 	if (!OFP_IFPORT_IS_NET(port))
 		return OFP_IFNET_INVALID;
 
-	return (ofp_ifnet_t)ofp_get_ifnet(port, OFP_IFPORT_NET_SUBPORT_ITF);
+	return (ofp_ifnet_t)ofp_get_ifnet(port, OFP_IFPORT_NET_SUBPORT_ITF, 0);
 }
 
 ofp_ifnet_t ofp_ifport_net_ifnet_get_by_name(char *if_name)
@@ -144,7 +151,7 @@ int ofp_ifport_count(void)
 
 ofp_ifnet_t ofp_ifport_ifnet_get(int port, uint16_t subport)
 {
-	struct ofp_ifnet *ifnet = ofp_get_ifnet(port, subport);
+	struct ofp_ifnet *ifnet = ofp_get_ifnet(port, subport, 0);
 
 	if (!ifnet)
 		return OFP_IFNET_INVALID;
@@ -471,7 +478,7 @@ static int iter_vlan(void *key, void *iter_arg)
 			  "%s%d%s	(%d) (%s) slowpath: %s\r\n",
 			  OFP_IFNAME_PREFIX,
 			  iface->port,
-			  iface->vlan ? buf : "",
+			  iface->vlan != OFP_IFPORT_NET_SUBPORT_ITF ? buf : "",
 			  iface->linux_index,
 			  iface->if_name,
 			  iface->sp_status ? "on" : "off");
@@ -480,7 +487,7 @@ static int iter_vlan(void *key, void *iter_arg)
 			  "%s%d%s	(%s)\r\n",
 			  OFP_IFNAME_PREFIX,
 			  iface->port,
-			  iface->vlan ? buf : "",
+			  iface->vlan != OFP_IFPORT_NET_SUBPORT_ITF ? buf : "",
 			  iface->if_name);
 #endif /* SP */
 
@@ -628,13 +635,15 @@ static int exec_sys_call_depending_on_vrf(const char *cmd, uint16_t vrf)
 }
 #endif /* SP */
 
-const char *ofp_ifport_net_ipv4_up(int port, uint16_t vlan, uint16_t vrf,
+const char *ofp_ifport_net_ipv4_up(int port, uint16_t subport_vlan,
+				   uint16_t vrf,
 				   uint32_t addr, int masklen)
 {
 #ifdef SP
 	char cmd[200];
 	int ret = 0;
 	uint32_t mask_t;
+	char *iname;
 #endif /* SP */
 	struct ofp_ifnet *data;
 	uint32_t mask;
@@ -651,34 +660,35 @@ const char *ofp_ifport_net_ipv4_up(int port, uint16_t vlan, uint16_t vrf,
 	mask = ~0;
 	mask = odp_cpu_to_be_32(mask << (32 - masklen));
 
-	data = ofp_get_ifnet(port, vlan);
+	data = ofp_get_ifnet(port, subport_vlan, 0);
 
 	if (data && data->vrf != vrf) {
 #ifdef SP
-		if (vlan == 0 && data->vrf == 0) {
+		if (subport_vlan == OFP_IFPORT_NET_SUBPORT_ITF &&
+		    data->vrf == 0) {
 			/* Create vrf in not exist using dummy call */
 			exec_sys_call_depending_on_vrf("", vrf);
 			/* Move to vrf (can be done only once!) */
+			iname = ofp_port_vlan_to_ifnet_name(port, OFP_IFPORT_NET_SUBPORT_ITF);
 			snprintf(cmd, sizeof(cmd),
-				 "ip link set %s netns vrf%d",
-				 ofp_port_vlan_to_ifnet_name(port, 0), vrf);
+				 "ip link set %s netns vrf%d", iname, vrf);
 			ret = exec_sys_call_depending_on_vrf(cmd, 0);
 		}
 #endif /* SP */
 
 		ofp_ifport_ifnet_down(data->port, data->vlan);
-		data = ofp_get_create_ifnet(port, vlan);
+		data = ofp_get_ifnet(port, subport_vlan, 1);
 	}
 
-	if (vlan) {
+	if (subport_vlan != OFP_IFPORT_NET_SUBPORT_ITF) {
 		if (data == NULL) {
-			data = ofp_get_create_ifnet(port, vlan);
+			data = ofp_get_ifnet(port, subport_vlan, 1);
 			data->if_type = OFP_IFT_ETHER;
 #ifdef SP
-			char *iname = ofp_port_vlan_to_ifnet_name(port, 0);
+			iname = ofp_port_vlan_to_ifnet_name(port, OFP_IFPORT_NET_SUBPORT_ITF);
 			snprintf(cmd, sizeof(cmd),
 				 "ip link add name %s.%d link %s type vlan id %d",
-				 iname, vlan, iname, vlan);
+				 iname, subport_vlan, iname, subport_vlan);
 			ret = exec_sys_call_depending_on_vrf(cmd, 0);
 
 			if (vrf) {
@@ -687,22 +697,29 @@ const char *ofp_ifport_net_ipv4_up(int port, uint16_t vlan, uint16_t vrf,
 				/* Move to vrf */
 				snprintf(cmd, sizeof(cmd),
 					 "ip link set %s.%d netns vrf%d",
-					 iname, vlan, vrf);
+					 iname, subport_vlan, vrf);
 				ret = exec_sys_call_depending_on_vrf(cmd, 0);
 			}
 #endif /* SP */
 		} else {
-			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, vlan, port,
-					data->ip_addr_info[0].ip_addr, data->ip_addr_info[0].masklen, 0, 0);
-			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, vlan, port,
-					data->ip_addr_info[0].ip_addr, 32, 0, 0);
+			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf,
+					     subport_vlan, port,
+					     data->ip_addr_info[0].ip_addr,
+					     data->ip_addr_info[0].masklen,
+					     0, 0);
+			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf,
+					     subport_vlan, port,
+					     data->ip_addr_info[0].ip_addr, 32,
+					     0, 0);
 		}
 		data->vrf = vrf;
-		ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, vlan, port,
-				addr, 32, 0,
-				OFP_RTF_LOCAL);
-		ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, vlan, port,
-				addr & mask, masklen, 0, OFP_RTF_NET);
+		ofp_set_route_params(OFP_ROUTE_ADD, data->vrf,
+				     subport_vlan, port,
+				     addr, 32, 0,
+				     OFP_RTF_LOCAL);
+		ofp_set_route_params(OFP_ROUTE_ADD, data->vrf,
+				     subport_vlan, port,
+				     addr & mask, masklen, 0, OFP_RTF_NET);
 		ofp_set_first_ifnet_addr(data, addr, addr | ~mask, masklen);
 #ifdef SP
 		if (vrf == 0)
@@ -712,7 +729,7 @@ const char *ofp_ifport_net_ipv4_up(int port, uint16_t vlan, uint16_t vrf,
 
 		mask_t = odp_be_to_cpu_32(mask);
 		snprintf(cmd, sizeof(cmd), "ifconfig %s %s netmask %d.%d.%d.%d up",
-			 ofp_port_vlan_to_ifnet_name(port, vlan),
+			 ofp_port_vlan_to_ifnet_name(port, subport_vlan),
 			 ofp_print_ip_addr(addr),
 			(uint8_t)(mask_t >> 24),
 			(uint8_t)(mask_t >> 16),
@@ -723,12 +740,15 @@ const char *ofp_ifport_net_ipv4_up(int port, uint16_t vlan, uint16_t vrf,
 #endif /* SP */
 	} else {
 		if (data->ip_addr_info[0].ip_addr) {
-			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, 0 /*vlan*/,
-					port, data->ip_addr_info[0].ip_addr, data->ip_addr_info[0].masklen,
-					0, 0);
-			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, 0 /*vlan*/,
-					port, data->ip_addr_info[0].ip_addr, 32,
-					0, 0);
+			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf,
+					     OFP_IFPORT_NET_SUBPORT_ITF, port,
+					     data->ip_addr_info[0].ip_addr,
+					     data->ip_addr_info[0].masklen,
+					     0, 0);
+			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf,
+					     OFP_IFPORT_NET_SUBPORT_ITF, port,
+					     data->ip_addr_info[0].ip_addr, 32,
+					     0, 0);
 		}
 
 		data->vrf = vrf;
@@ -739,10 +759,12 @@ const char *ofp_ifport_net_ipv4_up(int port, uint16_t vlan, uint16_t vrf,
 		ofp_mac_to_link_local(data->if_mac, data->link_local);
 #endif /* INET6 */
 
-		ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, 0 /*vlan*/, port,
-				addr, 32, 0, OFP_RTF_LOCAL);
-		ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, 0 /*vlan*/, port,
-				addr & mask, masklen, 0, OFP_RTF_NET);
+		ofp_set_route_params(OFP_ROUTE_ADD, data->vrf,
+				     OFP_IFPORT_NET_SUBPORT_ITF, port,
+				     addr, 32, 0, OFP_RTF_LOCAL);
+		ofp_set_route_params(OFP_ROUTE_ADD, data->vrf,
+				     OFP_IFPORT_NET_SUBPORT_ITF, port,
+				     addr & mask, masklen, 0, OFP_RTF_NET);
 		ofp_set_first_ifnet_addr(data, addr, addr | ~mask, masklen);
 
 #ifdef SP
@@ -752,9 +774,10 @@ const char *ofp_ifport_net_ipv4_up(int port, uint16_t vlan, uint16_t vrf,
 			data->sp_status = OFP_SP_DOWN;
 
 		mask_t = odp_be_to_cpu_32(mask);
+		iname = ofp_port_vlan_to_ifnet_name(port,
+						    OFP_IFPORT_NET_SUBPORT_ITF);
 		snprintf(cmd, sizeof(cmd), "ifconfig %s %s netmask %d.%d.%d.%d up",
-			ofp_port_vlan_to_ifnet_name(port, 0),
-			ofp_print_ip_addr(addr),
+			iname, ofp_print_ip_addr(addr),
 			(uint8_t)(mask_t >> 24),
 			(uint8_t)(mask_t >> 16),
 			(uint8_t)(mask_t >> 8),
@@ -779,7 +802,7 @@ const char *ofp_ifport_net_ipv4_addr_add(int port, uint16_t vlan, uint16_t vrf,
 	if (!OFP_IFPORT_IS_NET(port))
 		return "Wrong port number";
 
-	data = ofp_get_ifnet(port, vlan);
+	data = ofp_get_ifnet(port, vlan, 0);
 	if (NULL == data)
 		return "Invalid interface";
 	idx = ofp_ifnet_ip_find(data, addr);
@@ -831,7 +854,7 @@ const char *ofp_ifport_net_ipv4_addr_del(int port, uint16_t vlan, int vrf,
 	if (!OFP_IFPORT_IS_NET(port))
 		return "Wrong port number";
 
-	data = ofp_get_ifnet(port, vlan);
+	data = ofp_get_ifnet(port, vlan, 0);
 	if (NULL == data)
 		return "Invalid interface";
 
@@ -902,7 +925,7 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t greid,
 	if (dev_root == NULL)
 		return "Tunnel local ip not configured.";
 
-	data = ofp_get_ifnet(port, greid);
+	data = ofp_get_ifnet(port, greid, 0);
 
 	if (data && data->vrf != vrf) {
 		ofp_ifport_ifnet_down(data->port, data->vlan);
@@ -913,7 +936,7 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t greid,
 #ifdef SP
 		new = 1;
 #endif /* SP */
-		data = ofp_get_create_ifnet(port, greid);
+		data = ofp_get_ifnet(port, greid, 1);
 		data->if_type = OFP_IFT_GRE;
 	} else {
 		ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, greid, port,
@@ -1013,11 +1036,11 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint16_t vrf,
 
 	mask = ~0;
 	mask = odp_cpu_to_be_32(mask << (32 - mlen));
-	dev_root = ofp_get_ifnet(physport, physvlan);
+	dev_root = ofp_get_ifnet(physport, physvlan, 0);
 	if (dev_root == NULL)
 		return "No physical device configured.";
 
-	data = ofp_get_ifnet(OFP_IFPORT_VXLAN, vni);
+	data = ofp_get_ifnet(OFP_IFPORT_VXLAN, vni, 0);
 
 	/* To be on the safe side it is better to put down the interface and
 	   reconfigure.*/
@@ -1026,7 +1049,7 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint16_t vrf,
 		data = NULL;
 	}
 
-	data = ofp_get_create_ifnet(OFP_IFPORT_VXLAN, vni);
+	data = ofp_get_ifnet(OFP_IFPORT_VXLAN, vni, 1);
 	data->if_type = OFP_IFT_VXLAN;
 
 	data->vrf = dev_root->vrf;
@@ -1112,10 +1135,10 @@ const char *ofp_ifport_local_ipv4_up(uint16_t id, uint16_t vrf,
 	mask = ~0;
 	mask = odp_cpu_to_be_32(mask << (32 - masklen));
 
-	data = ofp_get_ifnet(OFP_IFPORT_LOCAL, id);
+	data = ofp_get_ifnet(OFP_IFPORT_LOCAL, id, 0);
 	if (data)
 		ofp_ifport_ifnet_down(data->port, data->vlan);
-	data = ofp_get_create_ifnet(OFP_IFPORT_LOCAL, id);
+	data = ofp_get_ifnet(OFP_IFPORT_LOCAL, id, 1);
 	ofp_loopq_create(data);
 
 #ifdef SP
@@ -1173,11 +1196,11 @@ const char *ofp_ifport_net_ipv6_up(int port, uint16_t vlan,
 	if (!OFP_IFPORT_IS_NET(port))
 		return "Wrong port number";
 
-	data = ofp_get_ifnet(port, vlan);
+	data = ofp_get_ifnet(port, vlan, 0);
 
 	if (vlan) {
 		if (data == NULL) {
-			data = ofp_get_create_ifnet(port, vlan);
+			data = ofp_get_ifnet(port, vlan, 1);
 			data->vrf = 0;
 #ifdef SP
 			char *iname = ofp_port_vlan_to_ifnet_name(port, 0);
@@ -1274,7 +1297,7 @@ const char *ofp_ifport_local_ipv6_up(uint16_t id, uint8_t *addr, int masklen)
 #endif /*SP*/
 	memset(gw6, 0, 16);
 
-	data = ofp_get_ifnet(OFP_IFPORT_LOCAL, id);
+	data = ofp_get_ifnet(OFP_IFPORT_LOCAL, id, 0);
 	if (data == NULL)
 		return "Create IPv4 loopback interface first";
 
@@ -1344,98 +1367,161 @@ int ofp_local_interfaces_destroy(void)
 	return 0;
 }
 
-const char *ofp_ifport_ifnet_down(int port, uint16_t vlan)
+static int ofp_ifnet_addr_cleanup(struct ofp_ifnet *ifnet)
 {
 #ifdef SP
 	char cmd[200];
-	int ret = 0;
 	uint16_t vrf;
 #endif /* SP */
-	uint8_t gw6[16];
-	struct ofp_ifnet *data;
+
+	if (!ifnet)
+		return -1;
+
+	/* Remove interface from the if_addr v4 queue */
+	ofp_ifaddr_elem_del(ifnet);
+#ifdef INET6
+	/* Remove interface from the if_addr v6 queue */
+	ofp_ifaddr6_elem_del(ifnet);
+#endif
 
 #ifdef SP
-	(void)ret;
+	vrf = ifnet->vrf;
 #endif /*SP*/
-	memset(gw6, 0, 16);
 
-	if (port < 0 || port >= shm->ofp_num_ports)
+	if (ifnet->ip_addr_info[0].ip_addr) {
+		struct ofp_ifnet_ipaddr *ipaddr = &ifnet->ip_addr_info[0];
+
+		uint32_t a = (ofp_if_type(ifnet) == OFP_IFT_GRE) ?
+			ifnet->ip_p2p : ipaddr->ip_addr;
+		int m = ipaddr->masklen;
+#ifdef SP
+		uint32_t dest = a;
+#endif /* SP */
+
+		a = odp_cpu_to_be_32(odp_be_to_cpu_32(a) & (0xFFFFFFFFULL << (32 - ipaddr->masklen)));
+		if (ofp_if_type(ifnet) == OFP_IFT_LOOP) {
+			ofp_set_route_params(OFP_ROUTE_DEL, ifnet->vrf,
+					     ifnet->vlan, ifnet->port,
+					     ipaddr->ip_addr, ipaddr->masklen,
+					     0, 0);
+			/*ofp_set_route_params(OFP_ROUTE_DEL, ifnet->vrf,
+					       ifnet->vlan, ifnet->port,
+					       dest, 32, 0, 0);*/
+		} else if (ofp_if_type(ifnet) != OFP_IFT_GRE)
+			ofp_set_route_params(OFP_ROUTE_DEL, ifnet->vrf,
+					     ifnet->vlan, ifnet->port,
+					     ipaddr->ip_addr, 32, 0, 0);
+		ofp_set_route_params(OFP_ROUTE_DEL, ifnet->vrf,
+				     ifnet->vlan, ifnet->port,
+				     a, m, 0, 0);
+
+		ofp_free_ifnet_ip_list(ifnet);
+#ifdef SP
+		if (ifnet->port == OFP_IFPORT_LOCAL)
+			snprintf(cmd, sizeof(cmd),
+				 "ip addr del %s/%d dev lo",
+				 ofp_print_ip_addr(dest), m);
+		else
+			snprintf(cmd, sizeof(cmd),
+				 "ifconfig %s 0.0.0.0",
+				 ofp_port_vlan_to_ifnet_name(ifnet->port,
+							     ifnet->vlan));
+		exec_sys_call_depending_on_vrf(cmd, vrf);
+#endif /*SP*/
+	}
+#ifdef INET6
+	if (ofp_ip6_is_set(ifnet->ip6_addr)) {
+		uint8_t gw6[16];
+
+		memset(gw6, 0, 16);
+		ofp_set_route6_params(OFP_ROUTE6_DEL, 0 /*vrf*/,
+				      ifnet->vlan, ifnet->port,
+				      ifnet->ip6_addr, ifnet->ip6_prefix,
+				      gw6, 0);
+		ofp_set_route6_params(OFP_ROUTE6_DEL, 0 /*vrf*/,
+				      ifnet->vlan, ifnet->port,
+				      ifnet->ip6_addr, 128,
+				      gw6, 0);
+#ifdef SP
+		snprintf(cmd, sizeof(cmd),
+			 "ifconfig %s inet6 del %s/%d",
+			 ifnet->port == OFP_IFPORT_LOCAL ? "lo" :
+			 ofp_port_vlan_to_ifnet_name(ifnet->port, ifnet->vlan),
+			 ofp_print_ip6_addr(ifnet->ip6_addr),
+			 ifnet->ip6_prefix);
+
+		exec_sys_call_depending_on_vrf(cmd, vrf);
+#endif /* SP */
+
+		memset(ifnet->ip6_addr, 0, 16);
+	}
+#endif /* INET6 */
+
+	return 0;
+}
+
+static const char *ofp_ifport_net_down(int port, uint16_t subport)
+{
+	struct ofp_ifnet *ifnet_port = NULL;
+	struct ofp_ifnet *ifnet;
+#ifdef SP
+	char cmd[200];
+#endif /* SP */
+
+	if (!OFP_IFPORT_IS_NET(port))
 		return "Wrong port number";
 
-	if (vlan || port == OFP_IFPORT_LOCAL) {
-		struct ofp_ifnet key;
+	ifnet_port = &shm->ofp_ifnet_data[port];
 
-		key.vlan = vlan;
-		if (ofp_vlan_get_by_key(
-			shm->ofp_ifnet_data[port].vlan_structs,
-			&key,
-			(void *)&data))
+	if (subport != OFP_IFPORT_NET_SUBPORT_ITF) {
+		ifnet = ofp_get_subport(ifnet_port, subport);
+		if (!ifnet)
 			return "Unknown interface";
 
-		/* Remove interface from the if_addr v4 queue */
-		ofp_ifaddr_elem_del(data);
-#ifdef INET6
-		/* Remove interface from the if_addr v6 queue */
-		ofp_ifaddr6_elem_del(data);
-#endif
-#ifdef SP
-		vrf = data->vrf;
-#endif /*SP*/
-		if (data->ip_addr_info[0].ip_addr) {
-			uint32_t a = (ofp_if_type(data) == OFP_IFT_GRE) ?
-				data->ip_p2p : data->ip_addr_info[0].ip_addr;
-			int m = data->ip_addr_info[0].masklen;
-#ifdef SP
-			uint32_t dest = a;
-#endif /* SP */
+		ofp_ifnet_addr_cleanup(ifnet);
 
-			a = odp_cpu_to_be_32(odp_be_to_cpu_32(a) & (0xFFFFFFFFULL << (32-data->ip_addr_info[0].masklen)));
-			if (ofp_if_type(data) == OFP_IFT_LOOP) {
-				ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, vlan, port,
-					data->ip_addr_info[0].ip_addr, data->ip_addr_info[0].masklen, 0, 0);
-				/*ofp_set_route_params(OFP_ROUTE_DEL,
-						       data->vrf, vlan, port,
-						       dest, 32, 0, 0);*/
-			}
-			else if (ofp_if_type(data) != OFP_IFT_GRE)
-				ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, vlan, port,
-					data->ip_addr_info[0].ip_addr, 32, 0, 0);
-			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, vlan, port,
-					a, m, 0, 0);
-			ofp_free_ifnet_ip_list(data);
-#ifdef SP
-			if (port == OFP_IFPORT_LOCAL)
-				snprintf(cmd, sizeof(cmd),
-					 "ip addr del %s/%d dev lo",
-					 ofp_print_ip_addr(dest),
-					 m);
-			else
-				snprintf(cmd, sizeof(cmd),
-					 "ifconfig %s 0.0.0.0",
-					 ofp_port_vlan_to_ifnet_name(port, vlan));
-			ret = exec_sys_call_depending_on_vrf(cmd, vrf);
-#endif /*SP*/
-		}
-#ifdef INET6
-		if (ofp_ip6_is_set(data->ip6_addr)) {
-			ofp_set_route6_params(OFP_ROUTE6_DEL, 0 /*vrf*/, vlan, port,
-					      data->ip6_addr, data->ip6_prefix,
-					      gw6, 0);
-			ofp_set_route6_params(OFP_ROUTE6_DEL, 0 /*vrf*/, vlan, port,
-					      data->ip6_addr, 128,
-					      gw6, 0);
-#ifdef SP
-			snprintf(cmd, sizeof(cmd),
-				 "ifconfig %s inet6 del %s/%d",
-				 port == OFP_IFPORT_LOCAL ? "lo" :
-				 ofp_port_vlan_to_ifnet_name(port, vlan),
-				 ofp_print_ip6_addr(data->ip6_addr),
-				 data->ip6_prefix);
+		free(ifnet->ii_inet.ii_igmp);
 
-			ret = exec_sys_call_depending_on_vrf(cmd, vrf);
+#ifdef SP
+		snprintf(cmd, sizeof(cmd), "ip link del %s",
+			 ofp_port_vlan_to_ifnet_name(port, subport));
+		exec_sys_call_depending_on_vrf(cmd, ifnet->vrf);
+#endif /*SP*/
+
+		ofp_del_subport(ifnet_port, subport);
+		return NULL;
+	}
+
+	ofp_ifnet_addr_cleanup(ifnet_port);
+
+	return NULL;
+}
+
+const char *ofp_ifport_ifnet_down(int port, uint16_t subport)
+{
+#ifdef SP
+	char cmd[200];
 #endif /* SP */
-		}
-#endif /* INET6 */
+	struct ofp_ifnet *data;
+	struct ofp_ifnet *ifnet_port = NULL;
+
+	if (port < 0 || port >= shm->ofp_num_ports) {
+		OFP_DBG("port:%d is outside the valid interval", port);
+		return "Wrong port number";
+	}
+
+	if (OFP_IFPORT_IS_NET(port))
+		return ofp_ifport_net_down(port, subport);
+
+	ifnet_port = &shm->ofp_ifnet_data[port];
+
+	if (subport || port == OFP_IFPORT_LOCAL) {
+		data = ofp_get_subport(ifnet_port, subport);
+		if (!data)
+			return "Unknown interface";
+
+		ofp_ifnet_addr_cleanup(data);
+
 		if (data->loopq_def != ODP_QUEUE_INVALID) {
 			if (odp_queue_destroy(data->loopq_def) < 0) {
 				OFP_ERR("Failed to destroy loop queue for %s",
@@ -1461,167 +1547,172 @@ const char *ofp_ifport_ifnet_down(int port, uint16_t vlan)
 		}
 #endif /*SP*/
 
-		vlan_ifnet_delete(
-			shm->ofp_ifnet_data[port].vlan_structs,
-			&key,
-			free_key);
 #ifdef SP
 		cmd[0] = '\0';
 		if (ofp_if_type(data) == OFP_IFT_GRE)
 			snprintf(cmd, sizeof(cmd), "ip tunnel del %s",
-				 ofp_port_vlan_to_ifnet_name(port, vlan));
+				 ofp_port_vlan_to_ifnet_name(port, subport));
 		else if (ofp_if_type(data) != OFP_IFT_LOOP)
 			snprintf(cmd, sizeof(cmd), "ip link del %s",
-				 ofp_port_vlan_to_ifnet_name(port, vlan));
+				 ofp_port_vlan_to_ifnet_name(port, subport));
 		if (cmd[0])
-			ret = exec_sys_call_depending_on_vrf(cmd, vrf);
+			exec_sys_call_depending_on_vrf(cmd, data->vrf);
 #endif /*SP*/
+
+		ofp_del_subport(ifnet_port, subport);
 	} else {
-		data = ofp_get_ifnet(port, vlan);
+		data = ofp_get_ifnet(port, subport, 0);
 
-		/* Remove interface from the if_addr v4 queue */
-		ofp_ifaddr_elem_del(data);
-#ifdef INET6
-		/* Remove interface from the if_addr v6 queue */
-		ofp_ifaddr6_elem_del(data);
-#endif
-#ifdef SP
-		vrf = data->vrf;
-#endif /*SP*/
-		if (data->ip_addr_info[0].ip_addr) {
-			uint32_t a = odp_cpu_to_be_32(
-				odp_be_to_cpu_32(data->ip_addr_info[0].ip_addr) &
-				(0xFFFFFFFFULL << (32 - data->ip_addr_info[0].masklen)));
-			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, 0 /*vlan*/, port,
-					a, data->ip_addr_info[0].masklen, 0, 0);
-			ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, 0 /*vlan*/, port,
-					data->ip_addr_info[0].ip_addr, 32, 0, 0);
-
-			ofp_free_ifnet_ip_list(data);
-#ifdef SP
-			snprintf(cmd, sizeof(cmd),
-				 "ifconfig %s 0.0.0.0",
-				 ofp_port_vlan_to_ifnet_name(port, 0));
-
-			ret = exec_sys_call_depending_on_vrf(cmd, vrf);
-#endif /* SP */
-		}
-#ifdef INET6
-		if (ofp_ip6_is_set(data->ip6_addr)) {
-			ofp_set_route6_params(OFP_ROUTE6_DEL, 0 /*vrf*/, 0 /*vlan*/,
-					      port, data->ip6_addr, data->ip6_prefix,
-					      gw6, 0);
-			ofp_set_route6_params(OFP_ROUTE6_DEL, 0 /*vrf*/, 0 /*vlan*/,
-					      port, data->ip6_addr, 128,
-					      gw6, 0);
-#ifdef SP
-			snprintf(cmd, sizeof(cmd),
-				 "ifconfig %s inet6 del %s/%d",
-				 ofp_port_vlan_to_ifnet_name(port, vlan),
-				 ofp_print_ip6_addr(data->ip6_addr),
-				 data->ip6_prefix);
-
-			ret = exec_sys_call_depending_on_vrf(cmd, vrf);
-#endif /*SP*/
-			memset(data->ip6_addr, 0, 16);
-		}
-#endif /* INET6 */
+		ofp_ifnet_addr_cleanup(data);
 	}
 
 	return NULL;
 }
 
-struct ofp_ifnet *ofp_get_ifnet(int port, uint16_t subport)
+static struct ofp_ifnet *ofp_get_subport(struct ofp_ifnet *ifnet_port,
+					 uint16_t subport)
 {
+	struct ofp_ifnet key, *data;
+
+	key.vlan = subport;
+	if (ofp_vlan_get_by_key(ifnet_port->vlan_structs, &key, (void *)&data))
+		return NULL;
+
+	return data;
+}
+
+static struct ofp_ifnet *ofp_create_subport(struct ofp_ifnet *ifnet_port,
+					    uint16_t subport)
+{
+	struct ofp_ifnet *ifnet = NULL;
+	struct ofp_in_ifinfo *ii = NULL;
+
+	ifnet = ofp_vlan_alloc();
+	if (!ifnet)
+		return NULL;
+
+	memset(ifnet, 0, sizeof(*ifnet));
+
+	ifnet->port = ifnet_port->port;
+	ifnet->vlan = subport;
+	memcpy(ifnet->if_mac, ifnet_port->if_mac, 6);
+	ifnet->if_mtu = ifnet_port->if_mtu;
+	ifnet->if_csum_offload_flags = ifnet_port->if_csum_offload_flags;
+
+#ifdef INET6
+	memcpy(ifnet->link_local, ifnet_port->link_local, 16);
+#endif /* INET6 */
+	/* Add interface to the if_addr v4 queue */
+	ofp_ifaddr_elem_add(ifnet);
+#ifdef INET6
+	/* Add interface to the if_addr v6 queue */
+	ofp_ifaddr6_elem_add(ifnet);
+#endif
+
+	/* Multicast related */
+	OFP_TAILQ_INIT(&ifnet->if_multiaddrs);
+	ifnet->if_flags |= OFP_IFF_MULTICAST;
+	ifnet->if_afdata[OFP_AF_INET] = &ifnet->ii_inet;
+
+	ii = &ifnet->ii_inet;
+	ii->ii_igmp = ofp_igmp_domifattach(ifnet);
+
+	IP_ADDR_LIST_INIT(ifnet);
+	memset(ifnet->ip_addr_info, 0, sizeof(ifnet->ip_addr_info));
+
+	vlan_ifnet_insert(ifnet_port->vlan_structs, ifnet);
+
+	return ifnet;
+}
+
+static int ofp_del_subport(struct ofp_ifnet *ifnet_port, uint16_t subport)
+{
+	struct ofp_ifnet key;
+
+	key.vlan = subport;
+	return vlan_ifnet_delete(ifnet_port->vlan_structs, &key, free_key);
+}
+
+struct ofp_ifnet *ofp_get_ifnet(int port, uint16_t subport,
+				odp_bool_t create_if_not_exist)
+{
+	struct ofp_ifnet *ifnet_port;
+	struct ofp_ifnet *ifnet = NULL;
+
 	if (port < 0 || port >= shm->ofp_num_ports) {
 		OFP_DBG("port:%d is outside the valid interval", port);
 		return NULL;
 	}
 
-	if (subport != OFP_IFPORT_NET_SUBPORT_ITF ||
-	    port == OFP_IFPORT_LOCAL) {
-		struct ofp_ifnet key, *data;
-
-		key.vlan = subport;
-		if (ofp_vlan_get_by_key(
-				shm->ofp_ifnet_data[port].vlan_structs,
-				&key,
-				(void *)&data))
-			return NULL;
-
-		return data;
-	}
-
-	if (port != PORT_UNDEF)
-		return &(shm->ofp_ifnet_data[port]);
-	else
+	if (port == PORT_UNDEF) {
+		OFP_DBG("port in undefined");
 		return NULL;
-}
-
-struct ofp_ifnet *ofp_get_create_ifnet(int port, uint16_t vlan)
-{
-	if (vlan || port == OFP_IFPORT_LOCAL) {
-		struct ofp_ifnet key, *data;
-
-		key.vlan = vlan;
-		if (ofp_vlan_get_by_key(
-				shm->ofp_ifnet_data[port].vlan_structs,
-				&key,
-				(void *)&data)) {
-			data = ofp_vlan_alloc();
-			memset(data, 0, sizeof(*data));
-			data->port = port;
-			data->vlan = vlan;
-			memcpy(data->if_mac,
-			       shm->ofp_ifnet_data[port].if_mac, 6);
-			data->if_csum_offload_flags =
-				shm->ofp_ifnet_data[port].if_csum_offload_flags;
-			data->if_mtu = shm->ofp_ifnet_data[port].if_mtu;
-#ifdef INET6
-			memcpy(data->link_local,
-				shm->ofp_ifnet_data[port].link_local, 16);
-#endif /* INET6 */
-			/* Add interface to the if_addr v4 queue */
-			ofp_ifaddr_elem_add(data);
-#ifdef INET6
-			/* Add interface to the if_addr v6 queue */
-			ofp_ifaddr6_elem_add(data);
-#endif
-			/* Multicast related */
-			OFP_TAILQ_INIT(&data->if_multiaddrs);
-			data->if_flags |= OFP_IFF_MULTICAST;
-			data->if_afdata[OFP_AF_INET] = &data->ii_inet;
-			struct ofp_in_ifinfo *ii = &data->ii_inet;
-			ii->ii_igmp = ofp_igmp_domifattach(data);
-			vlan_ifnet_insert(
-				shm->ofp_ifnet_data[port].vlan_structs, data);
-			IP_ADDR_LIST_INIT(data);
-			memset(data->ip_addr_info, 0, sizeof(data->ip_addr_info));
-		}
-		return data;
 	}
 
-	return &(shm->ofp_ifnet_data[port]);
+	ifnet_port = &shm->ofp_ifnet_data[port];
+
+	if (OFP_IFPORT_IS_NET(port)) {
+		if (subport != OFP_IFPORT_NET_SUBPORT_ITF) {
+			ifnet = ofp_get_subport(ifnet_port, subport);
+			if (ifnet || !create_if_not_exist)
+				return ifnet;
+
+			return ofp_create_subport(ifnet_port, subport);
+		}
+
+		return ifnet_port;
+	}
+
+	if (subport || port == OFP_IFPORT_LOCAL) {
+		ifnet = ofp_get_subport(ifnet_port, subport);
+		if (ifnet || !create_if_not_exist)
+			return ifnet;
+
+		return ofp_create_subport(ifnet_port, subport);
+	}
+
+	return ifnet_port;
 }
 
-int ofp_delete_ifnet(int port, uint16_t vlan)
+int ofp_delete_ifnet(int port, uint16_t subport)
 {
-	if (vlan || port == OFP_IFPORT_LOCAL) {
-		struct ofp_ifnet key, *data;
+	struct ofp_ifnet *ifnet_port;
+	struct ofp_ifnet *ifnet = NULL;
 
-		key.vlan = vlan;
-		if (ofp_vlan_get_by_key(
-			shm->ofp_ifnet_data[port].vlan_structs,
-			&key,
-			(void *)&data))
-			return 0; /* vlan not found (deleted already)*/
+	if (port < 0 || port >= shm->ofp_num_ports) {
+		OFP_DBG("port:%d is outside the valid interval", port);
+		return -1;
+	}
 
-		vlan_ifnet_delete(
-			shm->ofp_ifnet_data[port].vlan_structs,
-			&key,
-			free_key);
+	if (port == PORT_UNDEF) {
+		OFP_DBG("port in undefined");
+		return -1;
+	}
+
+	ifnet_port = &shm->ofp_ifnet_data[port];
+
+	if (OFP_IFPORT_IS_NET(port)) {
+		if (subport == OFP_IFPORT_NET_SUBPORT_ITF)
+			return 0;
+
+		ifnet = ofp_get_subport(ifnet_port, subport);
+		if (!ifnet)
+			return 0;/* subport not found (deleted already)*/
+
+		ofp_del_subport(ifnet_port, subport);
+
 		return 0;
 	}
+
+	if (subport || port == OFP_IFPORT_LOCAL) {
+		ifnet = ofp_get_subport(ifnet_port, subport);
+		if (!ifnet)
+			return 0;/* subport not found (deleted already)*/
+
+		ofp_del_subport(ifnet_port, subport);
+		return 0;
+	}
+
 	return -1;
 }
 
@@ -1652,7 +1743,7 @@ struct ofp_ifnet *ofp_get_ifnet_by_linux_ifindex(int ix)
 	if (odp_likely(ix < NUM_LINUX_INTERFACES))
 		return ofp_get_ifnet(
 			shm->linux_interface_table[ix].port,
-			shm->linux_interface_table[ix].vlan);
+			shm->linux_interface_table[ix].vlan, 0);
 
 	/* Iterate through other index values */
 	data.ix = ix;
@@ -1710,7 +1801,7 @@ struct ofp_ifnet *ofp_get_ifnet_match(uint32_t ip,
 				vlan_match_ip, &ip);
 
 			if (vlan_id)
-				return ofp_get_ifnet(port, vlan);
+				return ofp_get_ifnet(port, vlan, 0);
 		}
 	}
 	return NULL;
@@ -1814,7 +1905,7 @@ struct ofp_ifnet *ofp_get_ifnet_by_ip(uint32_t ip, uint16_t vrf)
 			shm->ofp_ifnet_data[port].vlan_structs,
 			vlan_match_ip_vrf, &iterdata);
 		if (vlan)
-			return ofp_get_ifnet(port, vlan);
+			return ofp_get_ifnet(port, vlan, 0);
 	}
 
 	return NULL;
@@ -1855,7 +1946,7 @@ struct ofp_ifnet *ofp_get_ifnet_by_tunnel(uint32_t tun_loc,
 		vlan_match_tun, &tundata);
 
 	if (greid)
-		return ofp_get_ifnet(port, greid);
+		return ofp_get_ifnet(port, greid, 0);
 
 	return NULL;
 }

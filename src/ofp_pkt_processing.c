@@ -167,7 +167,7 @@ enum ofp_return_code ofp_eth_vlan_processing(odp_packet_t *pkt)
 		vlan_hdr = (struct ofp_ether_vlan_header *)eth;
 		vlan = OFP_EVL_VLANOFTAG(odp_be_to_cpu_16(vlan_hdr->evl_tag));
 		ethtype = odp_be_to_cpu_16(vlan_hdr->evl_proto);
-		ifnet = ofp_get_ifnet(ifnet->port, vlan);
+		ifnet = ofp_get_ifnet(ifnet->port, vlan, 0);
 		if (!ifnet)
 			return OFP_PKT_DROP;
 		if (odp_likely(ofp_if_type(ifnet) != OFP_IFT_VXLAN))
@@ -321,7 +321,7 @@ enum ofp_return_code ofp_ipv4_processing(odp_packet_t *pkt)
 
 		/* Look for the correct device. */
 		ua = ofp_packet_user_area(*pkt);
-		dev = ofp_get_ifnet(OFP_IFPORT_VXLAN, ua->vxlan.vni);
+		dev = ofp_get_ifnet(OFP_IFPORT_VXLAN, ua->vxlan.vni, 0);
 		if (!dev)
 			return OFP_PKT_DROP;
 	}
@@ -544,7 +544,7 @@ enum ofp_return_code send_pkt_loop(struct ofp_ifnet *dev,
 	odp_packet_t pkt)
 {
 	if (dev->port != OFP_IFPORT_LOCAL)
-		dev = ofp_get_ifnet(dev->port, 0);
+		dev = ofp_get_ifnet(dev->port, OFP_IFPORT_NET_SUBPORT_ITF, 0);
 
 	if (odp_queue_enq(dev->loopq_def, odp_packet_to_event(pkt)))
 		return OFP_PKT_DROP;
@@ -654,7 +654,8 @@ enum ofp_return_code ofp_arp_processing(odp_packet_t *pkt)
 	return OFP_PKT_CONTINUE;
 }
 
-#define ETH_WITH_VLAN(dev) ((dev)->vlan && ofp_if_type(dev) != OFP_IFPORT_VXLAN)
+#define ETH_WITH_VLAN(dev) (ofp_if_type(dev) == OFP_IFT_ETHER && \
+			    (dev)->vlan != OFP_IFPORT_NET_SUBPORT_ITF)
 
 static void send_arp_request(struct ofp_ifnet *dev, uint32_t gw)
 {
@@ -734,7 +735,7 @@ enum ofp_return_code ofp_send_frame(struct ofp_ifnet *dev, odp_packet_t pkt)
 	eth_vlan = odp_packet_l2_ptr(pkt, NULL);
 
 	if (odp_be_to_cpu_16(eth->ether_type) == OFP_ETHERTYPE_VLAN) {
-		if (dev->vlan) {
+		if (dev->vlan != OFP_IFPORT_NET_SUBPORT_ITF) {
 			/* change vlan */
 			eth_vlan->evl_tag = odp_cpu_to_be_16(dev->vlan);
 		} else {
@@ -753,7 +754,7 @@ enum ofp_return_code ofp_send_frame(struct ofp_ifnet *dev, odp_packet_t pkt)
 			eth->ether_type = eth_vlan_tmp.evl_proto;
 		}
 	} else {
-		if (dev->vlan) {
+		if (dev->vlan != OFP_IFPORT_NET_SUBPORT_ITF) {
 			/* insert vlan */
 			eth_tmp = *eth;
 			eth_vlan = odp_packet_push_head(pkt, 4);
@@ -773,7 +774,7 @@ enum ofp_return_code ofp_send_frame(struct ofp_ifnet *dev, odp_packet_t pkt)
 		}
 	}
 
-	if (dev->vlan)
+	if (dev->vlan != OFP_IFPORT_NET_SUBPORT_ITF)
 		eth_hdr_len = OFP_ETHER_HDR_LEN + OFP_ETHER_VLAN_ENCAP_LEN;
 	else
 		eth_hdr_len = OFP_ETHER_HDR_LEN;
@@ -1053,7 +1054,7 @@ static enum ofp_return_code ofp_ip_output_find_route(struct ip_out *odata)
 		odata->nh->arp_ent_idx);
 	odata->gw = odata->nh->gw;
 
-	odata->dev_out = ofp_get_ifnet(odata->nh->port, odata->nh->vlan);
+	odata->dev_out = ofp_get_ifnet(odata->nh->port, odata->nh->vlan, 0);
 
 	if (!odata->dev_out) {
 		OFP_DBG("!dev_out");
@@ -1351,7 +1352,7 @@ enum ofp_return_code ofp_ip6_output(odp_packet_t pkt,
 			return OFP_PKT_DROP;
 	}
 
-	dev_out = ofp_get_ifnet(nh->port, vlan);
+	dev_out = ofp_get_ifnet(nh->port, vlan, 0);
 
 	if (!dev_out)
 		return OFP_PKT_DROP;

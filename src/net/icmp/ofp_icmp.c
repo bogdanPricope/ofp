@@ -646,7 +646,7 @@ icmp_reflect(odp_packet_t pkt)
 			goto drop;
 
 	}
-	dev_out = ofp_get_ifnet(nh->port, nh->vlan);
+	dev_out = ofp_get_ifnet(nh->port, nh->vlan, 0);
 	t.s_addr = dev_out->ip_addr_info[0].ip_addr;
 match:
 #ifdef MAC

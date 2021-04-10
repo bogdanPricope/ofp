@@ -73,7 +73,7 @@ void f_arp_add(ofp_print_t *pr, const char *s)
 		return;
 	}
 
-	itf = ofp_get_ifnet(port, vlan);
+	itf = ofp_get_ifnet(port, vlan, 0);
 	if (itf == NULL) {
 		ofp_print(pr, "Device not found.\r\n");
 		return;

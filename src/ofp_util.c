@@ -342,7 +342,7 @@ int ofp_name_to_port_vlan(const char *dev, int *vlan)
 	if (p)
 		*vlan = atoi(p+1);
 	else
-		*vlan = 0;
+		*vlan = OFP_IFPORT_NET_SUBPORT_ITF;
 
 	return port;
 }
@@ -368,7 +368,7 @@ char *ofp_port_vlan_to_ifnet_name(int port, int vlan)
 			OFP_VXLAN_IFNAME_PREFIX, vlan);
 		break;
 	default:
-		if (vlan)
+		if (vlan != OFP_IFPORT_NET_SUBPORT_ITF)
 			sprintf(buf[sel], "%s%d.%d",
 				OFP_IFNAME_PREFIX, port, vlan);
 		else

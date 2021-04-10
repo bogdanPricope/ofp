@@ -46,7 +46,8 @@
 
 #define PKT_BUF_SIZE  3000
 
-static uint32_t port = 0, vlan = 0, vrf = 0, def_mtu = 1500;
+static uint32_t port = 0, vlan = OFP_IFPORT_NET_SUBPORT_ITF;
+static uint32_t vrf = 0, def_mtu = 1500;
 static uint32_t dev_ip = 0x650AA8C0;   /* C0.A8.0A.65 = 192.168.10.101 */
 static uint8_t dev_mac[6] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
 static uint32_t dst_ipaddr = 0x660AA8C0; /* C0.A8.0A.66 = 192.168.10.102 */
@@ -65,7 +66,7 @@ static void init_ifnet(void)
 
 	ofp_ifport_net_ipv4_up(port, vlan, vrf, dev_ip, 24);
 
-	dev = ofp_get_ifnet(port, vlan);
+	dev = ofp_get_ifnet(port, vlan, 0);
 	memcpy(dev->if_mac, dev_mac, OFP_ETHER_ADDR_LEN);
 	dev->if_mtu = def_mtu;
 #ifdef SP
