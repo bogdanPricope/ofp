@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier:	BSD-3-Clause
  */
-
+#include "errno.h"
 #include "ofp.h"
 #include "socket_send_sendto_udp.h"
 #include "socket_util.h"
@@ -16,7 +16,7 @@ int init_udp_bind_local_ip(int *pfd_thread1, int *pfd_thread2)
 	*pfd_thread1 = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
 				OFP_IPPROTO_UDP);
 	if (*pfd_thread1 == -1) {
-		OFP_ERR("Faild to create SEND socket (errno = %d)\n",
+		OFP_ERR("Failed to create SEND socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -28,7 +28,7 @@ int init_udp_bind_local_ip(int *pfd_thread1, int *pfd_thread2)
 
 	if (ofp_bind(*pfd_thread1, (const struct ofp_sockaddr *)&addr,
 		sizeof(struct ofp_sockaddr_in)) == -1) {
-		OFP_ERR("Faild to bind socket (errno = %d)\n",
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -36,7 +36,7 @@ int init_udp_bind_local_ip(int *pfd_thread1, int *pfd_thread2)
 	*pfd_thread2 = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
 				OFP_IPPROTO_UDP);
 	if (*pfd_thread2 == -1) {
-		OFP_ERR("Faild to create RCV socket (errno = %d)\n",
+		OFP_ERR("Failed to create RCV socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -48,7 +48,7 @@ int init_udp_bind_local_ip(int *pfd_thread1, int *pfd_thread2)
 
 	if (ofp_bind(*pfd_thread2, (const struct ofp_sockaddr *)&addr,
 		sizeof(struct ofp_sockaddr_in)) == -1) {
-		OFP_ERR("Faild to bind socket (errno = %d)\n",
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -63,7 +63,7 @@ int init_udp_bind_any(int *pfd_thread1, int *pfd_thread2)
 	*pfd_thread1 = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
 			OFP_IPPROTO_UDP);
 	if (*pfd_thread1 == -1) {
-		OFP_ERR("Faild to create SEND socket (errno = %d)\n",
+		OFP_ERR("Failed to create SEND socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -75,7 +75,7 @@ int init_udp_bind_any(int *pfd_thread1, int *pfd_thread2)
 
 	if (ofp_bind(*pfd_thread1, (const struct ofp_sockaddr *)&addr,
 		sizeof(struct ofp_sockaddr_in)) == -1) {
-		OFP_ERR("Faild to bind socket (errno = %d)\n",
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -83,7 +83,7 @@ int init_udp_bind_any(int *pfd_thread1, int *pfd_thread2)
 	*pfd_thread2 = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
 			OFP_IPPROTO_UDP);
 	if (*pfd_thread2 == -1) {
-		OFP_ERR("Faild to create RCV socket (errno = %d)\n",
+		OFP_ERR("Failed to create RCV socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -95,7 +95,7 @@ int init_udp_bind_any(int *pfd_thread1, int *pfd_thread2)
 
 	if (ofp_bind(*pfd_thread2, (const struct ofp_sockaddr *)&addr,
 		sizeof(struct ofp_sockaddr_in)) == -1) {
-		OFP_ERR("Faild to bind socket (errno = %d)\n",
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -110,7 +110,7 @@ int init_udp6_bind_local_ip(int *pfd_thread1, int *pfd_thread2)
 
 	*pfd_thread1 = ofp_socket(OFP_AF_INET6, OFP_SOCK_DGRAM, 0);
 	if (*pfd_thread1 == -1) {
-		OFP_ERR("Faild to create socket 1 (errno = %d)\n",
+		OFP_ERR("Failed to create socket 1 (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -118,18 +118,21 @@ int init_udp6_bind_local_ip(int *pfd_thread1, int *pfd_thread2)
 	addr.sin6_len = sizeof(struct ofp_sockaddr_in6);
 	addr.sin6_family = OFP_AF_INET6;
 	addr.sin6_port = odp_cpu_to_be_16(TEST_PORT);
-	inet_pton(AF_INET6, "fd00:1baf::1", (void *)&addr.sin6_addr);
+	if (inet_pton(AF_INET6, "fd00:1baf::1", (void *)&addr.sin6_addr) != 1) {
+		OFP_ERR("Failed to convert IPv6 address (errno = %d)\n", errno);
+		return -1;
+	}
 
 	if (ofp_bind(*pfd_thread1, (const struct ofp_sockaddr *)&addr,
 		sizeof(addr)) == -1) {
-		OFP_ERR("Faild to bind socket (errno = %d)\n",
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
 
 	*pfd_thread2 = ofp_socket(OFP_AF_INET6, OFP_SOCK_DGRAM, 0);
 	if (*pfd_thread2 == -1) {
-		OFP_ERR("Faild to create socket 2 (errno = %d)\n",
+		OFP_ERR("Failed to create socket 2 (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -141,7 +144,7 @@ int init_udp6_bind_local_ip(int *pfd_thread1, int *pfd_thread2)
 
 	if (ofp_bind(*pfd_thread2, (const struct ofp_sockaddr *)&addr,
 		sizeof(addr)) == -1) {
-		OFP_ERR("Faild to bind socket (errno = %d)\n",
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -155,7 +158,7 @@ int init_udp6_bind_any(int *pfd_thread1, int *pfd_thread2)
 
 	*pfd_thread1 = ofp_socket(OFP_AF_INET6, OFP_SOCK_DGRAM, 0);
 	if (*pfd_thread1 == -1) {
-		OFP_ERR("Faild to create socket 1 (errno = %d)\n",
+		OFP_ERR("Failed to create socket 1 (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -167,14 +170,14 @@ int init_udp6_bind_any(int *pfd_thread1, int *pfd_thread2)
 
 	if (ofp_bind(*pfd_thread1, (const struct ofp_sockaddr *)&addr,
 		sizeof(addr)) == -1) {
-		OFP_ERR("Faild to bind socket (errno = %d)\n",
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
 
 	*pfd_thread2 = ofp_socket(OFP_AF_INET6, OFP_SOCK_DGRAM, 0);
 	if (*pfd_thread2 == -1) {
-		OFP_ERR("Faild to create socket 2 (errno = %d)\n",
+		OFP_ERR("Failed to create socket 2 (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -186,7 +189,7 @@ int init_udp6_bind_any(int *pfd_thread1, int *pfd_thread2)
 
 	if (ofp_bind(*pfd_thread2, (const struct ofp_sockaddr *)&addr,
 		sizeof(addr)) == -1) {
-		OFP_ERR("Faild to bind socket (errno = %d)\n",
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -208,13 +211,13 @@ int send_ip4_udp_local_ip(int fd)
 	if ((ofp_connect(fd, (const struct ofp_sockaddr *)&addr,
 		sizeof(struct ofp_sockaddr_in)) == -1) &&
 		(ofp_errno != OFP_EINPROGRESS)) {
-		OFP_ERR("Faild to connect socket (errno = %d)\n",
+		OFP_ERR("Failed to connect socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
 
 	if (ofp_send(fd, buf, strlen(buf), 0) != (ofp_ssize_t)strlen(buf)) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 	OFP_INFO("Data (%s) sent successfully.\n", buf);
@@ -235,7 +238,7 @@ int sendto_ip4_udp_local_ip(int fd)
 	if (ofp_sendto(fd, buf, strlen(buf), 0,
 		(struct ofp_sockaddr *)&dest_addr,
 		sizeof(dest_addr)) != (ofp_ssize_t)strlen(buf)) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 	OFP_INFO("Data (%s) sent successfully.\n", buf);
@@ -257,13 +260,13 @@ int send_ip4_udp_any(int fd)
 	if ((ofp_connect(fd, (const struct ofp_sockaddr *)&addr,
 		sizeof(struct ofp_sockaddr_in)) == -1) &&
 		(ofp_errno != OFP_EINPROGRESS)) {
-		OFP_ERR("Faild to connect socket (errno = %d)\n",
+		OFP_ERR("Failed to connect socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
 
 	if (ofp_send(fd, buf, strlen(buf), 0) != (ofp_ssize_t)strlen(buf)) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -285,7 +288,7 @@ int sendto_ip4_udp_any(int fd)
 	if (ofp_sendto(fd, buf, strlen(buf), 0,
 		(struct ofp_sockaddr *)&dest_addr,
 		sizeof(dest_addr)) != (ofp_ssize_t)strlen(buf)) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -309,12 +312,12 @@ int send_ip6_udp_local_ip(int fd)
 	if ((ofp_connect(fd, (const struct ofp_sockaddr *)&addr,
 		sizeof(struct ofp_sockaddr_in6)) == -1) &&
 		(ofp_errno != OFP_EINPROGRESS)) {
-		OFP_ERR("Faild to connect socket (errno = %d)\n",
+		OFP_ERR("Failed to connect socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
 	if (ofp_send(fd, buf, strlen(buf), 0) != (ofp_ssize_t)strlen(buf)) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -336,7 +339,7 @@ int sendto_ip6_udp_local_ip(int fd)
 	if (ofp_sendto(fd, buf, strlen(buf), 0,
 		(struct ofp_sockaddr *)&dest_addr,
 		sizeof(dest_addr)) != (ofp_ssize_t)strlen(buf)) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -359,13 +362,13 @@ int send_ip6_udp_any(int fd)
 	if ((ofp_connect(fd, (const struct ofp_sockaddr *)&addr,
 		sizeof(struct ofp_sockaddr_in6)) == -1) &&
 		(ofp_errno != OFP_EINPROGRESS)) {
-		OFP_ERR("Faild to connect socket (errno = %d)\n",
+		OFP_ERR("Failed to connect socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
 
 	if (ofp_send(fd, buf, strlen(buf), 0) != (ofp_ssize_t)strlen(buf)) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -388,7 +391,7 @@ int sendto_ip6_udp_any(int fd)
 	if (ofp_sendto(fd, buf, strlen(buf), 0,
 		(struct ofp_sockaddr *)&dest_addr,
 		sizeof(dest_addr)) != (ofp_ssize_t)strlen(buf)) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 

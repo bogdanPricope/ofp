@@ -60,6 +60,9 @@ enum {
 #define OFP_IFPORT_IS_NET(_port) \
 	(_port >= OFP_IFPORT_NET_FIRST && OFP_IFPORT_IS_NET_U(_port))
 
+#define OFP_IFPORT_IS_LOCAL(_port) \
+	(_port == OFP_IFPORT_LOCAL)
+
 /* Sub-port of the network (physical or otherwise) interface */
 #define OFP_IFPORT_NET_SUBPORT_ITF 4096
 

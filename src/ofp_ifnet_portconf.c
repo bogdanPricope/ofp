@@ -1184,6 +1184,7 @@ const char *ofp_ifport_net_ipv6_up(int port, uint16_t vlan,
 #ifdef SP
 	char cmd[200];
 	int ret = 0;
+	char *iname = NULL;
 #endif /* SP */
 	uint8_t gw6[16];
 	struct ofp_ifnet *data;
@@ -1198,12 +1199,12 @@ const char *ofp_ifport_net_ipv6_up(int port, uint16_t vlan,
 
 	data = ofp_get_ifnet(port, vlan, 0);
 
-	if (vlan) {
+	if (vlan != OFP_IFPORT_NET_SUBPORT_ITF) {
 		if (data == NULL) {
 			data = ofp_get_ifnet(port, vlan, 1);
 			data->vrf = 0;
 #ifdef SP
-			char *iname = ofp_port_vlan_to_ifnet_name(port, 0);
+			iname = ofp_port_vlan_to_ifnet_name(port, OFP_IFPORT_NET_SUBPORT_ITF);
 			snprintf(cmd, sizeof(cmd),
 				 "ip link add name %s.%d link %s type vlan id %d",
 				 iname, vlan, iname, vlan);
@@ -1242,10 +1243,12 @@ const char *ofp_ifport_net_ipv6_up(int port, uint16_t vlan,
 #endif /*SP*/
 	} else {
 		if (ofp_ip6_is_set(data->ip6_addr)) {
-			ofp_set_route6_params(OFP_ROUTE6_DEL, 0 /*vrf*/, 0 /*vlan*/,
-					      port, data->ip6_addr, data->ip6_prefix,
-					      gw6, 0);
-			ofp_set_route6_params(OFP_ROUTE6_DEL, 0 /*vrf*/, 0 /*vlan*/,
+			ofp_set_route6_params(OFP_ROUTE6_DEL, 0 /*vrf*/,
+					      OFP_IFPORT_NET_SUBPORT_ITF,
+					      port, data->ip6_addr,
+					      data->ip6_prefix, gw6, 0);
+			ofp_set_route6_params(OFP_ROUTE6_DEL, 0 /*vrf*/,
+					      OFP_IFPORT_NET_SUBPORT_ITF,
 					      port, data->ip6_addr, 128,
 					      gw6, 0);
 		}
@@ -1257,10 +1260,12 @@ const char *ofp_ifport_net_ipv6_up(int port, uint16_t vlan,
 		/* Add interface to the if_addr v6 queue */
 		ofp_ifaddr6_elem_add(data);
 
-		ofp_set_route6_params(OFP_ROUTE6_ADD, 0 /*vrf*/, 0 /*vlan*/, port,
+		ofp_set_route6_params(OFP_ROUTE6_ADD, 0 /*vrf*/,
+				      OFP_IFPORT_NET_SUBPORT_ITF, port,
 				      data->ip6_addr, 128, gw6,
 				      OFP_RTF_LOCAL);
-		ofp_set_route6_params(OFP_ROUTE6_ADD, 0 /*vrf*/, 0 /*vlan*/, port,
+		ofp_set_route6_params(OFP_ROUTE6_ADD, 0 /*vrf*/,
+				      OFP_IFPORT_NET_SUBPORT_ITF, port,
 				      data->ip6_addr, data->ip6_prefix, gw6,
 				      OFP_RTF_NET);
 #ifdef SP
@@ -1271,7 +1276,7 @@ const char *ofp_ifport_net_ipv6_up(int port, uint16_t vlan,
 
 		snprintf(cmd, sizeof(cmd),
 			 "ifconfig %s inet6 add %s/%d up",
-			 ofp_port_vlan_to_ifnet_name(port, 0),
+			 ofp_port_vlan_to_ifnet_name(port, OFP_IFPORT_NET_SUBPORT_ITF),
 			 ofp_print_ip6_addr(addr), masklen);
 
 		ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
@@ -1497,6 +1502,45 @@ static const char *ofp_ifport_net_down(int port, uint16_t subport)
 	return NULL;
 }
 
+static const char *ofp_ifport_local_down(int port, uint16_t subport)
+{
+	struct ofp_ifnet *ifnet_port = NULL;
+	struct ofp_ifnet *ifnet;
+
+	if (!OFP_IFPORT_IS_LOCAL(port))
+		return "Wrong port number";
+
+	ifnet_port = &shm->ofp_ifnet_data[port];
+
+	ifnet = ofp_get_subport(ifnet_port, subport);
+	if (!ifnet)
+		return "Unknown interface";
+
+	ofp_ifnet_addr_cleanup(ifnet);
+
+	if (ifnet->loopq_def != ODP_QUEUE_INVALID) {
+		if (odp_queue_destroy(ifnet->loopq_def) < 0) {
+			OFP_ERR("Failed to destroy loop queue for %s",
+				ifnet->if_name);
+		}
+		ifnet->loopq_def = ODP_QUEUE_INVALID;
+	}
+
+	free(ifnet->ii_inet.ii_igmp);
+
+#ifdef SP
+	if (ifnet->linux_index < NUM_LINUX_INTERFACES) {
+		int idx = ifnet->linux_index;
+
+		shm->linux_interface_table[idx].port = PORT_UNDEF;
+	}
+#endif /*SP*/
+
+	ofp_del_subport(ifnet_port, subport);
+
+	return NULL;
+}
+
 const char *ofp_ifport_ifnet_down(int port, uint16_t subport)
 {
 #ifdef SP
@@ -1513,9 +1557,12 @@ const char *ofp_ifport_ifnet_down(int port, uint16_t subport)
 	if (OFP_IFPORT_IS_NET(port))
 		return ofp_ifport_net_down(port, subport);
 
+	if (OFP_IFPORT_IS_LOCAL(port))
+		return ofp_ifport_local_down(port, subport);
+
 	ifnet_port = &shm->ofp_ifnet_data[port];
 
-	if (subport || port == OFP_IFPORT_LOCAL) {
+	if (subport) {
 		data = ofp_get_subport(ifnet_port, subport);
 		if (!data)
 			return "Unknown interface";
@@ -1539,24 +1586,15 @@ const char *ofp_ifport_ifnet_down(int port, uint16_t subport)
 		free(data->ii_inet.ii_igmp);
 
 #ifdef SP
-		if (port == OFP_IFPORT_LOCAL &&
-		    data->linux_index < NUM_LINUX_INTERFACES) {
-			int idx = data->linux_index;
-
-			shm->linux_interface_table[idx].port = PORT_UNDEF;
-		}
-#endif /*SP*/
-
-#ifdef SP
 		cmd[0] = '\0';
 		if (ofp_if_type(data) == OFP_IFT_GRE)
 			snprintf(cmd, sizeof(cmd), "ip tunnel del %s",
 				 ofp_port_vlan_to_ifnet_name(port, subport));
-		else if (ofp_if_type(data) != OFP_IFT_LOOP)
+		else
 			snprintf(cmd, sizeof(cmd), "ip link del %s",
 				 ofp_port_vlan_to_ifnet_name(port, subport));
-		if (cmd[0])
-			exec_sys_call_depending_on_vrf(cmd, data->vrf);
+
+		exec_sys_call_depending_on_vrf(cmd, data->vrf);
 #endif /*SP*/
 
 		ofp_del_subport(ifnet_port, subport);
@@ -1663,7 +1701,15 @@ struct ofp_ifnet *ofp_get_ifnet(int port, uint16_t subport,
 		return ifnet_port;
 	}
 
-	if (subport || port == OFP_IFPORT_LOCAL) {
+	if (OFP_IFPORT_IS_LOCAL(port)) {
+		ifnet = ofp_get_subport(ifnet_port, subport);
+		if (ifnet || !create_if_not_exist)
+			return ifnet;
+
+		return ofp_create_subport(ifnet_port, subport);
+	}
+
+	if (subport) {
 		ifnet = ofp_get_subport(ifnet_port, subport);
 		if (ifnet || !create_if_not_exist)
 			return ifnet;
@@ -1704,7 +1750,16 @@ int ofp_delete_ifnet(int port, uint16_t subport)
 		return 0;
 	}
 
-	if (subport || port == OFP_IFPORT_LOCAL) {
+	if (OFP_IFPORT_IS_LOCAL(port)) {
+		ifnet = ofp_get_subport(ifnet_port, subport);
+		if (!ifnet)
+			return 0;/* subport not found (deleted already)*/
+
+		ofp_del_subport(ifnet_port, subport);
+		return 0;
+	}
+
+	if (subport) {
 		ifnet = ofp_get_subport(ifnet_port, subport);
 		if (!ifnet)
 			return 0;/* subport not found (deleted already)*/

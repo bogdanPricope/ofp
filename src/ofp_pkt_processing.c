@@ -1361,7 +1361,7 @@ enum ofp_return_code ofp_ip6_output(odp_packet_t pkt,
 	if (ofp_if_type(dev_out) == OFP_IFT_GRE)
 		return ofp_output_ipv6_to_gre(pkt, dev_out);
 
-	if (!vlan)
+	if (vlan == OFP_IFPORT_NET_SUBPORT_ITF)
 		l2_size = sizeof(struct ofp_ether_header);
 	else
 		l2_size = sizeof(struct ofp_ether_vlan_header);
@@ -1401,7 +1401,7 @@ enum ofp_return_code ofp_ip6_output(odp_packet_t pkt,
 		}
 	}
 
-	if (!vlan) {
+	if (vlan == OFP_IFPORT_NET_SUBPORT_ITF) {
 		struct ofp_ether_header *eth =
 			(struct ofp_ether_header *)l2_addr;
 
