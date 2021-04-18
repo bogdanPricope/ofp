@@ -622,13 +622,29 @@ int ofp_initialize(ofp_initialize_param_t *params)
 	state = OFP_INIT_STATE_LOOPBACK_INIT;
 	if (params->if_loopback) {
 		uint32_t loop_addr = odp_cpu_to_be_32(OFP_INADDR_LOOPBACK);
+#ifdef INET6
+		uint8_t loop6_add[16] = {0x00, 0x00, 0x00, 0x00,
+					 0x00, 0x00, 0x00, 0x00,
+					 0x00, 0x00, 0x00, 0x00,
+					 0x00, 0x00, 0x00, 0x01};
+#endif /* INET6 */
 
 		err = ofp_ifport_local_ipv4_up(0, 0, loop_addr, 8);
 		if (err != NULL) {
-			OFP_ERR("Failed to create the interface: %s.", err);
+			OFP_ERR("Failed to set IPv4 loopback interface: %s.",
+				err);
 			state = OFP_INIT_STATE_LOOPBACK_INIT;
 			goto init_error;
 		}
+#ifdef INET6
+		err = ofp_ifport_local_ipv6_up(0, loop6_add, 64);
+		if (err != NULL) {
+			OFP_ERR("Failed to set IPv6 loopback interface: %s.",
+				err);
+			state = OFP_INIT_STATE_LOOPBACK_INIT;
+			goto init_error;
+		}
+#endif /* INET6 */
 	}
 
 	odp_schedule_resume();
