@@ -17,7 +17,7 @@ int init_udp_local_ip(int *pfd_thread1, int *pfd_thread2)
 	*pfd_thread1 = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
 				OFP_IPPROTO_UDP);
 	if (*pfd_thread1 == -1) {
-		OFP_ERR("Faild to create SEND socket (errno = %d)\n",
+		OFP_ERR("Failed to create SEND socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -25,7 +25,7 @@ int init_udp_local_ip(int *pfd_thread1, int *pfd_thread2)
 	*pfd_thread2 = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
 				OFP_IPPROTO_UDP);
 	if (*pfd_thread2 == -1) {
-		OFP_ERR("Faild to create RCV socket (errno = %d)\n",
+		OFP_ERR("Failed to create RCV socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -37,7 +37,7 @@ int init_udp_local_ip(int *pfd_thread1, int *pfd_thread2)
 
 	if (ofp_bind(*pfd_thread2, (const struct ofp_sockaddr *)&addr,
 		sizeof(struct ofp_sockaddr_in)) == -1) {
-		OFP_ERR("Faild to bind socket (errno = %d)\n",
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -53,7 +53,7 @@ int init_udp_any(int *pfd_thread1, int *pfd_thread2)
 	*pfd_thread1 = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
 			OFP_IPPROTO_UDP);
 	if (*pfd_thread1 == -1) {
-		OFP_ERR("Faild to create SEND socket (errno = %d)\n",
+		OFP_ERR("Failed to create SEND socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -61,7 +61,7 @@ int init_udp_any(int *pfd_thread1, int *pfd_thread2)
 	*pfd_thread2 = ofp_socket(OFP_AF_INET, OFP_SOCK_DGRAM,
 			OFP_IPPROTO_UDP);
 	if (*pfd_thread2 == -1) {
-		OFP_ERR("Faild to create RCV socket (errno = %d)\n",
+		OFP_ERR("Failed to create RCV socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -73,7 +73,7 @@ int init_udp_any(int *pfd_thread1, int *pfd_thread2)
 
 	if (ofp_bind(*pfd_thread2, (const struct ofp_sockaddr *)&addr,
 		sizeof(struct ofp_sockaddr_in)) == -1) {
-		OFP_ERR("Faild to bind socket (errno = %d)\n",
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
 			ofp_errno);
 		return -1;
 	}
@@ -129,7 +129,7 @@ int send_udp_local_ip(int fd)
 	if (ofp_sendto(fd, buf, strlen(buf), 0,
 		(struct ofp_sockaddr *)&dest_addr,
 		sizeof(dest_addr)) == -1) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -167,7 +167,7 @@ int recv_udp(int fd)
 
 	len = ofp_recv(fd, buf, len, 0);
 	if (len == -1) {
-		OFP_ERR("Faild to rcv data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to rcv data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -191,7 +191,7 @@ int send_udp_any(int fd)
 	if (ofp_sendto(fd, buf, strlen(buf), 0,
 		(struct ofp_sockaddr *)&dest_addr,
 		sizeof(dest_addr)) == -1) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -210,7 +210,7 @@ int recvfrom_udp(int fd)
 	len = ofp_recvfrom(fd, buf, len, 0,
 			(struct ofp_sockaddr *)&addr, &addr_len);
 	if (len == -1) {
-		OFP_ERR("Faild to rcv data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to rcv data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -218,7 +218,7 @@ int recvfrom_udp(int fd)
 	OFP_INFO("Data (%s, len = %d) was received.\n", buf, len);
 
 	if (addr_len != sizeof(addr)) {
-		OFP_ERR("Faild to rcv source address: %d (errno = %d)\n",
+		OFP_ERR("Failed to rcv source address: %d (errno = %d)\n",
 			addr_len, ofp_errno);
 		return -1;
 	}
@@ -237,7 +237,7 @@ int recvfrom_udp_null_addr(int fd)
 
 	len = ofp_recvfrom(fd, buf, len, 0, NULL, NULL);
 	if (len == -1) {
-		OFP_ERR("Faild to rcv data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to rcv data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -249,6 +249,39 @@ int recvfrom_udp_null_addr(int fd)
 }
 
 #ifdef INET6
+int init_udp6_loopback(int *pfd_thread1, int *pfd_thread2)
+{
+	struct ofp_sockaddr_in6 addr = {0};
+
+	*pfd_thread1 = ofp_socket(OFP_AF_INET6, OFP_SOCK_DGRAM, 0);
+	if (*pfd_thread1 == -1) {
+		OFP_ERR("Failed to create socket 1 (errno = %d)\n",
+			ofp_errno);
+		return -1;
+	}
+
+	*pfd_thread2 = ofp_socket(OFP_AF_INET6, OFP_SOCK_DGRAM, 0);
+	if (*pfd_thread2 == -1) {
+		OFP_ERR("Failed to create socket 2 (errno = %d)\n",
+			ofp_errno);
+		return -1;
+	}
+
+	addr.sin6_len = sizeof(struct ofp_sockaddr_in6);
+	addr.sin6_family = OFP_AF_INET6;
+	addr.sin6_port = odp_cpu_to_be_16(TEST_PORT + 1);
+	addr.sin6_addr = ofp_in6addr_loopback;
+
+	if (ofp_bind(*pfd_thread2, (const struct ofp_sockaddr *)&addr,
+		     sizeof(addr)) == -1) {
+		OFP_ERR("Failed to bind socket (errno = %d)\n",
+			ofp_errno);
+		return -1;
+	}
+
+	return 0;
+}
+
 int send_udp6_local_ip(int fd)
 {
 	struct ofp_sockaddr_in6 dest_addr = {0};
@@ -262,7 +295,7 @@ int send_udp6_local_ip(int fd)
 	if (ofp_sendto(fd, buf, strlen(buf), 0,
 		(struct ofp_sockaddr *)&dest_addr,
 		sizeof(dest_addr)) == -1) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -285,7 +318,30 @@ int send_udp6_any(int fd)
 	if (ofp_sendto(fd, buf, strlen(buf), 0,
 		(struct ofp_sockaddr *)&dest_addr,
 		sizeof(dest_addr)) == -1) {
-		OFP_ERR("Faild to send data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
+		return -1;
+	}
+
+	OFP_INFO("Data (%s) sent successfully.\n", buf);
+
+	OFP_INFO("SUCCESS.\n");
+	return 0;
+}
+
+int send_udp6_loopback(int fd)
+{
+	struct ofp_sockaddr_in6 dest_addr = {0};
+	const char *buf = "socket_test";
+
+	dest_addr.sin6_len = sizeof(struct ofp_sockaddr_in6);
+	dest_addr.sin6_family = OFP_AF_INET6;
+	dest_addr.sin6_port = odp_cpu_to_be_16(TEST_PORT + 1);
+	dest_addr.sin6_addr = ofp_in6addr_loopback;
+
+	if (ofp_sendto(fd, buf, strlen(buf), 0,
+		       (struct ofp_sockaddr *)&dest_addr,
+		       sizeof(dest_addr)) == -1) {
+		OFP_ERR("Failed to send data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -305,7 +361,7 @@ int recvfrom_udp6(int fd)
 	len = ofp_recvfrom(fd, buf, len, 0,
 			(struct ofp_sockaddr *)&addr, &addr_len);
 	if (len == -1) {
-		OFP_ERR("Faild to rcv data(errno = %d)\n", ofp_errno);
+		OFP_ERR("Failed to rcv data(errno = %d)\n", ofp_errno);
 		return -1;
 	}
 
@@ -313,7 +369,7 @@ int recvfrom_udp6(int fd)
 	OFP_INFO("Data (%s, len = %d) was received.\n", buf, len);
 
 	if (addr_len != sizeof(addr)) {
-		OFP_ERR("Faild to rcv source address: %d (errno = %d)\n",
+		OFP_ERR("Failed to rcv source address: %d (errno = %d)\n",
 			addr_len, ofp_errno);
 		return -1;
 	}

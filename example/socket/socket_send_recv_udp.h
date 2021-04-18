@@ -20,8 +20,11 @@ int recvfrom_udp(int fd);
 int recvfrom_udp_null_addr(int fd);
 
 #ifdef INET6
+int init_udp6_loopback(int *pfd_thread1, int *pfd_thread2);
+
 int send_udp6_local_ip(int fd);
 int send_udp6_any(int fd);
+int send_udp6_loopback(int fd);
 int recvfrom_udp6(int fd);
 #endif /* INET6 */
 

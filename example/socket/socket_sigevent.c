@@ -322,6 +322,10 @@ static void notify_tcp_rcv(union ofp_sigval *sv)
 	int i;
 
 	ss = (struct ofp_sock_sigval *)sv;
+
+	if (ss->event != OFP_EVENT_RECV)
+		return;
+
 	data = odp_packet_data(ss->pkt);
 	data_len = odp_packet_len(ss->pkt);
 
@@ -420,6 +424,10 @@ static void notify_tcp_accept(union ofp_sigval *sv)
 	struct ofp_sock_sigval *ss;
 
 	ss = (struct ofp_sock_sigval *)sv;
+
+	if (ss->event != OFP_EVENT_ACCEPT)
+		return;
+
 	OFP_INFO("TCP Connection received on socket %d: %d created.\n",
 		ss->sockfd,
 		ss->sockfd2);

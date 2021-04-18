@@ -335,6 +335,12 @@ int main(int argc, char *argv[])
 		run_suite(send_udp6_any, recvfrom_udp_null_addr);
 	end_suite();
 	OFP_INFO("Test ended.\n");
+
+	OFP_INFO("\n\nSuite: IPv6 UDP bind loopback IP: sendto + recv.\n\n");
+	if (!init_suite(init_udp6_loopback))
+		run_suite(send_udp6_loopback, recv_udp);
+	end_suite();
+	OFP_INFO("Test ended.\n");
 #endif /*INET6*/
 
 	OFP_INFO("\n\nSuite: IPv4 TCP socket local IP: listen.\n\n");
@@ -414,7 +420,6 @@ int main(int argc, char *argv[])
 		run_suite(send_tcp4_msg_waitall, receive_tcp4_msg_waitall);
 	end_suite();
 	OFP_INFO("Test ended.\n");
-
 
 #ifdef INET6
 	OFP_INFO("\n\nSuite: IPv6 TCP socket local IP: send + recv.\n\n");
