@@ -297,7 +297,7 @@ int ofp_socket_init_global(odp_pool_t pool)
 	}
 	shm_socket->free_sleepers = shm_sleeper_list;
 
-	shm_socket->somaxconn = SOMAXCONN;
+	shm_socket->somaxconn = OFP_SOMAXCONN;
 	shm_socket->pool = pool;
 	odp_rwlock_init(&shm_socket->so_global_mtx);
 	odp_rwlock_init(&shm_socket->ofp_accept_mtx);
