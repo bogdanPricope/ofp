@@ -71,7 +71,7 @@ static void string_copy(char *dest, size_t destsize,
 	if (cpy_len > destsize - 1)
 		cpy_len = destsize - 1;
 
-	strncpy(dest, src, cpy_len);
+	odp_memcpy(dest, src, cpy_len);
 	dest[cpy_len] = '\0';
 }
 

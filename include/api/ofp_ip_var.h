@@ -49,7 +49,7 @@ struct ipovly {
 	uint16_t	ih_len;			/* protocol length */
 	struct ofp_in_addr ih_src;		/* source internet address */
 	struct ofp_in_addr ih_dst;		/* destination internet address */
-};
+} __attribute__((packed));
 
 
 /*

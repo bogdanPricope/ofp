@@ -189,7 +189,7 @@ static void read_conf_file(ofp_initialize_param_t *params, const char *filename)
 		str_len  = strlen(str);					\
 		if (str_len >= sizeof(params->p) - 1)			\
 			str_len = sizeof(params->p) - 1;		\
-		strncpy(params->p, str, str_len);			\
+		odp_memcpy(params->p, str, str_len);			\
 		params->p[str_len] = '\0';				\
 	}								\
 } while (0)

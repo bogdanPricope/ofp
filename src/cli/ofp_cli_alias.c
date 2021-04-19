@@ -43,14 +43,14 @@ void f_alias_set(ofp_print_t *pr, const char *s)
 			len_max = name_len;
 			if (name_len > ALIAS_TABLE_NAME_LEN - 1)
 				len_max = ALIAS_TABLE_NAME_LEN - 1;
-			strncpy(V_cli_alias_table[i].name, name, len_max);
+			odp_memcpy(V_cli_alias_table[i].name, name, len_max);
 			V_cli_alias_table[i].name[len_max] = 0;
 
 			/* alias cmd*/
 			len_max = strlen(line);
 			if (len_max > ALIAS_TABLE_CMD_LEN - 1)
 				len_max = ALIAS_TABLE_CMD_LEN - 1;
-			strncpy(V_cli_alias_table[i].cmd, line, len_max);
+			odp_memcpy(V_cli_alias_table[i].cmd, line, len_max);
 			V_cli_alias_table[i].cmd[len_max] = 0;
 
 			/*Add command*/
@@ -67,8 +67,8 @@ void f_alias_set(ofp_print_t *pr, const char *s)
 				len_max = strlen(line);
 				if (len_max > ALIAS_TABLE_CMD_LEN - 1)
 					len_max = ALIAS_TABLE_CMD_LEN - 1;
-				strncpy(V_cli_alias_table[i].cmd,
-					line, len_max);
+				odp_memcpy(V_cli_alias_table[i].cmd,
+					   line, len_max);
 				V_cli_alias_table[i].cmd[len_max] = 0;
 				break;
 			}
