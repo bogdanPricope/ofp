@@ -172,6 +172,16 @@ struct ofp_ifnet *ofp_get_ifnet_pktio(odp_pktio_t pktio)
 	return NULL;
 }
 
+struct ofp_ifnet *ofp_get_port_itf(int port)
+{
+	if (port < 0 || port >= shm->ofp_num_ports) {
+		OFP_DBG("port:%d is outside the valid interval", port);
+		return NULL;
+	}
+
+	return &shm->ofp_ifnet_data[port];
+}
+
 odp_pktio_t ofp_ifport_net_pktio_get(int port)
 {
 	struct ofp_ifnet *ifnet = NULL;
@@ -1016,8 +1026,7 @@ void ofp_leave_multicast_group(struct ofp_ifnet *dev_vxlan)
 	dev_vxlan->ii_inet.ii_allhosts = NULL;
 }
 
-const char *ofp_ifport_vxlan_ipv4_up(int vni, uint16_t vrf,
-				     uint32_t group,
+const char *ofp_ifport_vxlan_ipv4_up(int vni, uint32_t group,
 				     int physport, int physvlan,
 				     uint32_t addr, int mlen)
 {
@@ -1032,7 +1041,6 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint16_t vrf,
 	(void)ret;
 	(void)new;
 #endif /*SP*/
-	(void)vrf; /* vrf is copied from the root device */
 
 	mask = ~0;
 	mask = odp_cpu_to_be_32(mask << (32 - mlen));
@@ -1057,9 +1065,8 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint16_t vrf,
 	data->if_mtu = dev_root->if_mtu - sizeof(struct ofp_vxlan_udp_ip);
 	data->physport = physport;
 	data->physvlan = physvlan;
-	data->pkt_pool = ofp_get_packet_pool();
+	data->pkt_pool = shm->ofp_ifnet_data[OFP_IFPORT_VXLAN].pkt_pool;
 
-	shm->ofp_ifnet_data[OFP_IFPORT_VXLAN].pkt_pool = ofp_get_packet_pool();
 	ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, vni, OFP_IFPORT_VXLAN,
 			     addr, 32, 0, OFP_RTF_LOCAL);
 	ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, vni, OFP_IFPORT_VXLAN,
@@ -1079,16 +1086,16 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint16_t vrf,
 		 "ip link add vxlan%d type vxlan id %d group %s dev %s",
 		 vni, vni, ofp_print_ip_addr(group),
 		 ofp_port_vlan_to_ifnet_name(physport, physvlan));
-	ret = exec_sys_call_depending_on_vrf(cmd, vrf);
+	ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
 
 	snprintf(cmd, sizeof(cmd),
 		 "ip link set dev vxlan%d up", vni);
-	ret = exec_sys_call_depending_on_vrf(cmd, vrf);
+	ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
 
 	snprintf(cmd, sizeof(cmd),
 		 "ip addr add dev vxlan%d %s", vni,
 		 ofp_print_ip_addr(addr));
-	ret = exec_sys_call_depending_on_vrf(cmd, vrf);
+	ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
 #endif /* SP */
 
 	return NULL;
@@ -1541,6 +1548,44 @@ static const char *ofp_ifport_local_down(int port, uint16_t subport)
 	return NULL;
 }
 
+static const char *ofp_ifport_vxlan_down(int port, uint16_t subport)
+{
+	struct ofp_ifnet *data;
+	struct ofp_ifnet *ifnet_port = NULL;
+#ifdef SP
+	char cmd[200];
+#endif /* SP */
+
+	if (!OFP_IFPORT_IS_VXLAN(port))
+		return "Wrong port number";
+
+	ifnet_port = &shm->ofp_ifnet_data[port];
+
+	data = ofp_get_subport(ifnet_port, subport);
+	if (!data)
+		return "Unknown interface";
+
+	ofp_ifnet_addr_cleanup(data);
+
+	if (data->ii_inet.ii_allhosts) {
+		/* Use data->ii_inet.ii_allhosts for Vxlan. */
+		ofp_in_leavegroup(data->ii_inet.ii_allhosts, NULL);
+	}
+
+	free(data->ii_inet.ii_igmp);
+
+#ifdef SP
+	snprintf(cmd, sizeof(cmd), "ip link del %s",
+		 ofp_port_vlan_to_ifnet_name(port, subport));
+
+	exec_sys_call_depending_on_vrf(cmd, data->vrf);
+#endif /*SP*/
+
+	ofp_del_subport(ifnet_port, subport);
+
+	return NULL;
+}
+
 const char *ofp_ifport_ifnet_down(int port, uint16_t subport)
 {
 #ifdef SP
@@ -1559,6 +1604,9 @@ const char *ofp_ifport_ifnet_down(int port, uint16_t subport)
 
 	if (OFP_IFPORT_IS_LOCAL(port))
 		return ofp_ifport_local_down(port, subport);
+
+	if (OFP_IFPORT_IS_VXLAN(port))
+		return ofp_ifport_vxlan_down(port, subport);
 
 	ifnet_port = &shm->ofp_ifnet_data[port];
 
@@ -1709,6 +1757,14 @@ struct ofp_ifnet *ofp_get_ifnet(int port, uint16_t subport,
 		return ofp_create_subport(ifnet_port, subport);
 	}
 
+	if (OFP_IFPORT_IS_VXLAN(port)) {
+		ifnet = ofp_get_subport(ifnet_port, subport);
+		if (ifnet || !create_if_not_exist)
+			return ifnet;
+
+		return ofp_create_subport(ifnet_port, subport);
+	}
+
 	if (subport) {
 		ifnet = ofp_get_subport(ifnet_port, subport);
 		if (ifnet || !create_if_not_exist)
@@ -1751,6 +1807,15 @@ int ofp_delete_ifnet(int port, uint16_t subport)
 	}
 
 	if (OFP_IFPORT_IS_LOCAL(port)) {
+		ifnet = ofp_get_subport(ifnet_port, subport);
+		if (!ifnet)
+			return 0;/* subport not found (deleted already)*/
+
+		ofp_del_subport(ifnet_port, subport);
+		return 0;
+	}
+
+	if (OFP_IFPORT_IS_VXLAN(port)) {
 		ifnet = ofp_get_subport(ifnet_port, subport);
 		if (!ifnet)
 			return 0;/* subport not found (deleted already)*/

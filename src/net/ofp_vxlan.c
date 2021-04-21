@@ -171,7 +171,7 @@ enum ofp_return_code ofp_vxlan_input(odp_packet_t pkt)
 	struct ofp_ip *ip = (struct ofp_ip *)odp_packet_l3_ptr(pkt, NULL);
 	struct ofp_udphdr *udp;
 	struct ofp_vxlan_h *vxlan;
-	struct ofp_ifnet *dev, *dev0;
+	struct ofp_ifnet *dev, *dev_root;
 	struct ofp_ether_header *eth;
 	uint32_t vni;
 	int vxlen;
@@ -215,9 +215,9 @@ enum ofp_return_code ofp_vxlan_input(odp_packet_t pkt)
 	ofp_vxlan_set_mac_dst(eth->ether_shost, from);
 	odp_packet_user_ptr_set(pkt, dev);
 	ofp_ipsec_flags_set(pkt, 0);
-	dev0 = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0, 0);
+	dev_root = ofp_get_port_itf(OFP_IFPORT_VXLAN);
 	odp_event_t ev = odp_packet_to_event(pkt);
-	if (odp_queue_enq(dev0->loopq_def, ev) < 0) {
+	if (odp_queue_enq(dev_root->loopq_def, ev) < 0) {
 		OFP_ERR("odp_queue_enq");
 		return OFP_PKT_DROP;
 	}
@@ -368,7 +368,7 @@ int ofp_vxlan_lookup_shared_memory(void)
 int ofp_set_vxlan_interface_queue(void)
 {
 	odp_queue_param_t qparam;
-	struct ofp_ifnet *ifnet = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0, 0);
+	struct ofp_ifnet *ifnet = ofp_get_port_itf(OFP_IFPORT_VXLAN);
 
 	/* VXLAN interface queue */
 	odp_queue_param_init(&qparam);
@@ -386,12 +386,14 @@ int ofp_set_vxlan_interface_queue(void)
 	/* Set device loopq queue context */
 	odp_queue_context_set(ifnet->loopq_def, ifnet, sizeof(ifnet));
 
+	ifnet->pkt_pool = V_global_packet_pool;
+
 	return 0;
 }
 
 int ofp_clean_vxlan_interface_queue(void)
 {
-	struct ofp_ifnet *ifnet = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0, 0);
+	struct ofp_ifnet *ifnet = ofp_get_port_itf(OFP_IFPORT_VXLAN);
 
 	if (ifnet == NULL) {
 		OFP_ERR("Error: Failed to locate VXLAN port");

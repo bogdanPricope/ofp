@@ -508,7 +508,7 @@ static int add_link(struct ifinfomsg *ifinfo_entry, int vlan, int link,
 		} else if (ifinfo_entry->ifi_type == ARPHRD_VXLAN) {
 			OFP_DBG(" - VXLAN ADD LINK vlan=%d link=%d",
 				vlan, link);
-			dev_root = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0, 0);
+			dev_root = ofp_get_port_itf(OFP_IFPORT_VXLAN);
 		} else {
 			dev_root = ofp_get_ifnet_by_linux_ifindex(link);
 		}
@@ -599,7 +599,7 @@ static int del_link(struct ifinfomsg *ifinfo_entry, int vlan, int link)
 		if (ifinfo_entry->ifi_type == ARPHRD_IPGRE) {
 			dev_root = ofp_get_ifnet(OFP_IFPORT_GRE, 0, 0);
 		} else if (ifinfo_entry->ifi_type == ARPHRD_VXLAN) {
-			dev_root = ofp_get_ifnet(OFP_IFPORT_VXLAN, 0, 0);
+			dev_root = ofp_get_port_itf(OFP_IFPORT_VXLAN);
 			OFP_DBG("VXLAN DEL LINK vlan=%d", vlan);
 		} else {
 			dev_root = ofp_get_ifnet_by_linux_ifindex(link);

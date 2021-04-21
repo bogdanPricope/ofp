@@ -156,7 +156,7 @@ void f_ifconfig_vxlan(ofp_print_t *pr, const char *s)
 {
 	char dev[16], physdev[16], group[16];
 	uint32_t vxlan_group, addr;
-	int n, port, vlan, physport, physvlan, a, b, c, d, m;
+	int n, port, subport_vni, physport, physvlan, a, b, c, d, m;
 	const char *err;
 
 	if ((n = sscanf(s, "%s %s %s %d.%d.%d.%d/%d",
@@ -166,7 +166,7 @@ void f_ifconfig_vxlan(ofp_print_t *pr, const char *s)
 	}
 
 	addr = odp_cpu_to_be_32((a << 24) | (b << 16) | (c << 8) | d);
-	port = ofp_name_to_port_vlan(dev, &vlan);
+	port = ofp_name_to_port_vlan(dev, &subport_vni);
 
 	if (port != OFP_IFPORT_VXLAN) {
 		ofp_print(pr, "Invalid device name %s.\r\n", dev);
@@ -181,7 +181,8 @@ void f_ifconfig_vxlan(ofp_print_t *pr, const char *s)
 	}
 
 	/* vrf is copied from the physical port */
-	err = ofp_ifport_vxlan_ipv4_up(vlan, 0, vxlan_group, physport, physvlan,
+	err = ofp_ifport_vxlan_ipv4_up(subport_vni, vxlan_group,
+				       physport, physvlan,
 				       addr, m);
 	if (err != NULL)
 		ofp_print(pr, err);

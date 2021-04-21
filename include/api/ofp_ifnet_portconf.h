@@ -63,6 +63,9 @@ enum {
 #define OFP_IFPORT_IS_LOCAL(_port) \
 	(_port == OFP_IFPORT_LOCAL)
 
+#define OFP_IFPORT_IS_VXLAN(_port) \
+	(_port == OFP_IFPORT_VXLAN)
+
 /* Sub-port of the network (physical or otherwise) interface */
 #define OFP_IFPORT_NET_SUBPORT_ITF 4096
 
@@ -287,8 +290,6 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t subport,
  * Port is always OFP_IFPORT_VXLAN.
  *
  * @param subport_vni VXLAN Network Identifier
- * @param vrf Virtual routing table
- *
  * @param group Multicast IP Address group
  * @param endpoint_port Endpoint interface port
  * @param endpoint_subport Endpoint interface sub-port
@@ -298,8 +299,7 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t subport,
  * @retval NULL on success
  * @retval error message on error
  */
-const char *ofp_ifport_vxlan_ipv4_up(int subport_vni, uint16_t vrf,
-				     uint32_t group,
+const char *ofp_ifport_vxlan_ipv4_up(int subport_vni, uint32_t group,
 				     int endpoint_port, int endpoint_subport,
 				     uint32_t addr, int masklen);
 
