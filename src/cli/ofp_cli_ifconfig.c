@@ -135,15 +135,22 @@ void f_ifconfig_tun(ofp_print_t *pr, const char *s)
 		return;
 	}
 
-	if (!ofp_parse_ip_addr(loc, &tun_loc))
+	if (!ofp_parse_ip_addr(loc, &tun_loc)) {
+		ofp_print(pr, "Invalid address: %s.", loc);
 		return;
-	if (!ofp_parse_ip_addr(rem, &tun_rem))
+	}
+	if (!ofp_parse_ip_addr(rem, &tun_rem)) {
+		ofp_print(pr, "Invalid address: %s.", rem);
 		return;
-	if (!ofp_parse_ip_addr(peer, &p2p))
+	}
+	if (!ofp_parse_ip_addr(peer, &p2p)) {
+		ofp_print(pr, "Invalid address: %s.", peer);
 		return;
-	if (!ofp_parse_ip_addr(ip, &addr))
+	}
+	if (!ofp_parse_ip_addr(ip, &addr)) {
+		ofp_print(pr, "Invalid address: %s.", ip);
 		return;
-
+	}
 
 	err = ofp_ifport_tun_ipv4_up(port, vlan, vrf, tun_loc, tun_rem, p2p,
 				     addr, masklen);

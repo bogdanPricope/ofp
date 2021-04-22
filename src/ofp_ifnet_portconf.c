@@ -925,8 +925,8 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t greid,
 	(void)new;
 #endif /*SP*/
 
-	if (port != OFP_IFPORT_GRE || greid == 0)
-		return "Wrong port number or tunnel ID.";
+	if (!OFP_IFPORT_IS_GRE(port))
+		return "Wrong port number.";
 
 	if (vrf >= global_param->num_vrf)
 		return "VRF ID too big";
@@ -1586,14 +1586,41 @@ static const char *ofp_ifport_vxlan_down(int port, uint16_t subport)
 	return NULL;
 }
 
-const char *ofp_ifport_ifnet_down(int port, uint16_t subport)
+static const char *ofp_ifport_gre_down(int port, uint16_t subport)
 {
+	struct ofp_ifnet *data;
+	struct ofp_ifnet *ifnet_port = NULL;
 #ifdef SP
 	char cmd[200];
 #endif /* SP */
-	struct ofp_ifnet *data;
-	struct ofp_ifnet *ifnet_port = NULL;
 
+	if (!OFP_IFPORT_IS_GRE(port))
+		return "Wrong port number";
+
+	ifnet_port = &shm->ofp_ifnet_data[port];
+
+	data = ofp_get_subport(ifnet_port, subport);
+	if (!data)
+		return "Unknown interface";
+
+	ofp_ifnet_addr_cleanup(data);
+
+	free(data->ii_inet.ii_igmp);
+
+#ifdef SP
+	snprintf(cmd, sizeof(cmd), "ip tunnel del %s",
+		 ofp_port_vlan_to_ifnet_name(port, subport));
+
+	exec_sys_call_depending_on_vrf(cmd, data->vrf);
+#endif /*SP*/
+
+	ofp_del_subport(ifnet_port, subport);
+
+	return NULL;
+}
+
+const char *ofp_ifport_ifnet_down(int port, uint16_t subport)
+{
 	if (port < 0 || port >= shm->ofp_num_ports) {
 		OFP_DBG("port:%d is outside the valid interval", port);
 		return "Wrong port number";
@@ -1608,49 +1635,8 @@ const char *ofp_ifport_ifnet_down(int port, uint16_t subport)
 	if (OFP_IFPORT_IS_VXLAN(port))
 		return ofp_ifport_vxlan_down(port, subport);
 
-	ifnet_port = &shm->ofp_ifnet_data[port];
-
-	if (subport) {
-		data = ofp_get_subport(ifnet_port, subport);
-		if (!data)
-			return "Unknown interface";
-
-		ofp_ifnet_addr_cleanup(data);
-
-		if (data->loopq_def != ODP_QUEUE_INVALID) {
-			if (odp_queue_destroy(data->loopq_def) < 0) {
-				OFP_ERR("Failed to destroy loop queue for %s",
-					data->if_name);
-			}
-			data->loopq_def = ODP_QUEUE_INVALID;
-		}
-
-		if (ofp_if_type(data) == OFP_IFT_VXLAN &&
-		    data->ii_inet.ii_allhosts) {
-			/* Use data->ii_inet.ii_allhosts for Vxlan. */
-			ofp_in_leavegroup(data->ii_inet.ii_allhosts, NULL);
-		}
-
-		free(data->ii_inet.ii_igmp);
-
-#ifdef SP
-		cmd[0] = '\0';
-		if (ofp_if_type(data) == OFP_IFT_GRE)
-			snprintf(cmd, sizeof(cmd), "ip tunnel del %s",
-				 ofp_port_vlan_to_ifnet_name(port, subport));
-		else
-			snprintf(cmd, sizeof(cmd), "ip link del %s",
-				 ofp_port_vlan_to_ifnet_name(port, subport));
-
-		exec_sys_call_depending_on_vrf(cmd, data->vrf);
-#endif /*SP*/
-
-		ofp_del_subport(ifnet_port, subport);
-	} else {
-		data = ofp_get_ifnet(port, subport, 0);
-
-		ofp_ifnet_addr_cleanup(data);
-	}
+	if (OFP_IFPORT_IS_GRE(port))
+		return ofp_ifport_gre_down(port, subport);
 
 	return NULL;
 }
@@ -1765,7 +1751,7 @@ struct ofp_ifnet *ofp_get_ifnet(int port, uint16_t subport,
 		return ofp_create_subport(ifnet_port, subport);
 	}
 
-	if (subport) {
+	if (OFP_IFPORT_IS_GRE(port)) {
 		ifnet = ofp_get_subport(ifnet_port, subport);
 		if (ifnet || !create_if_not_exist)
 			return ifnet;
@@ -1773,7 +1759,8 @@ struct ofp_ifnet *ofp_get_ifnet(int port, uint16_t subport,
 		return ofp_create_subport(ifnet_port, subport);
 	}
 
-	return ifnet_port;
+	OFP_DBG("port:%d is unknown.", port);
+	return NULL;
 }
 
 int ofp_delete_ifnet(int port, uint16_t subport)
@@ -1824,7 +1811,7 @@ int ofp_delete_ifnet(int port, uint16_t subport)
 		return 0;
 	}
 
-	if (subport) {
+	if (OFP_IFPORT_IS_GRE(port)) {
 		ifnet = ofp_get_subport(ifnet_port, subport);
 		if (!ifnet)
 			return 0;/* subport not found (deleted already)*/

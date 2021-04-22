@@ -66,6 +66,9 @@ enum {
 #define OFP_IFPORT_IS_VXLAN(_port) \
 	(_port == OFP_IFPORT_VXLAN)
 
+#define OFP_IFPORT_IS_GRE(_port) \
+	(_port == OFP_IFPORT_GRE)
+
 /* Sub-port of the network (physical or otherwise) interface */
 #define OFP_IFPORT_NET_SUBPORT_ITF 4096
 
