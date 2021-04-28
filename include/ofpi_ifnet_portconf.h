@@ -20,30 +20,14 @@
 #include "ofpi_ethernet.h"
 #include "ofpi_queue.h"
 
+#define PORT_UNDEF 0xFFFF
+
 #define OFP_IFNAME_PREFIX "fp"
 #define OFP_GRE_IFNAME_PREFIX "gre"
 #define OFP_VXLAN_IFNAME_PREFIX "vxlan"
 #define OFP_LOCAL_IFNAME_PREFIX "lo"
 
 OFP_TAILQ_HEAD(ofp_ifmultihead, ofp_ifmultiaddr);
-
-#define OFP_IFNET_LOCK_READ(name) odp_rwlock_read_lock(\
-		&ofp_ifnet_locks_shm->lock_##name##_rw)
-#define OFP_IFNET_UNLOCK_READ(name) odp_rwlock_read_unlock(\
-		&ofp_ifnet_locks_shm->lock_##name##_rw)
-#define OFP_IFNET_LOCK_WRITE(name) odp_rwlock_write_lock(\
-		&ofp_ifnet_locks_shm->lock_##name##_rw)
-#define OFP_IFNET_UNLOCK_WRITE(name) odp_rwlock_write_unlock(\
-		&ofp_ifnet_locks_shm->lock_##name##_rw)
-
-struct ofp_ifnet_locks_str {
-	odp_rwlock_t lock_ifaddr_list_rw;
-#ifdef INET6
-	odp_rwlock_t lock_ifaddr6_list_rw;
-#endif /* INET6 */
-};
-
-extern __thread struct ofp_ifnet_locks_str *ofp_ifnet_locks_shm;
 
 OFP_TAILQ_HEAD(ofp_in_ifaddrhead, ofp_ifnet);
 
@@ -385,15 +369,6 @@ int ofp_get_linuxindex(const char *name);
 #endif /* SP */
 
 int ofp_free_port_alloc(void);
-
-int ofp_portconf_lookup_shared_memory(void);
-void ofp_portconf_init_prepare(void);
-int ofp_portconf_init_global(void);
-int ofp_portconf_term_global(void);
-int ofp_vlan_lookup_shared_memory(void);
-void ofp_vlan_init_prepare(void);
-int ofp_vlan_init_global(void);
-int ofp_vlan_term_global(void);
 
 #ifdef SP
 void ofp_update_ifindex_lookup_tab(struct ofp_ifnet *ifnet);

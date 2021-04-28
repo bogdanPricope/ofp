@@ -12,6 +12,7 @@
 #include <limits.h>
 
 #include "ofpi.h"
+#include "ofpi_ifnet_shm.h"
 #include "ofpi_ifnet_portconf.h"
 #include "ofpi_ifnet.h"
 #include "ofpi_route.h"
@@ -29,17 +30,6 @@
 #include "ofpi_netlink.h"
 #include "ofpi_igmp_var.h"
 
-#define SHM_NAME_PORTS "OfpPortconfShMem"
-#define SHM_NAME_PORT_LOCKS "OfpPortconfLocksShMem"
-#define SHM_NAME_VLAN "OfpVlanconfShMem"
-
-
-#ifdef SP
-#define NUM_LINUX_INTERFACES 512
-#endif /*SP*/
-
-#define PORT_UNDEF 0xFFFF
-
 void ofp_ifnet_print_ip_addrs(struct ofp_ifnet *dev);
 
 static struct ofp_ifnet *ofp_create_subport(struct ofp_ifnet *ifnet_port,
@@ -47,41 +37,6 @@ static struct ofp_ifnet *ofp_create_subport(struct ofp_ifnet *ifnet_port,
 static struct ofp_ifnet *ofp_get_subport(struct ofp_ifnet *ifnet_port,
 					 uint16_t subport);
 static int ofp_del_subport(struct ofp_ifnet *ifnet_port, uint16_t subport);
-
-/*
- * Shared data
- */
-struct ofp_portconf_mem {
-	struct ofp_ifnet ofp_ifnet_data[OFP_IFPORT_NUM];
-	odp_atomic_u32_t free_port;
-	int ofp_num_ports;
-
-	struct ofp_in_ifaddrhead in_ifaddrhead;
-#ifdef INET6
-	struct ofp_in_ifaddrhead in_ifaddr6head;
-#endif /* INET6 */
-
-#ifdef SP
-	struct ofp_linux_interface_param {
-		uint16_t port;
-		uint16_t vlan;
-	} linux_interface_table[NUM_LINUX_INTERFACES];
-#endif /* SP */
-};
-
-struct ofp_vlan_mem {
-	struct ofp_ifnet *free_ifnet_list;
-	odp_rwlock_t vlan_mtx;
-	struct ofp_ifnet vlan_ifnet[0];
-};
-
-/*
- * Data per core
- */
-static __thread struct ofp_portconf_mem *shm;
-__thread struct ofp_ifnet_locks_str  *ofp_ifnet_locks_shm;
-
-static __thread struct ofp_vlan_mem *vlan_shm;
 
 int ofp_ifport_net_create(char *if_name,
 			  odp_pktio_param_t *pktio_param,
@@ -133,7 +88,7 @@ ofp_ifnet_t ofp_ifport_net_ifnet_get_by_name(char *if_name)
 	struct ofp_ifnet *ifnet = NULL;
 
 	for (i = OFP_IFPORT_NET_FIRST; i <= OFP_IFPORT_NET_LAST; i++) {
-		ifnet = &shm->ofp_ifnet_data[i];
+		ifnet = &V_ifnet_port[i];
 
 		if (ifnet->if_state == OFP_IFT_STATE_USED &&
 		    !strcmp(ifnet->if_name, if_name)) {
@@ -146,7 +101,7 @@ ofp_ifnet_t ofp_ifport_net_ifnet_get_by_name(char *if_name)
 
 int ofp_ifport_count(void)
 {
-	return shm->ofp_num_ports;
+	return V_ifnet_num_ports;
 }
 
 ofp_ifnet_t ofp_ifport_ifnet_get(int port, uint16_t subport)
@@ -164,9 +119,9 @@ struct ofp_ifnet *ofp_get_ifnet_pktio(odp_pktio_t pktio)
 	int i;
 
 	for (i = 0; i < OFP_IFPORT_NUM; i++) {
-		if (shm->ofp_ifnet_data[i].if_state == OFP_IFT_STATE_USED &&
-		    shm->ofp_ifnet_data[i].pktio == pktio)
-			return &shm->ofp_ifnet_data[i];
+		if (V_ifnet_port[i].if_state == OFP_IFT_STATE_USED &&
+		    V_ifnet_port[i].pktio == pktio)
+			return &V_ifnet_port[i];
 	}
 
 	return NULL;
@@ -174,12 +129,12 @@ struct ofp_ifnet *ofp_get_ifnet_pktio(odp_pktio_t pktio)
 
 struct ofp_ifnet *ofp_get_port_itf(int port)
 {
-	if (port < 0 || port >= shm->ofp_num_ports) {
+	if (port < 0 || port >= V_ifnet_num_ports) {
 		OFP_DBG("port:%d is outside the valid interval", port);
 		return NULL;
 	}
 
-	return &shm->ofp_ifnet_data[port];
+	return &V_ifnet_port[port];
 }
 
 odp_pktio_t ofp_ifport_net_pktio_get(int port)
@@ -189,7 +144,7 @@ odp_pktio_t ofp_ifport_net_pktio_get(int port)
 	if (!OFP_IFPORT_IS_NET(port))
 		return ODP_PKTIO_INVALID;
 
-	ifnet = &shm->ofp_ifnet_data[port];
+	ifnet = &V_ifnet_port[port];
 	if (ifnet->if_state != OFP_IFT_STATE_USED)
 		return ODP_PKTIO_INVALID;
 
@@ -204,7 +159,7 @@ odp_queue_t ofp_ifport_net_spq_get(int port)
 	if (!OFP_IFPORT_IS_NET(port))
 		return ODP_QUEUE_INVALID;
 
-	ifnet = &shm->ofp_ifnet_data[port];
+	ifnet = &V_ifnet_port[port];
 	if (ifnet->if_state != OFP_IFT_STATE_USED)
 		return ODP_QUEUE_INVALID;
 
@@ -223,24 +178,11 @@ odp_queue_t ofp_ifport_net_loopq_get(int port)
 	if (!OFP_IFPORT_IS_NET(port))
 		return ODP_QUEUE_INVALID;
 
-	ifnet = &shm->ofp_ifnet_data[port];
+	ifnet = &V_ifnet_port[port];
 	if (ifnet->if_state != OFP_IFT_STATE_USED)
 		return ODP_QUEUE_INVALID;
 
 	return ifnet->loopq_def;
-}
-
-/*Wrapper functions over AVL tree*/
-static void *new_vlan(
-		int (*compare_fun)(void *compare_arg, void *a, void *b),
-		void *compare_arg)
-{
-	return avl_tree_new(compare_fun, compare_arg);
-}
-
-static void free_vlan(void *root, int (*free_key_fun)(void *arg))
-{
-	avl_tree_free((avl_tree *)root, free_key_fun);
 }
 
 static int vlan_iterate_inorder(void *root,
@@ -277,16 +219,6 @@ int ofp_vlan_get_by_key(
 	return avl_get_by_key(root, key, value_address);
 }
 
-static int vlan_ifnet_compare(void *compare_arg, void *a, void *b)
-{
-	struct ofp_ifnet *a1 = a;
-	struct ofp_ifnet *b1 = b;
-
-	(void)compare_arg;
-
-	return (a1->vlan - b1->vlan);
-}
-
 static int vlan_match_ip(void *key, void *iter_arg)
 {
 	struct ofp_ifnet *iface = key;
@@ -300,7 +232,7 @@ static int vlan_match_ip(void *key, void *iter_arg)
 
 int ofp_free_port_alloc(void)
 {
-	int port = (int)odp_atomic_fetch_inc_u32(&shm->free_port);
+	int port = (int)odp_atomic_fetch_inc_u32(&V_ifnet_free_port);
 	if (port > OFP_IFPORT_NET_LAST) {
 		OFP_ERR("Interfaces are depleted");
 		return -1;
@@ -310,12 +242,13 @@ int ofp_free_port_alloc(void)
 
 struct ofp_ifnet *ofp_vlan_alloc(void)
 {
-	odp_rwlock_write_lock(&vlan_shm->vlan_mtx);
-	struct ofp_ifnet *vlan = vlan_shm->free_ifnet_list;
-	if (vlan_shm->free_ifnet_list) {
-		vlan_shm->free_ifnet_list = vlan_shm->free_ifnet_list->next;
-	}
-	odp_rwlock_write_unlock(&vlan_shm->vlan_mtx);
+	odp_rwlock_write_lock(&V_ifnet_vlan_mtx);
+	struct ofp_ifnet *vlan = V_ifnet_vlan_free_list;
+
+	if (V_ifnet_vlan_free_list)
+		V_ifnet_vlan_free_list = V_ifnet_vlan_free_list->next;
+
+	odp_rwlock_write_unlock(&V_ifnet_vlan_mtx);
 
 	if (vlan == NULL) {
 		OFP_ERR("Cannot allocate vlan!");
@@ -327,10 +260,10 @@ struct ofp_ifnet *ofp_vlan_alloc(void)
 
 static void ofp_vlan_free(struct ofp_ifnet *vlan)
 {
-	odp_rwlock_write_lock(&vlan_shm->vlan_mtx);
-	vlan->next = vlan_shm->free_ifnet_list;
-	vlan_shm->free_ifnet_list = vlan;
-	odp_rwlock_write_unlock(&vlan_shm->vlan_mtx);
+	odp_rwlock_write_lock(&V_ifnet_vlan_mtx);
+	vlan->next = V_ifnet_vlan_free_list;
+	V_ifnet_vlan_free_list = vlan;
+	odp_rwlock_write_unlock(&V_ifnet_vlan_mtx);
 }
 
 static void print_eth_stats(odp_pktio_stats_t stats, ofp_print_t *pr)
@@ -550,32 +483,32 @@ void ofp_ifport_ifnet_show(ofp_print_t *pr)
 
 	/* fp interfaces */
 	for (i = 0; i < OFP_FP_INTERFACE_MAX; i++) {
-		iter_vlan(&shm->ofp_ifnet_data[i], pr);
-		vlan_iterate_inorder(shm->ofp_ifnet_data[i].vlan_structs,
-					iter_vlan, pr);
+		iter_vlan(&V_ifnet_port[i], pr);
+		vlan_iterate_inorder(V_ifnet_port[i].vlan_structs,
+				     iter_vlan, pr);
 	}
 
 	/* gre interfaces */
-	if (avl_get_first(shm->ofp_ifnet_data[OFP_IFPORT_GRE].vlan_structs))
+	if (avl_get_first(V_ifnet_port[OFP_IFPORT_GRE].vlan_structs))
 		vlan_iterate_inorder(
-			shm->ofp_ifnet_data[OFP_IFPORT_GRE].vlan_structs,
+			V_ifnet_port[OFP_IFPORT_GRE].vlan_structs,
 			iter_vlan, pr);
 	else
 		ofp_print(pr, "gre\r\n"
 				"	Link not configured\r\n\r\n");
 
 	/* vxlan interfaces */
-	if (avl_get_first(shm->ofp_ifnet_data[OFP_IFPORT_VXLAN].vlan_structs))
+	if (avl_get_first(V_ifnet_port[OFP_IFPORT_VXLAN].vlan_structs))
 		vlan_iterate_inorder(
-			shm->ofp_ifnet_data[OFP_IFPORT_VXLAN].vlan_structs,
+			V_ifnet_port[OFP_IFPORT_VXLAN].vlan_structs,
 			iter_vlan, pr);
 	else
 		ofp_print(pr, "vxlan\r\n"
 				"	Link not configured\r\n\r\n");
 	/* local interfaces */
-	if (avl_get_first(shm->ofp_ifnet_data[OFP_IFPORT_LOCAL].vlan_structs))
+	if (avl_get_first(V_ifnet_port[OFP_IFPORT_LOCAL].vlan_structs))
 		vlan_iterate_inorder(
-			shm->ofp_ifnet_data[OFP_IFPORT_LOCAL].vlan_structs,
+			V_ifnet_port[OFP_IFPORT_LOCAL].vlan_structs,
 			iter_vlan, pr);
 	else
 		ofp_print(pr, "lo\r\n"
@@ -596,9 +529,9 @@ void ofp_ifport_net_ipv4_addr_show(ofp_print_t *pr)
 {
 	int i;
 	for (i = 0; i < OFP_FP_INTERFACE_MAX; i++) {
-		iter_vlan_2(&shm->ofp_ifnet_data[i], pr);
-		vlan_iterate_inorder(shm->ofp_ifnet_data[i].vlan_structs,
-				iter_vlan_2, pr);
+		iter_vlan_2(&V_ifnet_port[i], pr);
+		vlan_iterate_inorder(V_ifnet_port[i].vlan_structs,
+				     iter_vlan_2, pr);
 	}
 }
 
@@ -1065,7 +998,7 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint32_t group,
 	data->if_mtu = dev_root->if_mtu - sizeof(struct ofp_vxlan_udp_ip);
 	data->physport = physport;
 	data->physvlan = physvlan;
-	data->pkt_pool = shm->ofp_ifnet_data[OFP_IFPORT_VXLAN].pkt_pool;
+	data->pkt_pool = V_ifnet_port[OFP_IFPORT_VXLAN].pkt_pool;
 
 	ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, vni, OFP_IFPORT_VXLAN,
 			     addr, 32, 0, OFP_RTF_LOCAL);
@@ -1128,7 +1061,7 @@ const char *ofp_ifport_local_ipv4_up(uint16_t id, uint16_t vrf,
 	if (linux_index >= NUM_LINUX_INTERFACES)
 		return "Invalid interface index.";
 
-	ifparam = &shm->linux_interface_table[linux_index];
+	ifparam = &V_ifnet_linux_itf[linux_index];
 
 	if (!((ifparam->port == PORT_UNDEF) ||
 	      ((ifparam->port == OFP_IFPORT_LOCAL) &&
@@ -1363,17 +1296,17 @@ static int iter_local_iface_destroy(void *key, void *iter_arg)
 
 int ofp_local_interfaces_destroy(void)
 {
-	if (!shm)
-		shm = ofp_shared_memory_lookup(SHM_NAME_PORTS);
-	if (!shm) {
+	if (!shm_ifnet_port)
+		ofp_portconf_lookup_shared_memory();
+	if (!shm_ifnet_port) {
 		OFP_ERR("ofp_shared_memory_lookup failed");
 		return -1;
 	}
 
-	if (!shm->ofp_ifnet_data[OFP_IFPORT_LOCAL].vlan_structs)
+	if (!V_ifnet_port[OFP_IFPORT_LOCAL].vlan_structs)
 		return 0;
 
-	vlan_cleanup_inorder(shm->ofp_ifnet_data[OFP_IFPORT_LOCAL].vlan_structs,
+	vlan_cleanup_inorder(V_ifnet_port[OFP_IFPORT_LOCAL].vlan_structs,
 			     iter_local_iface_destroy, NULL);
 
 	return 0;
@@ -1483,7 +1416,7 @@ static const char *ofp_ifport_net_down(int port, uint16_t subport)
 	if (!OFP_IFPORT_IS_NET(port))
 		return "Wrong port number";
 
-	ifnet_port = &shm->ofp_ifnet_data[port];
+	ifnet_port = &V_ifnet_port[port];
 
 	if (subport != OFP_IFPORT_NET_SUBPORT_ITF) {
 		ifnet = ofp_get_subport(ifnet_port, subport);
@@ -1517,7 +1450,7 @@ static const char *ofp_ifport_local_down(int port, uint16_t subport)
 	if (!OFP_IFPORT_IS_LOCAL(port))
 		return "Wrong port number";
 
-	ifnet_port = &shm->ofp_ifnet_data[port];
+	ifnet_port = &V_ifnet_port[port];
 
 	ifnet = ofp_get_subport(ifnet_port, subport);
 	if (!ifnet)
@@ -1539,7 +1472,7 @@ static const char *ofp_ifport_local_down(int port, uint16_t subport)
 	if (ifnet->linux_index < NUM_LINUX_INTERFACES) {
 		int idx = ifnet->linux_index;
 
-		shm->linux_interface_table[idx].port = PORT_UNDEF;
+		V_ifnet_linux_itf[idx].port = PORT_UNDEF;
 	}
 #endif /*SP*/
 
@@ -1559,7 +1492,7 @@ static const char *ofp_ifport_vxlan_down(int port, uint16_t subport)
 	if (!OFP_IFPORT_IS_VXLAN(port))
 		return "Wrong port number";
 
-	ifnet_port = &shm->ofp_ifnet_data[port];
+	ifnet_port = &V_ifnet_port[port];
 
 	data = ofp_get_subport(ifnet_port, subport);
 	if (!data)
@@ -1597,7 +1530,7 @@ static const char *ofp_ifport_gre_down(int port, uint16_t subport)
 	if (!OFP_IFPORT_IS_GRE(port))
 		return "Wrong port number";
 
-	ifnet_port = &shm->ofp_ifnet_data[port];
+	ifnet_port = &V_ifnet_port[port];
 
 	data = ofp_get_subport(ifnet_port, subport);
 	if (!data)
@@ -1621,7 +1554,7 @@ static const char *ofp_ifport_gre_down(int port, uint16_t subport)
 
 const char *ofp_ifport_ifnet_down(int port, uint16_t subport)
 {
-	if (port < 0 || port >= shm->ofp_num_ports) {
+	if (port < 0 || port >= V_ifnet_num_ports) {
 		OFP_DBG("port:%d is outside the valid interval", port);
 		return "Wrong port number";
 	}
@@ -1711,7 +1644,7 @@ struct ofp_ifnet *ofp_get_ifnet(int port, uint16_t subport,
 	struct ofp_ifnet *ifnet_port;
 	struct ofp_ifnet *ifnet = NULL;
 
-	if (port < 0 || port >= shm->ofp_num_ports) {
+	if (port < 0 || port >= V_ifnet_num_ports) {
 		OFP_DBG("port:%d is outside the valid interval", port);
 		return NULL;
 	}
@@ -1721,7 +1654,7 @@ struct ofp_ifnet *ofp_get_ifnet(int port, uint16_t subport,
 		return NULL;
 	}
 
-	ifnet_port = &shm->ofp_ifnet_data[port];
+	ifnet_port = &V_ifnet_port[port];
 
 	if (OFP_IFPORT_IS_NET(port)) {
 		if (subport != OFP_IFPORT_NET_SUBPORT_ITF) {
@@ -1768,7 +1701,7 @@ int ofp_delete_ifnet(int port, uint16_t subport)
 	struct ofp_ifnet *ifnet_port;
 	struct ofp_ifnet *ifnet = NULL;
 
-	if (port < 0 || port >= shm->ofp_num_ports) {
+	if (port < 0 || port >= V_ifnet_num_ports) {
 		OFP_DBG("port:%d is outside the valid interval", port);
 		return -1;
 	}
@@ -1778,7 +1711,7 @@ int ofp_delete_ifnet(int port, uint16_t subport)
 		return -1;
 	}
 
-	ifnet_port = &shm->ofp_ifnet_data[port];
+	ifnet_port = &V_ifnet_port[port];
 
 	if (OFP_IFPORT_IS_NET(port)) {
 		if (subport == OFP_IFPORT_NET_SUBPORT_ITF)
@@ -1849,19 +1782,19 @@ struct ofp_ifnet *ofp_get_ifnet_by_linux_ifindex(int ix)
 
 	if (odp_likely(ix < NUM_LINUX_INTERFACES))
 		return ofp_get_ifnet(
-			shm->linux_interface_table[ix].port,
-			shm->linux_interface_table[ix].vlan, 0);
+			V_ifnet_linux_itf[ix].port,
+			V_ifnet_linux_itf[ix].vlan, 0);
 
 	/* Iterate through other index values */
 	data.ix = ix;
 	data.dev = NULL;
 
-	for (i = 0; i < shm->ofp_num_ports && data.dev == NULL; i++) {
-		if (shm->ofp_ifnet_data[i].linux_index == ix)
-			return &(shm->ofp_ifnet_data[i]);
+	for (i = 0; i < V_ifnet_num_ports && data.dev == NULL; i++) {
+		if (V_ifnet_port[i].linux_index == ix)
+			return &(V_ifnet_port[i]);
 
-		vlan_iterate_inorder(shm->ofp_ifnet_data[i].vlan_structs,
-				iter_vlan_1, &data);
+		vlan_iterate_inorder(V_ifnet_port[i].vlan_structs,
+				     iter_vlan_1, &data);
 	}
 
 	return data.dev;
@@ -1871,9 +1804,9 @@ void ofp_update_ifindex_lookup_tab(struct ofp_ifnet *ifnet)
 {
 	/* quick access table */
 	if (ifnet->linux_index < NUM_LINUX_INTERFACES) {
-		shm->linux_interface_table[ifnet->linux_index].port =
+		V_ifnet_linux_itf[ifnet->linux_index].port =
 			ifnet->port;
-		shm->linux_interface_table[ifnet->linux_index].vlan =
+		V_ifnet_linux_itf[ifnet->linux_index].vlan =
 			ifnet->vlan;
 	}
 }
@@ -1895,7 +1828,7 @@ struct ofp_ifnet *ofp_get_ifnet_match(uint32_t ip,
 	if (vlan == 0) {
 		for (port = 0; port < OFP_FP_INTERFACE_MAX; port++) {
 			struct ofp_ifnet *ifnet =
-				&shm->ofp_ifnet_data[port];
+				&V_ifnet_port[port];
 
 			if (ifnet->vrf == vrf)
 				if (-1 != ofp_ifnet_ip_find(ifnet, ip))
@@ -1904,7 +1837,7 @@ struct ofp_ifnet *ofp_get_ifnet_match(uint32_t ip,
 	} else {
 		for (port = 0; port < OFP_FP_INTERFACE_MAX; port++) {
 			uint16_t vlan_id = vlan_iterate_inorder(
-				shm->ofp_ifnet_data[port].vlan_structs,
+				V_ifnet_port[port].vlan_structs,
 				vlan_match_ip, &ip);
 
 			if (vlan_id)
@@ -1954,21 +1887,21 @@ void ofp_get_interfaces(struct ofp_ifconf *ifc)
 
 	/* fp interfaces */
 	for (i = 0; i < OFP_FP_INTERFACE_MAX; i++) {
-		iter_interface(&shm->ofp_ifnet_data[i], ifc);
-		vlan_iterate_inorder(shm->ofp_ifnet_data[i].vlan_structs,
-					iter_interface, ifc);
+		iter_interface(&V_ifnet_port[i], ifc);
+		vlan_iterate_inorder(V_ifnet_port[i].vlan_structs,
+				     iter_interface, ifc);
 	}
 
 	/* gre interfaces */
-	if (avl_get_first(shm->ofp_ifnet_data[OFP_IFPORT_GRE].vlan_structs))
+	if (avl_get_first(V_ifnet_port[OFP_IFPORT_GRE].vlan_structs))
 		vlan_iterate_inorder(
-			shm->ofp_ifnet_data[OFP_IFPORT_GRE].vlan_structs,
+			V_ifnet_port[OFP_IFPORT_GRE].vlan_structs,
 			iter_interface, ifc);
 
 	/* vxlan interfaces */
-	if (avl_get_first(shm->ofp_ifnet_data[OFP_IFPORT_VXLAN].vlan_structs))
+	if (avl_get_first(V_ifnet_port[OFP_IFPORT_VXLAN].vlan_structs))
 		vlan_iterate_inorder(
-			shm->ofp_ifnet_data[OFP_IFPORT_VXLAN].vlan_structs,
+			V_ifnet_port[OFP_IFPORT_VXLAN].vlan_structs,
 			iter_interface, ifc);
 
 	ifc->ifc_len = ifc->ifc_current_len;
@@ -1999,7 +1932,7 @@ struct ofp_ifnet *ofp_get_ifnet_by_ip(uint32_t ip, uint16_t vrf)
 	struct iter_ip iterdata;
 
 	for (port = 0; port < OFP_FP_INTERFACE_MAX; ++port) {
-		ifnet = &shm->ofp_ifnet_data[port];
+		ifnet = &V_ifnet_port[port];
 		if (ifnet->ip_addr_info[0].ip_addr == ip && ifnet->vrf == vrf)
 			return ifnet;
 	}
@@ -2009,7 +1942,7 @@ struct ofp_ifnet *ofp_get_ifnet_by_ip(uint32_t ip, uint16_t vrf)
 
 	for (port = 0; port < OFP_FP_INTERFACE_MAX; ++port) {
 		vlan = vlan_iterate_inorder(
-			shm->ofp_ifnet_data[port].vlan_structs,
+			V_ifnet_port[port].vlan_structs,
 			vlan_match_ip_vrf, &iterdata);
 		if (vlan)
 			return ofp_get_ifnet(port, vlan, 0);
@@ -2049,7 +1982,7 @@ struct ofp_ifnet *ofp_get_ifnet_by_tunnel(uint32_t tun_loc,
 	tundata.vrf = vrf;
 
 	greid = vlan_iterate_inorder(
-		shm->ofp_ifnet_data[port].vlan_structs,
+		V_ifnet_port[port].vlan_structs,
 		vlan_match_tun, &tundata);
 
 	if (greid)
@@ -2058,249 +1991,9 @@ struct ofp_ifnet *ofp_get_ifnet_by_tunnel(uint32_t tun_loc,
 	return NULL;
 }
 
-void ofp_portconf_init_prepare(void)
-{
-	ofp_shared_memory_prealloc(SHM_NAME_PORTS, sizeof(*shm));
-	ofp_shared_memory_prealloc(SHM_NAME_PORT_LOCKS,
-				   sizeof(*ofp_ifnet_locks_shm));
-}
-
-static int ofp_portconf_alloc_shared_memory(void)
-{
-	shm = ofp_shared_memory_alloc(SHM_NAME_PORTS, sizeof(*shm));
-	if (shm == NULL) {
-		OFP_ERR("ofp_shared_memory_alloc failed");
-		return -1;
-	}
-
-	ofp_ifnet_locks_shm = ofp_shared_memory_alloc(SHM_NAME_PORT_LOCKS,
-		sizeof(*ofp_ifnet_locks_shm));
-	if (ofp_ifnet_locks_shm == NULL) {
-		OFP_ERR("ofp_shared_memory_alloc failed");
-		return -1;
-	}
-
-	return 0;
-}
-
-#define SHM_SIZE_VLAN (sizeof(struct ofp_vlan_mem) + \
-		       sizeof(struct ofp_ifnet) * global_param->num_vlan)
-
-static int ofp_vlan_alloc_shared_memory(void)
-{
-	vlan_shm = ofp_shared_memory_alloc(SHM_NAME_VLAN, SHM_SIZE_VLAN);
-	if (vlan_shm == NULL) {
-		OFP_ERR("ofp_shared_memory_alloc failed");
-		return -1;
-	}
-	return 0;
-}
-
-void ofp_vlan_init_prepare(void)
-{
-	ofp_shared_memory_prealloc(SHM_NAME_VLAN, SHM_SIZE_VLAN);
-}
-
-static int ofp_portconf_free_shared_memory(void)
-{
-	int rc = 0;
-
-	if (ofp_shared_memory_free(SHM_NAME_PORTS) == -1) {
-		OFP_ERR("ofp_shared_memory_free failed");
-		rc = -1;
-	}
-	shm = NULL;
-
-	if (ofp_shared_memory_free(SHM_NAME_PORT_LOCKS) == -1) {
-		OFP_ERR("ofp_shared_memory_free failed");
-		rc = -1;
-	}
-	ofp_ifnet_locks_shm = NULL;
-	return rc;
-}
-
-
-static int ofp_vlan_free_shared_memory(void)
-{
-	int rc = 0;
-
-	if (ofp_shared_memory_free(SHM_NAME_VLAN) == -1) {
-		OFP_ERR("ofp_shared_memory_free failed");
-		rc = -1;
-	}
-	vlan_shm = NULL;
-	return rc;
-}
-
-
-int ofp_portconf_lookup_shared_memory(void)
-{
-	shm = ofp_shared_memory_lookup(SHM_NAME_PORTS);
-	if (shm == NULL) {
-		OFP_ERR("ofp_shared_memory_lookup failed");
-		return -1;
-	}
-
-	ofp_ifnet_locks_shm = ofp_shared_memory_lookup(SHM_NAME_PORT_LOCKS);
-	if (ofp_ifnet_locks_shm == NULL) {
-		OFP_ERR("ofp_shared_memory_lookup failed");
-		return -1;
-	}
-
-	return 0;
-}
-
-
-int ofp_vlan_lookup_shared_memory(void)
-{
-	vlan_shm = ofp_shared_memory_lookup(SHM_NAME_VLAN);
-	if (vlan_shm == NULL) {
-		OFP_ERR("ofp_shared_memory_lookup failed");
-		return -1;
-	}
-	return 0;
-}
-
-int ofp_portconf_init_global(void)
-{
-	int i, j;
-	struct ofp_ifnet *ifnet = NULL;
-
-	HANDLE_ERROR(ofp_portconf_alloc_shared_memory());
-
-	memset(shm, 0, sizeof(*shm));
-	for (i = 0; i < OFP_IFPORT_NUM; i++) {
-		shm->ofp_ifnet_data[i].if_state = OFP_IFT_STATE_FREE;
-		shm->ofp_ifnet_data[i].pktio = ODP_PKTIO_INVALID;
-
-		for (j = 0; j < OFP_PKTOUT_QUEUE_MAX; j++)
-			shm->ofp_ifnet_data[i].out_queue_queue[j] =
-				ODP_QUEUE_INVALID;
-
-		shm->ofp_ifnet_data[i].loopq_def = ODP_QUEUE_INVALID;
-#ifdef SP
-		shm->ofp_ifnet_data[i].spq_def = ODP_QUEUE_INVALID;
-#endif /*SP*/
-		shm->ofp_ifnet_data[i].pkt_pool = ODP_POOL_INVALID;
-	}
-
-	memset(ofp_ifnet_locks_shm, 0, sizeof(*ofp_ifnet_locks_shm));
-
-	odp_atomic_init_u32(&shm->free_port, 0);
-
-	shm->ofp_num_ports = OFP_IFPORT_NUM;
-
-	for (i = 0; i < shm->ofp_num_ports; i++) {
-		ifnet = &shm->ofp_ifnet_data[i];
-
-		ifnet->vlan_structs = new_vlan(vlan_ifnet_compare, NULL);
-		if (ifnet->vlan_structs == NULL) {
-			OFP_ERR("Failed to initialize vlan structures.");
-			return -1;
-		}
-		ifnet->port = i;
-		ifnet->vlan = OFP_IFPORT_NET_SUBPORT_ITF;
-		ifnet->if_type = OFP_IFT_ETHER;
-		ifnet->if_mtu = 1500;
-		ifnet->if_state = OFP_IFT_STATE_FREE;
-		/* Multicast related */
-		OFP_TAILQ_INIT(&ifnet->if_multiaddrs);
-		ifnet->if_flags |= OFP_IFF_MULTICAST;
-		ifnet->if_afdata[OFP_AF_INET] = &ifnet->ii_inet;
-		/* TO DO:
-		   shm->ofp_ifnet_data[i].if_afdata[OFP_AF_INET6] =
-		   &shm->ofp_ifnet_data[i].ii_inet6;
-		*/
-		/* Set locally administered default mac address.
-		   This is needed by vxlan and other
-		   virtual interfaces.
-		*/
-		if (odp_random_data((uint8_t *)ifnet->if_mac,
-				    sizeof(ifnet->if_mac), 0) < 0) {
-			OFP_ERR("Failed to initialize default MAC address.");
-			return -1;
-		}
-		/* Universally administered and locally administered addresses
-		   are distinguished by setting the second least significant bit
-		   of the most significant byte of the address.
-		*/
-		ifnet->if_mac[0] = 0x02;
-		/* Port number. */
-		ifnet->if_mac[1] = i;
-		memset(ifnet->ip_addr_info, 0, sizeof(ifnet->ip_addr_info));
-	}
-
-#ifdef SP
-	for (i = 0; i < NUM_LINUX_INTERFACES; ++i)
-		shm->linux_interface_table[i].port = PORT_UNDEF;
-#endif /* SP */
-
-	OFP_TAILQ_INIT(&shm->in_ifaddrhead);
-	odp_rwlock_init(&ofp_ifnet_locks_shm->lock_ifaddr_list_rw);
-#ifdef INET6
-	OFP_TAILQ_INIT(&shm->in_ifaddr6head);
-	odp_rwlock_init(&ofp_ifnet_locks_shm->lock_ifaddr6_list_rw);
-#endif /* INET6 */
-
-	return 0;
-}
-
-int ofp_vlan_init_global(void)
-{
-	int i;
-
-	/* init vlan shared memory */
-	HANDLE_ERROR(ofp_vlan_alloc_shared_memory());
-	memset(vlan_shm, 0, sizeof(*vlan_shm));
-	for (i = 0; i < global_param->num_vlan; i++) {
-		vlan_shm->vlan_ifnet[i].next = (i == global_param->num_vlan - 1) ?
-			NULL : &(vlan_shm->vlan_ifnet[i+1]);
-	}
-	vlan_shm->free_ifnet_list = &(vlan_shm->vlan_ifnet[0]);
-	odp_rwlock_init(&vlan_shm->vlan_mtx);
-
-	return 0;
-}
-
-int ofp_portconf_term_global(void)
-{
-	int i;
-	int rc = 0;
-
-	shm = ofp_shared_memory_lookup(SHM_NAME_PORTS);
-	if (shm == NULL) {
-		OFP_ERR("ofp_shared_memory_lookup failed");
-		rc = -1;
-	} else
-		for (i = 0; i < shm->ofp_num_ports; ++i)
-			if (shm->ofp_ifnet_data[i].vlan_structs)
-				free_vlan(shm->ofp_ifnet_data[i].vlan_structs,
-					free_key);
-
-	CHECK_ERROR(ofp_portconf_free_shared_memory(), rc);
-
-	return rc;
-}
-
-
-int ofp_vlan_term_global(void)
-{
-	int rc = 0;
-
-	vlan_shm = ofp_shared_memory_lookup(SHM_NAME_VLAN);
-	if (vlan_shm == NULL) {
-		OFP_ERR("ofp_shared_memory_lookup failed");
-		rc = -1;
-	}
-	CHECK_ERROR(ofp_vlan_free_shared_memory(), rc);
-
-	return rc;
-}
-
-
 struct ofp_in_ifaddrhead *ofp_get_ifaddrhead(void)
 {
-	return &shm->in_ifaddrhead;
+	return &V_ifnet_ifaddrhead;
 }
 
 void ofp_ifaddr_elem_add(struct ofp_ifnet *ifnet)
@@ -2562,7 +2255,7 @@ inline void ofp_ifnet_print_ip_info(ofp_print_t *pr, struct ofp_ifnet *dev)
 #ifdef INET6
 struct ofp_in_ifaddrhead *ofp_get_ifaddr6head(void)
 {
-	return &shm->in_ifaddr6head;
+	return &V_ifnet_ifaddr6head;
 }
 
 void ofp_ifaddr6_elem_add(struct ofp_ifnet *ifnet)

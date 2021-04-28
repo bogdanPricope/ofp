@@ -74,7 +74,7 @@
 #include "ofpi_socketvar.h"
 #include "ofpi_tcp_var.h"
 #include "ofpi_ip6_var.h"
-#include "ofpi_ifnet_portconf.h"
+#include "ofpi_ifnet_shm.h"
 #include "ofpi_protosw.h"
 #include "ofpi_errno.h"
 

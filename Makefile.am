@@ -72,6 +72,7 @@ noinst_HEADERS = \
 		  $(top_srcdir)/include/ofpi_if_vxlan.h \
 		  $(top_srcdir)/include/ofpi_ifnet.h \
 		  $(top_srcdir)/include/ofpi_ifnet_portconf.h \
+		  $(top_srcdir)/include/ofpi_ifnet_shm.h \
 		  $(top_srcdir)/include/ofpi_inet.h \
 		  $(top_srcdir)/include/ofpi_in6.h \
 		  $(top_srcdir)/include/ofpi_in6_pcb.h \

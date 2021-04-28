@@ -46,7 +46,7 @@
 #include "ofpi_in.h"
 #include "ofpi_queue.h"
 #include "ofpi_socket.h"
-#include "ofpi_ifnet_portconf.h"
+#include "ofpi_ifnet_shm.h"
 #include "ofpi_udp_var.h"
 #include "ofpi_systm.h"
 #include "ofpi_uma.h"
@@ -513,9 +513,9 @@ void	inp_4tuple_get(struct inpcb *inp, uint32_t *laddr, uint16_t *lp,
 #define	IN_IFADDR_WLOCK()		OFP_IFNET_LOCK_WRITE(ifaddr_list)
 #define	IN_IFADDR_WUNLOCK()		OFP_IFNET_UNLOCK_WRITE(ifaddr_list)
 
-#define	IN_IFADDR_LOCK_ASSERT()		/*rw_assert(&ofp_ifnet_locks_shm->lock_ifaddr_list_rw, RA_LOCKED)*/
-#define	IN_IFADDR_RLOCK_ASSERT()	/*rw_assert(&ofp_ifnet_locks_shm->lock_ifaddr_list_rw, RA_RLOCKED)*/
-#define	IN_IFADDR_WLOCK_ASSERT()	/*rw_assert(&ofp_ifnet_locks_shm->lock_ifaddr_list_rw, RA_WLOCKED)*/
+#define	IN_IFADDR_LOCK_ASSERT() /*rw_assert(&V_ifnet_lock_addr, RA_LOCKED)*/
+#define	IN_IFADDR_RLOCK_ASSERT() /*rw_assert(&V_ifnet_lock_addr, RA_RLOCKED)*/
+#define	IN_IFADDR_WLOCK_ASSERT() /*rw_assert(&V_ifnet_lock_addr, RA_WLOCKED)*/
 
 #define	INP_GROUP_LOCK_INIT(ipg, d)	//mtx_init(&(ipg)->ipg_lock, (d), NULL, MTX_DEF | MTX_DUPOK)
 #define	INP_GROUP_LOCK_DESTROY(ipg)	mtx_destroy(&(ipg)->ipg_lock)

@@ -23,6 +23,7 @@ ofp_pkt_processing.c \
 ofp_pkt_send_burst.c \
 ofp_ifnet.c \
 ofp_ifnet_portconf.c \
+ofp_ifnet_shm.c \
 ofp_avl.c \
 ofp_log.c \
 ofp_api_cli.c \

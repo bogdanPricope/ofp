@@ -21,7 +21,7 @@
 #include "ofpi_sysctl.h"
 #include "ofpi_util.h"
 #include "ofpi_stat.h"
-#include "ofpi_ifnet_portconf.h"
+#include "ofpi_ifnet_shm.h"
 #include "ofpi_route.h"
 #include "ofpi_rt_lookup.h"
 #include "ofpi_arp.h"
