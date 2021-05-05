@@ -109,7 +109,15 @@ int ofp_portconf_init_global(void)
 		}
 		ifnet->port = i;
 		ifnet->vlan = OFP_IFPORT_NET_SUBPORT_ITF;
-		ifnet->if_type = OFP_IFT_ETHER;
+
+		switch (i) {
+		case OFP_IFPORT_VXLAN:
+			ifnet->if_type = OFP_IFT_VXLAN;
+			break;
+		default:
+			ifnet->if_type = OFP_IFT_ETHER;
+		};
+
 		ifnet->if_mtu = 1500;
 		ifnet->if_state = OFP_IFT_STATE_FREE;
 		/* Multicast related */

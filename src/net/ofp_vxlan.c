@@ -435,7 +435,7 @@ void ofp_vxlan_update_devices(odp_packet_t pkt, struct ofp_arphdr *arp, uint16_t
 	if (vxdev && ofp_if_type(vxdev) == OFP_IFT_VXLAN) {
 		*dev = vxdev;
 		*outdev = ofp_get_ifnet(vxdev->physport, vxdev->physvlan, 0);
-		*vlan = 0;
+		*vlan = OFP_IFPORT_NET_SUBPORT_ITF;
 		memcpy(save_space, arp->eth_src, OFP_ETHER_ADDR_LEN);
 	}
 }
@@ -451,6 +451,7 @@ void ofp_vxlan_restore_and_update_header(odp_packet_t pkt,
 {
 	struct ofp_ether_header *eth;
 	struct ofp_ip *ip;
+	struct ofp_udphdr *udp;
 
 	/* Vxlan header pull length is saved in packet's user area. */
 	struct vxlan_user_data *saved = &ofp_packet_user_area(pkt)->vxlan;
@@ -475,6 +476,10 @@ void ofp_vxlan_restore_and_update_header(odp_packet_t pkt,
 	ip->ip_src.s_addr = outdev->ip_addr_info[0].ip_addr;
 	ip->ip_sum = 0;
 	ip->ip_sum = ofp_cksum_iph(ip, sizeof(*ip)>>2);
+
+	/*udp*/
+	udp = (struct ofp_udphdr *)((char *)ip + (ip->ip_hl << 2));
+	udp->uh_sum = 0;
 
 	/* Save MAC address to IP address information. */
 	ofp_vxlan_set_mac_dst(saved_mac, ip->ip_dst.s_addr);

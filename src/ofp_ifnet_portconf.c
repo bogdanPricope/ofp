@@ -1016,9 +1016,9 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint32_t group,
 		data->sp_status = OFP_SP_DOWN;
 
 	snprintf(cmd, sizeof(cmd),
-		 "ip link add vxlan%d type vxlan id %d group %s dev %s",
+		 "ip link add vxlan%d type vxlan id %d group %s dev %s dstport %d",
 		 vni, vni, ofp_print_ip_addr(group),
-		 ofp_port_vlan_to_ifnet_name(physport, physvlan));
+		 ofp_port_vlan_to_ifnet_name(physport, physvlan), VXLAN_PORT);
 	ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
 
 	snprintf(cmd, sizeof(cmd),

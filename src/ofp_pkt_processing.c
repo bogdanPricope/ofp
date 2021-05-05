@@ -604,7 +604,7 @@ enum ofp_return_code ofp_arp_processing(odp_packet_t *pkt)
 			(struct ofp_ether_vlan_header *)l2_addr;
 
 		ofp_add_mac(dev, arp->ip_src, arp->eth_src);
-		if (vlan)
+		if (vlan != OFP_IFPORT_NET_SUBPORT_ITF)
 			tmp_eth_vlan = *eth_vlan;
 		else
 			tmp_eth = *eth;
@@ -628,7 +628,7 @@ enum ofp_return_code ofp_arp_processing(odp_packet_t *pkt)
 		tmp.op = odp_cpu_to_be_16(OFP_ARPOP_REPLY);
 		*arp = tmp;
 
-		if (vlan) {
+		if (vlan != OFP_IFPORT_NET_SUBPORT_ITF) {
 			memcpy(tmp_eth_vlan.evl_dhost, &arp->eth_dst,
 				OFP_ETHER_ADDR_LEN);
 			memcpy(tmp_eth_vlan.evl_shost, &arp->eth_src,
