@@ -168,10 +168,11 @@ static void ofp_vxlan_tmo(void *arg)
 
 enum ofp_return_code ofp_vxlan_input(odp_packet_t pkt)
 {
+	enum ofp_return_code ret = OFP_PKT_CONTINUE;
 	struct ofp_ip *ip = (struct ofp_ip *)odp_packet_l3_ptr(pkt, NULL);
 	struct ofp_udphdr *udp;
 	struct ofp_vxlan_h *vxlan;
-	struct ofp_ifnet *dev, *dev_root;
+	struct ofp_ifnet *dev;
 	struct ofp_ether_header *eth;
 	uint32_t vni;
 	int vxlen;
@@ -215,14 +216,15 @@ enum ofp_return_code ofp_vxlan_input(odp_packet_t pkt)
 	ofp_vxlan_set_mac_dst(eth->ether_shost, from);
 	odp_packet_user_ptr_set(pkt, dev);
 	ofp_ipsec_flags_set(pkt, 0);
-	dev_root = ofp_get_port_itf(OFP_IFPORT_VXLAN);
-	odp_event_t ev = odp_packet_to_event(pkt);
-	if (odp_queue_enq(dev_root->loopq_def, ev) < 0) {
-		OFP_ERR("odp_queue_enq");
-		return OFP_PKT_DROP;
+
+	ret = ofp_eth_vlan_processing(&pkt);
+
+	if (ret == OFP_PKT_CONTINUE) {
+		odp_packet_push_head(pkt, vxlen);
+		odp_packet_l2_offset_set(pkt, 0);
 	}
 
-	return OFP_PKT_PROCESSED;
+	return ret;
 }
 
 enum ofp_return_code ofp_vxlan_prepend_hdr(odp_packet_t pkt, struct ofp_ifnet *vxdev,
@@ -308,6 +310,16 @@ static int ofp_vxlan_free_shared_memory(void)
 	return rc;
 }
 
+static int ofp_vxlan_lookup_shared_memory(void)
+{
+	shm = ofp_shared_memory_lookup(SHM_NAME_VXLAN);
+	if (shm == NULL) {
+		OFP_ERR("ofp_shared_memory_lookup failed");
+		return -1;
+	}
+	return 0;
+}
+
 void ofp_vxlan_init_prepare(void)
 {
 	ofp_shared_memory_prealloc(SHM_NAME_VXLAN, sizeof(*shm));
@@ -347,70 +359,13 @@ int ofp_vxlan_term_global(void)
 	return rc;
 }
 
-void ofp_vxlan_init_local(void)
+int ofp_vxlan_init_local(void)
 {
+	return ofp_vxlan_lookup_shared_memory();
 }
 
 void ofp_vxlan_term_local(void)
 {
-}
-
-int ofp_vxlan_lookup_shared_memory(void)
-{
-	shm = ofp_shared_memory_lookup(SHM_NAME_VXLAN);
-	if (shm == NULL) {
-		OFP_ERR("ofp_shared_memory_lookup failed");
-		return -1;
-	}
-	return 0;
-}
-
-int ofp_set_vxlan_interface_queue(void)
-{
-	odp_queue_param_t qparam;
-	struct ofp_ifnet *ifnet = ofp_get_port_itf(OFP_IFPORT_VXLAN);
-
-	/* VXLAN interface queue */
-	odp_queue_param_init(&qparam);
-	qparam.type = ODP_QUEUE_TYPE_SCHED;
-	qparam.sched.prio  = ODP_SCHED_PRIO_DEFAULT;
-	qparam.sched.sync  = ODP_SCHED_SYNC_ATOMIC;
-	qparam.sched.group = ODP_SCHED_GROUP_ALL;
-
-	ifnet->loopq_def = odp_queue_create("vxlan_loopq", &qparam);
-	if (ifnet->loopq_def == ODP_QUEUE_INVALID) {
-		OFP_ERR("odp_queue_create failed");
-		return -1;
-	}
-
-	/* Set device loopq queue context */
-	odp_queue_context_set(ifnet->loopq_def, ifnet, sizeof(ifnet));
-
-	ifnet->pkt_pool = V_global_packet_pool;
-
-	return 0;
-}
-
-int ofp_clean_vxlan_interface_queue(void)
-{
-	struct ofp_ifnet *ifnet = ofp_get_port_itf(OFP_IFPORT_VXLAN);
-
-	if (ifnet == NULL) {
-		OFP_ERR("Error: Failed to locate VXLAN port");
-		return -1;
-	}
-
-	if (ifnet->loopq_def == ODP_QUEUE_INVALID) {
-		OFP_ERR("Error: VXLAN port queue not initialized");
-		return -1;
-	}
-
-	if (odp_queue_destroy(ifnet->loopq_def)) {
-		OFP_ERR("Error: Failed to destroy VXLAN port queue");
-		return -1;
-	}
-
-	return 0;
 }
 
 /*

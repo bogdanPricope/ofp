@@ -216,6 +216,7 @@ int sp_rx_thread(void *ifnet_void)
 			usleep(2000);
 			continue;
 		}
+
 		pkt = odp_packet_from_event(ev);
 
 		if (ifnet->sp_status != OFP_SP_UP) {
@@ -228,7 +229,7 @@ int sp_rx_thread(void *ifnet_void)
 			vlan_hdr = (struct ofp_ether_vlan_header *)eth;
 			vlan = OFP_EVL_VLANOFTAG(vlan_hdr->evl_tag);
 		} else {
-			vlan = 0;
+			vlan = OFP_IFPORT_NET_SUBPORT_ITF;
 		}
 
 		pkt_ifnet = ofp_get_ifnet(ifnet->port, vlan, 0);

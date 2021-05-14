@@ -1436,8 +1436,7 @@ enum ofp_return_code ofp_packet_input(odp_packet_t pkt,
 	odp_pktio_t pktio;
 	int res;
 
-	/* Packets from VXLAN interfaces do not have an outq even
-	 * they have a valid pktio. Use loopback context instead. */
+	/* Packets received on queues e.g. looped back packets.*/
 	if (in_queue != ODP_QUEUE_INVALID)
 		ifnet = (struct ofp_ifnet *)odp_queue_context(in_queue);
 
@@ -1455,13 +1454,7 @@ enum ofp_return_code ofp_packet_input(odp_packet_t pkt,
 
 	odp_packet_user_ptr_set(pkt, ifnet);
 
-	/*
-	 * Packets from VXLAN ifnets are looped from OFP and have
-	 * data stored in the user area.
-	 */
-	if (ofp_if_type(ifnet) != OFP_IFT_VXLAN) {
-		ofp_packet_user_area_reset(pkt);
-	}
+	ofp_packet_user_area_reset(pkt);
 
 	/*
 	 * The packets received on loopback queue do not have csum

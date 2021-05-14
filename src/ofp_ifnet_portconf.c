@@ -993,6 +993,13 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint32_t group,
 	data = ofp_get_ifnet(OFP_IFPORT_VXLAN, vni, 1);
 	data->if_type = OFP_IFT_VXLAN;
 
+	/* different MAC address per VNI*/
+	if (odp_random_data((uint8_t *)data->if_mac,
+			    sizeof(data->if_mac), 0) < 0)
+		return "Failed to initialize default MAC address.";
+	data->if_mac[0] = 0x02;
+	data->if_mac[1] = data->port;
+
 	data->vrf = dev_root->vrf;
 	data->ip_p2p = group;
 	data->if_mtu = dev_root->if_mtu - sizeof(struct ofp_vxlan_udp_ip);
@@ -1022,12 +1029,13 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint32_t group,
 	ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
 
 	snprintf(cmd, sizeof(cmd),
-		 "ip link set dev vxlan%d up", vni);
+		 "ip link set dev vxlan%d address %s up",
+		 vni, ofp_print_mac(data->if_mac));
 	ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
 
 	snprintf(cmd, sizeof(cmd),
-		 "ip addr add dev vxlan%d %s", vni,
-		 ofp_print_ip_addr(addr));
+		 "ip addr add dev vxlan%d %s/%d", vni,
+		 ofp_print_ip_addr(addr), mlen);
 	ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
 #endif /* SP */
 
@@ -1578,6 +1586,9 @@ static struct ofp_ifnet *ofp_get_subport(struct ofp_ifnet *ifnet_port,
 					 uint16_t subport)
 {
 	struct ofp_ifnet key, *data;
+
+	if (!ifnet_port || !ifnet_port->vlan_structs)
+		return NULL;
 
 	key.vlan = subport;
 	if (ofp_vlan_get_by_key(ifnet_port->vlan_structs, &key, (void *)&data))

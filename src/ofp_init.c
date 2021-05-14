@@ -522,7 +522,6 @@ enum ofp_init_state {
 	OFP_INIT_STATE_NOT_INIT = 0,
 	OFP_INIT_STATE_ODP_INIT,
 	OFP_INIT_STATE_STACK_INIT,
-	OFP_INIT_STATE_VXLAN_INIT,
 	OFP_INIT_STATE_INTERFACES_INIT,
 	OFP_INIT_STATE_NL_INIT,
 	OFP_INIT_STATE_LOOPBACK_INIT,
@@ -570,10 +569,6 @@ int ofp_initialize(ofp_initialize_param_t *params)
 
 	state = OFP_INIT_STATE_STACK_INIT;
 	if (ofp_initialize_stack_global(params, instance, instance_owner))
-		goto init_error;
-
-	state = OFP_INIT_STATE_VXLAN_INIT;
-	if (ofp_set_vxlan_interface_queue())
 		goto init_error;
 
 	state = OFP_INIT_STATE_INTERFACES_INIT;
@@ -709,9 +704,6 @@ init_error:
 			}
 		}
 		/* Fallthrough */
-	case OFP_INIT_STATE_VXLAN_INIT:
-		ofp_clean_vxlan_interface_queue();
-		/* Fallthrough */
 	case OFP_INIT_STATE_STACK_INIT:
 		ofp_terminate_stack_global(SHM_PKT_POOL_NAME);
 
@@ -763,7 +755,7 @@ int ofp_init_local_resources(const char *description)
 	HANDLE_ERROR(ofp_timer_lookup_shared_memory());
 	HANDLE_ERROR(ofp_hook_lookup_shared_memory());
 	HANDLE_ERROR(ofp_arp_lookup_shared_memory());
-	HANDLE_ERROR(ofp_vxlan_lookup_shared_memory());
+	HANDLE_ERROR(ofp_vxlan_init_local());
 	HANDLE_ERROR(ofp_in_proto_init_local());
 	HANDLE_ERROR(ofp_arp_init_local());
 	HANDLE_ERROR(ofp_ip_init_local());
@@ -835,7 +827,6 @@ int ofp_terminate(void)
 		}
 	}
 
-	CHECK_ERROR(ofp_clean_vxlan_interface_queue(), rc);
 	CHECK_ERROR(ofp_local_interfaces_destroy(), rc);
 
 	if (ofp_terminate_stack_global(SHM_PKT_POOL_NAME)) {
