@@ -369,30 +369,24 @@ void ofp_vxlan_term_local(void)
 }
 
 /*
- * Arp request to a vxlan interface comes from a physical interface.
- * After vxlan header removal it is put to vxlan input queue.
- * Vxlan device must be looked up while the output
- * device must be a physical interface. Vxlan doesn't use vlans.
- * Arp request's source mac address is saved to be used as a key
- * in MAC address to IP address hash table.
+ * Vxlan doesn't use vlans.
  */
-void ofp_vxlan_update_devices(odp_packet_t pkt, struct ofp_arphdr *arp, uint16_t *vlan,
-			      struct ofp_ifnet **dev, struct ofp_ifnet **outdev,
-			      uint8_t *save_space)
+int ofp_vxlan_update_devices(struct ofp_ifnet *vxdev, struct ofp_ifnet **outdev,
+			     uint16_t *inner_vlan)
 {
 	/* Find the vxlan device this message is destined to. */
-	struct vxlan_user_data *saved = &ofp_packet_user_area(pkt)->vxlan;
-	struct ofp_ifnet *vxdev;
+	if (!vxdev || !outdev)
+		return -1;
 
-	vxdev = ofp_get_ifnet(OFP_IFPORT_VXLAN, saved->vni, 0);
+	*outdev = ofp_get_ifnet(vxdev->physport, vxdev->physvlan, 0);
+	if (!*outdev)
+		return -1;
 
-	/* Sanity check. */
-	if (vxdev && ofp_if_type(vxdev) == OFP_IFT_VXLAN) {
-		*dev = vxdev;
-		*outdev = ofp_get_ifnet(vxdev->physport, vxdev->physvlan, 0);
-		*vlan = OFP_IFPORT_NET_SUBPORT_ITF;
-		memcpy(save_space, arp->eth_src, OFP_ETHER_ADDR_LEN);
-	}
+	/*rfc7348: On the encapsulation side, a VTEP SHOULD NOT include an
+	inner VLAN tag on tunnel packets unless configured otherwise.*/
+	*inner_vlan = OFP_IFPORT_NET_SUBPORT_ITF;
+
+	return 0;
 }
 
 /*

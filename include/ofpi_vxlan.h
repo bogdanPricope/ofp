@@ -26,9 +26,9 @@ int ofp_vxlan_init_local(void);
 void ofp_vxlan_term_local(void);
 void ofp_vxlan_set_mac_dst(uint8_t *mac, uint32_t dst);
 uint32_t ofp_vxlan_get_mac_dst(uint8_t *mac);
-void ofp_vxlan_update_devices(odp_packet_t pkt, struct ofp_arphdr *arp, uint16_t *vlan,
-			      struct ofp_ifnet **dev, struct ofp_ifnet **outdev,
-			      uint8_t *save_space);
+int ofp_vxlan_update_devices(struct ofp_ifnet *vxdev,
+			     struct ofp_ifnet **outdev,
+			     uint16_t *inner_vlan);
 void ofp_vxlan_restore_and_update_header(odp_packet_t pkt,
 					 struct ofp_ifnet *outdev,
 					 uint8_t *saved_mac);

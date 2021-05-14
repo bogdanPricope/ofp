@@ -164,14 +164,21 @@ enum ofp_return_code ofp_eth_vlan_processing(odp_packet_t *pkt)
 	if (ethtype == OFP_ETHERTYPE_VLAN) {
 		struct ofp_ether_vlan_header *vlan_hdr;
 
+/* rfc7348: Decapsulated VXLAN frames with the inner VLAN tag
+SHOULD be discarded unless configured otherwise.*/
+		if (odp_unlikely(ofp_if_type(ifnet) == OFP_IFT_VXLAN)) {
+			OFP_DBG("Inner VLAN Tag not supported on VXLANS");
+			return OFP_PKT_DROP;
+		}
+
 		vlan_hdr = (struct ofp_ether_vlan_header *)eth;
 		vlan = OFP_EVL_VLANOFTAG(odp_be_to_cpu_16(vlan_hdr->evl_tag));
 		ethtype = odp_be_to_cpu_16(vlan_hdr->evl_proto);
 		ifnet = ofp_get_ifnet(ifnet->port, vlan, 0);
 		if (!ifnet)
 			return OFP_PKT_DROP;
-		if (odp_likely(ofp_if_type(ifnet) != OFP_IFT_VXLAN))
-			odp_packet_user_ptr_set(*pkt, ifnet);
+
+		odp_packet_user_ptr_set(*pkt, ifnet);
 	}
 
 	OFP_DBG("ETH TYPE = %04x", ethtype);
@@ -558,7 +565,7 @@ enum ofp_return_code ofp_arp_processing(odp_packet_t *pkt)
 	struct ofp_ifnet *dev = odp_packet_user_ptr(*pkt);
 	struct ofp_ifnet *outdev = dev;
 	uint16_t vlan = dev->vlan;
-	uint8_t inner_from_mac[OFP_ETHER_ADDR_LEN];
+	uint8_t inner_src_mac[OFP_ETHER_ADDR_LEN];
 	uint32_t is_ours;
 
 	arp = (struct ofp_arphdr *)odp_packet_l3_ptr(*pkt, NULL);
@@ -578,8 +585,9 @@ enum ofp_return_code ofp_arp_processing(odp_packet_t *pkt)
 
 	/* Check for VXLAN interface */
 	if (odp_unlikely(ofp_if_type(dev) == OFP_IFT_VXLAN)) {
-		ofp_vxlan_update_devices(*pkt, arp, &vlan, &dev, &outdev,
-					 inner_from_mac);
+		if (ofp_vxlan_update_devices(dev, &outdev, &vlan))
+			return OFP_PKT_DROP;
+		memcpy(inner_src_mac, arp->eth_src, OFP_ETHER_ADDR_LEN);
 	}
 
 	is_ours = (-1 != ofp_ifnet_ip_find(dev, (ofp_in_addr_t)(arp->ip_dst)));
@@ -646,7 +654,7 @@ enum ofp_return_code ofp_arp_processing(odp_packet_t *pkt)
 			/* Restore the original vxlan header and
 			   update the addresses */
 			ofp_vxlan_restore_and_update_header
-				(*pkt, outdev, inner_from_mac);
+				(*pkt, outdev, inner_src_mac);
 		}
 
 		return send_pkt_out(outdev, *pkt);
@@ -654,6 +662,8 @@ enum ofp_return_code ofp_arp_processing(odp_packet_t *pkt)
 	return OFP_PKT_CONTINUE;
 }
 
+/*rfc7348: On the encapsulation side, a VTEP SHOULD NOT include an
+	inner VLAN tag on tunnel packets unless configured otherwise.*/
 #define ETH_WITH_VLAN(dev) (ofp_if_type(dev) == OFP_IFT_ETHER && \
 			    (dev)->vlan != OFP_IFPORT_NET_SUBPORT_ITF)
 
