@@ -56,8 +56,6 @@
 
 static void drain_scheduler(void);
 static void drain_scheduler_for_global_term(void);
-static void cleanup_pkt_queue(odp_queue_t pkt_queue);
-static int cleanup_interface(struct ofp_ifnet *ifnet);
 
 static int ofp_terminate_stack_global(const char *pool_name);
 
@@ -691,17 +689,9 @@ init_error:
 		/* Fallthrough */
 	case OFP_INIT_STATE_INTERFACES_INIT:
 		{
-			struct ofp_ifnet *ifnet = NULL;
-
 			ofp_stop_processing();
 
-			for (i = 0; OFP_IFPORT_IS_NET(i); i++) {
-				ifnet = ofp_get_ifnet(i, OFP_IFPORT_NET_SUBPORT_ITF, 0);
-				if (!ifnet)
-					continue;
-
-				cleanup_interface(ifnet);
-			}
+			ofp_net_interfaces_destroy();
 		}
 		/* Fallthrough */
 	case OFP_INIT_STATE_STACK_INIT:
@@ -788,8 +778,6 @@ int ofp_init_local_resources(const char *description)
 int ofp_terminate(void)
 {
 	int rc = 0;
-	uint16_t i;
-	struct ofp_ifnet *ifnet;
 	odp_instance_t odp_instance = OFP_ODP_INSTANCE_INVALID;
 	odp_bool_t odp_instance_owner = 0;
 
@@ -812,22 +800,14 @@ int ofp_terminate(void)
 	}
 #endif /* SP */
 
-	/* Cleanup interfaces: queues and pktios*/
-	for (i = 0; OFP_IFPORT_IS_NET_U(i); i++) {
-		ifnet = ofp_get_ifnet((uint16_t)i, OFP_IFPORT_NET_SUBPORT_ITF, 0);
-		if (!ifnet) {
-			OFP_ERR("Failed to locate interface for port %d", i);
-			rc = -1;
-			continue;
-		}
-
-		if (cleanup_interface(ifnet)) {
-			rc = -1;
-			continue;
-		}
-	}
-
+	/* Cleanup interfaces */
 	CHECK_ERROR(ofp_local_interfaces_destroy(), rc);
+
+	CHECK_ERROR(ofp_gre_interfaces_destroy(), rc);
+
+	CHECK_ERROR(ofp_vxlan_interfaces_destroy(), rc);
+
+	CHECK_ERROR(ofp_net_interfaces_destroy(), rc);
 
 	if (ofp_terminate_stack_global(SHM_PKT_POOL_NAME)) {
 		OFP_ERR("Failed to cleanup resources\n");
@@ -1020,95 +1000,3 @@ static void drain_scheduler_for_global_term(void)
 		}
 	}
 }
-
-static void cleanup_pkt_queue(odp_queue_t pkt_queue)
-{
-	odp_event_t evt;
-
-	if (odp_queue_type(pkt_queue) == ODP_QUEUE_TYPE_SCHED)
-		return;
-
-	while (1) {
-		evt = odp_queue_deq(pkt_queue);
-		if (evt == ODP_EVENT_INVALID)
-			break;
-		if (odp_event_type(evt) == ODP_EVENT_PACKET)
-			odp_packet_free(odp_packet_from_event(evt));
-	}
-}
-
-static int cleanup_interface(struct ofp_ifnet *ifnet)
-{
-	int rc = 0;
-	uint16_t j = 0;
-
-	if (!ifnet) {
-		OFP_ERR("Error: Invalid argument");
-		return -1;
-	}
-
-	if (ifnet->if_state == OFP_IFT_STATE_FREE)
-		return 0;
-
-	if (ifnet->pktio == ODP_PKTIO_INVALID)
-		return 0;
-
-	OFP_INFO("Cleaning device '%s' addr %s", ifnet->if_name,
-		 ofp_print_mac((uint8_t *)ifnet->if_mac));
-
-	CHECK_ERROR(odp_pktio_stop(ifnet->pktio), rc);
-#ifdef SP
-	odph_odpthreads_join(ifnet->rx_tbl);
-	odph_odpthreads_join(ifnet->tx_tbl);
-	close(ifnet->sp_fd);
-	ifnet->sp_fd = -1;
-#endif /*SP*/
-
-	/* Multicasting. */
-	ofp_igmp_domifdetach(ifnet);
-	ifnet->ii_inet.ii_igmp = NULL;
-
-	if (ifnet->loopq_def != ODP_QUEUE_INVALID) {
-		if (odp_queue_destroy(ifnet->loopq_def) < 0) {
-			OFP_ERR("Failed to destroy loop queue for %s",
-				ifnet->if_name);
-			rc = -1;
-		}
-		ifnet->loopq_def = ODP_QUEUE_INVALID;
-	}
-#ifdef SP
-	if (ifnet->spq_def != ODP_QUEUE_INVALID) {
-		cleanup_pkt_queue(ifnet->spq_def);
-		if (odp_queue_destroy(ifnet->spq_def) < 0) {
-			OFP_ERR("Failed to destroy slow path "
-				"queue for %s", ifnet->if_name);
-			rc = -1;
-		}
-		ifnet->spq_def = ODP_QUEUE_INVALID;
-	}
-#endif /*SP*/
-	for (j = 0; j < OFP_PKTOUT_QUEUE_MAX; j++)
-		ifnet->out_queue_queue[j] = ODP_QUEUE_INVALID;
-
-	if (ifnet->pktio != ODP_PKTIO_INVALID) {
-		int num_queues = odp_pktin_event_queue(ifnet->pktio, NULL, 0);
-		odp_queue_t in_queue[num_queues];
-		int num_in_queue, idx;
-
-		num_in_queue = odp_pktin_event_queue(ifnet->pktio,
-						     in_queue, num_queues);
-
-		for (idx = 0; idx < num_in_queue; idx++)
-			cleanup_pkt_queue(in_queue[idx]);
-
-		if (odp_pktio_close(ifnet->pktio) < 0) {
-			OFP_ERR("Failed to destroy pktio for %s",
-				ifnet->if_name);
-			rc = -1;
-		}
-		ifnet->pktio = ODP_PKTIO_INVALID;
-	}
-
-	return rc;
-}
-

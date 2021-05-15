@@ -413,5 +413,9 @@ void ofp_join_device_to_multicast_group(struct ofp_ifnet *dev_root,
 				       uint32_t group);
 void ofp_leave_multicast_group(struct ofp_ifnet *dev_vxlan);
 int ofp_local_interfaces_destroy(void);
+int ofp_gre_interfaces_destroy(void);
+int ofp_vxlan_interfaces_destroy(void);
+int ofp_net_interfaces_destroy(void);
 
+int ofp_destroy_subports(struct ofp_ifnet *ifnet);
 #endif

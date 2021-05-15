@@ -58,8 +58,8 @@ int ofp_ifport_net_create(char *if_name,
 		return -1;
 	}
 
-	res = ofp_ifnet_create(if_name, pktio_param,
-			       pktin_param, pktout_param, ifnet);
+	res = ofp_ifnet_net_create(if_name, pktio_param,
+				   pktin_param, pktout_param, ifnet);
 	if (res != 0) {
 		OFP_ERR("Error: Failed to create the interface.");
 		return -1;
@@ -1292,7 +1292,71 @@ const char *ofp_ifport_local_ipv6_up(uint16_t id, uint8_t *addr, int masklen)
 }
 #endif /* INET6 */
 
-static int iter_local_iface_destroy(void *key, void *iter_arg)
+int ofp_local_interfaces_destroy(void)
+{
+	if (!shm_ifnet_port) {
+		ofp_portconf_lookup_shared_memory();
+
+		if (!shm_ifnet_port) {
+			OFP_ERR("ofp_shared_memory_lookup failed");
+			return -1;
+		}
+	}
+
+	return ofp_destroy_subports(&V_ifnet_port[OFP_IFPORT_LOCAL]);
+}
+
+int ofp_gre_interfaces_destroy(void)
+{
+	if (!shm_ifnet_port) {
+		ofp_portconf_lookup_shared_memory();
+
+		if (!shm_ifnet_port) {
+			OFP_ERR("ofp_shared_memory_lookup failed");
+			return -1;
+		}
+	}
+
+	return ofp_destroy_subports(&V_ifnet_port[OFP_IFPORT_GRE]);
+}
+
+int ofp_vxlan_interfaces_destroy(void)
+{
+	if (!shm_ifnet_port) {
+		ofp_portconf_lookup_shared_memory();
+
+		if (!shm_ifnet_port) {
+			OFP_ERR("ofp_shared_memory_lookup failed");
+			return -1;
+		}
+	}
+
+	return ofp_destroy_subports(&V_ifnet_port[OFP_IFPORT_VXLAN]);
+}
+
+int ofp_net_interfaces_destroy(void)
+{
+	uint16_t i;
+	int rc = 0;
+
+	if (!shm_ifnet_port) {
+		ofp_portconf_lookup_shared_memory();
+
+		if (!shm_ifnet_port) {
+			OFP_ERR("ofp_shared_memory_lookup failed");
+			return -1;
+		}
+	}
+
+	for (i = 0; OFP_IFPORT_IS_NET_U(i); i++) {
+		if (ofp_ifnet_net_cleanup(&V_ifnet_port[i]))
+			rc = -1;
+	}
+
+	return rc;
+}
+
+static int iter_iface_destroy(void *key, void *iter_arg)
 {
 	struct ofp_ifnet *iface = key;
 	(void)iter_arg;
@@ -1302,20 +1366,16 @@ static int iter_local_iface_destroy(void *key, void *iter_arg)
 	return 0;
 }
 
-int ofp_local_interfaces_destroy(void)
+int ofp_destroy_subports(struct ofp_ifnet *ifnet)
 {
-	if (!shm_ifnet_port)
-		ofp_portconf_lookup_shared_memory();
-	if (!shm_ifnet_port) {
-		OFP_ERR("ofp_shared_memory_lookup failed");
+	if (!ifnet)
 		return -1;
-	}
 
-	if (!V_ifnet_port[OFP_IFPORT_LOCAL].vlan_structs)
+	if (!ifnet->vlan_structs)
 		return 0;
 
-	vlan_cleanup_inorder(V_ifnet_port[OFP_IFPORT_LOCAL].vlan_structs,
-			     iter_local_iface_destroy, NULL);
+	vlan_cleanup_inorder(ifnet->vlan_structs,
+			     iter_iface_destroy, NULL);
 
 	return 0;
 }
@@ -1370,16 +1430,18 @@ static int ofp_ifnet_addr_cleanup(struct ofp_ifnet *ifnet)
 
 		ofp_free_ifnet_ip_list(ifnet);
 #ifdef SP
-		if (ifnet->port == OFP_IFPORT_LOCAL)
+		if (ifnet->port == OFP_IFPORT_LOCAL) {
 			snprintf(cmd, sizeof(cmd),
 				 "ip addr del %s/%d dev lo",
 				 ofp_print_ip_addr(dest), m);
-		else
+			exec_sys_call_depending_on_vrf(cmd, vrf);
+		} else if (!OFP_IFPORT_IS_NET_U(ifnet->port)) {
 			snprintf(cmd, sizeof(cmd),
 				 "ifconfig %s 0.0.0.0",
 				 ofp_port_vlan_to_ifnet_name(ifnet->port,
 							     ifnet->vlan));
-		exec_sys_call_depending_on_vrf(cmd, vrf);
+			exec_sys_call_depending_on_vrf(cmd, vrf);
+		}
 #endif /*SP*/
 	}
 #ifdef INET6
@@ -1419,6 +1481,8 @@ static const char *ofp_ifport_net_down(int port, uint16_t subport)
 	struct ofp_ifnet *ifnet;
 #ifdef SP
 	char cmd[200];
+
+	(void)cmd;
 #endif /* SP */
 
 	if (!OFP_IFPORT_IS_NET(port))
@@ -1436,9 +1500,10 @@ static const char *ofp_ifport_net_down(int port, uint16_t subport)
 		free(ifnet->ii_inet.ii_igmp);
 
 #ifdef SP
+		/* Already deleted
 		snprintf(cmd, sizeof(cmd), "ip link del %s",
 			 ofp_port_vlan_to_ifnet_name(port, subport));
-		exec_sys_call_depending_on_vrf(cmd, ifnet->vrf);
+		exec_sys_call_depending_on_vrf(cmd, ifnet->vrf);*/
 #endif /*SP*/
 
 		ofp_del_subport(ifnet_port, subport);

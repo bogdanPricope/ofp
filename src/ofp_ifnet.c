@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier:	BSD-3-Clause
  */
+#include <unistd.h>
 
 #include "ofpi.h"
 #include "ofpi_ifnet.h"
@@ -13,6 +14,8 @@
 #include "ofpi_global_param_shm.h"
 #include "ofp_errno.h"
 #include "ofpi_log.h"
+
+static void cleanup_pkt_queue(odp_queue_t pkt_queue);
 
 /* Open a packet IO instance for this ifnet device for the pktin_mode. */
 int ofp_pktio_open(struct ofp_ifnet *ifnet, odp_pktio_param_t *pktio_param)
@@ -275,10 +278,10 @@ int ofp_sp_inq_create(struct ofp_ifnet *ifnet)
 }
 #endif /*SP*/
 
-int ofp_ifnet_create(char *if_name,
-		     odp_pktio_param_t *pktio_param,
-		     odp_pktin_queue_param_t *pktin_param,
-		     odp_pktout_queue_param_t *pktout_param,
+int ofp_ifnet_net_create(char *if_name,
+			 odp_pktio_param_t *pktio_param,
+			 odp_pktin_queue_param_t *pktin_param,
+			 odp_pktout_queue_param_t *pktout_param,
 			 struct ofp_ifnet *ifnet)
 {
 	odp_pktio_param_t pktio_param_local;
@@ -407,6 +410,105 @@ int ofp_ifnet_create(char *if_name,
 #endif /* SP */
 
 	return 0;
+}
+
+int ofp_ifnet_net_cleanup(struct ofp_ifnet *ifnet)
+{
+	int rc = 0;
+	uint16_t j = 0;
+
+	if (!ifnet) {
+		OFP_ERR("Error: Invalid argument");
+		return -1;
+	}
+
+	if (ifnet->if_state == OFP_IFT_STATE_FREE)
+		return 0;
+
+	if (ifnet->pktio == ODP_PKTIO_INVALID)
+		return 0;
+
+	OFP_INFO("Cleaning device '%s' addr %s", ifnet->if_name,
+		 ofp_print_mac((uint8_t *)ifnet->if_mac));
+
+	CHECK_ERROR(odp_pktio_stop(ifnet->pktio), rc);
+#ifdef SP
+	odph_odpthreads_join(ifnet->rx_tbl);
+	odph_odpthreads_join(ifnet->tx_tbl);
+	close(ifnet->sp_fd);
+	ifnet->sp_fd = -1;
+#endif /*SP*/
+
+	if (ofp_destroy_subports(ifnet)) {
+		OFP_ERR("Failed to destroy subports for %s",
+			ifnet->if_name);
+		rc = -1;
+	}
+
+	/* Multicasting. */
+	ofp_igmp_domifdetach(ifnet);
+	ifnet->ii_inet.ii_igmp = NULL;
+
+	if (ifnet->loopq_def != ODP_QUEUE_INVALID) {
+		if (odp_queue_destroy(ifnet->loopq_def) < 0) {
+			OFP_ERR("Failed to destroy loop queue for %s",
+				ifnet->if_name);
+			rc = -1;
+		}
+		ifnet->loopq_def = ODP_QUEUE_INVALID;
+	}
+#ifdef SP
+	if (ifnet->spq_def != ODP_QUEUE_INVALID) {
+		cleanup_pkt_queue(ifnet->spq_def);
+		if (odp_queue_destroy(ifnet->spq_def) < 0) {
+			OFP_ERR("Failed to destroy slow path "
+				"queue for %s", ifnet->if_name);
+			rc = -1;
+		}
+		ifnet->spq_def = ODP_QUEUE_INVALID;
+	}
+#endif /*SP*/
+	for (j = 0; j < OFP_PKTOUT_QUEUE_MAX; j++)
+		ifnet->out_queue_queue[j] = ODP_QUEUE_INVALID;
+
+	if (ifnet->pktio != ODP_PKTIO_INVALID) {
+		int num_queues = odp_pktin_event_queue(ifnet->pktio, NULL, 0);
+		odp_queue_t in_queue[num_queues];
+		int num_in_queue, idx;
+
+		num_in_queue = odp_pktin_event_queue(ifnet->pktio,
+						     in_queue, num_queues);
+
+		for (idx = 0; idx < num_in_queue; idx++)
+			cleanup_pkt_queue(in_queue[idx]);
+
+		if (odp_pktio_close(ifnet->pktio) < 0) {
+			OFP_ERR("Failed to destroy pktio for %s",
+				ifnet->if_name);
+			rc = -1;
+		}
+		ifnet->pktio = ODP_PKTIO_INVALID;
+	}
+
+	ifnet->if_state = OFP_IFT_STATE_FREE;
+
+	return rc;
+}
+
+static void cleanup_pkt_queue(odp_queue_t pkt_queue)
+{
+	odp_event_t evt;
+
+	if (odp_queue_type(pkt_queue) == ODP_QUEUE_TYPE_SCHED)
+		return;
+
+	while (1) {
+		evt = odp_queue_deq(pkt_queue);
+		if (evt == ODP_EVENT_INVALID)
+			break;
+		if (odp_event_type(evt) == ODP_EVENT_PACKET)
+			odp_packet_free(odp_packet_from_event(evt));
+	}
 }
 
 int ofp_ifnet_port_get(ofp_ifnet_t _ifnet, int *port, uint16_t *subport)
