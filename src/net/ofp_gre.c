@@ -25,6 +25,7 @@
 
 enum ofp_return_code ofp_gre_input(odp_packet_t *pkt, int off0)
 {
+	enum ofp_return_code ret = OFP_PKT_CONTINUE;
 	int res;
 	struct ofp_ifnet *dev, *dev_in;
 	struct ofp_ether_header *eth_hdr;
@@ -34,6 +35,7 @@ enum ofp_return_code ofp_gre_input(odp_packet_t *pkt, int off0)
 	uint8_t eth_d_addr[OFP_ETHER_ADDR_LEN];
 	uint8_t eth_s_addr[OFP_ETHER_ADDR_LEN];
 	uint16_t ptype, offset, eth_hdr_len = OFP_ETHER_HDR_LEN;
+	struct ofp_ether_vlan_header hdr_bkp;
 
 	(void)off0;
 
@@ -83,6 +85,7 @@ enum ofp_return_code ofp_gre_input(odp_packet_t *pkt, int off0)
 	}
 	odp_packet_l2_offset_set(*pkt, 0);
 	odp_packet_l3_offset_set(*pkt, eth_hdr_len);
+	odp_memcpy(&hdr_bkp, odp_packet_l2_ptr(*pkt, NULL), eth_hdr_len);
 
 	/* Add eth header */
 	if (dev->vlan) {
@@ -106,16 +109,26 @@ enum ofp_return_code ofp_gre_input(odp_packet_t *pkt, int off0)
 
 	switch (odp_be_to_cpu_16(ptype)) {
 	case OFP_ETHERTYPE_IP:
-		return ofp_ipv4_processing(pkt);
+		ret = ofp_ipv4_processing(pkt);
+		break;
 #ifdef INET6
 	case OFP_ETHERTYPE_IPV6:
-		return ofp_ipv6_processing(pkt);
+		ret = ofp_ipv6_processing(pkt);
+		break;
 #endif /* INET6 */
 	default:
-		return OFP_PKT_CONTINUE;
+		ret = OFP_PKT_CONTINUE;
 	}
 
-	return OFP_PKT_CONTINUE;
+	if (ret == OFP_PKT_CONTINUE) {
+		/* restore packet for SP */
+		odp_memcpy(odp_packet_l2_ptr(*pkt, NULL),
+			   &hdr_bkp, eth_hdr_len);
+		odp_packet_push_head(*pkt, offset);
+		odp_packet_l2_offset_set(*pkt, 0);
+	}
+
+	return ret;
 }
 
 enum ofp_return_code ofp_output_ipv4_to_gre(odp_packet_t pkt,

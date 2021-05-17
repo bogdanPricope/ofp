@@ -1993,9 +1993,9 @@ static int vlan_match_ip_vrf(void *key, void *iter_arg)
 	struct ofp_ifnet *iface = key;
 	struct iter_ip *iterdata = (struct iter_ip *)iter_arg;
 
-	if (iface->ip_addr_info[0].ip_addr == iterdata->addr &&
-	    iface->vrf == iterdata->vrf)
-		return iface->vlan;
+	if (iface->vrf == iterdata->vrf &&
+	    (ofp_ifnet_ip_find(iface, iterdata->addr) != -1))
+		return iface->vlan + 1;	/* workaround for vlan 0*/
 	else
 		return 0;
 }
@@ -2005,11 +2005,12 @@ struct ofp_ifnet *ofp_get_ifnet_by_ip(uint32_t ip, uint16_t vrf)
 	uint16_t port;
 	struct ofp_ifnet *ifnet;
 	uint16_t vlan;
+	int res;
 	struct iter_ip iterdata;
 
 	for (port = 0; port < OFP_FP_INTERFACE_MAX; ++port) {
 		ifnet = &V_ifnet_port[port];
-		if (ifnet->ip_addr_info[0].ip_addr == ip && ifnet->vrf == vrf)
+		if (ifnet->vrf == vrf && (ofp_ifnet_ip_find(ifnet, ip) != -1))
 			return ifnet;
 	}
 
@@ -2017,11 +2018,12 @@ struct ofp_ifnet *ofp_get_ifnet_by_ip(uint32_t ip, uint16_t vrf)
 	iterdata.vrf = vrf;
 
 	for (port = 0; port < OFP_FP_INTERFACE_MAX; ++port) {
-		vlan = vlan_iterate_inorder(
-			V_ifnet_port[port].vlan_structs,
-			vlan_match_ip_vrf, &iterdata);
-		if (vlan)
+		res = vlan_iterate_inorder(V_ifnet_port[port].vlan_structs,
+					   vlan_match_ip_vrf, &iterdata);
+		if (res) {
+			vlan = res - 1; /* workaround for vlan 0*/
 			return ofp_get_ifnet(port, vlan, 0);
+		}
 	}
 
 	return NULL;

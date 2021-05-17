@@ -1236,7 +1236,6 @@ static inline enum ofp_return_code ofp_ip_output_continue(odp_packet_t pkt,
 	switch (ofp_if_type(odata->dev_out)) {
 	case OFP_IFT_GRE:
 		return ofp_output_ipv4_to_gre(pkt, odata->dev_out);
-		break;
 	case OFP_IFT_VXLAN:
 		if ((ret = ofp_ip_output_add_eth(pkt, odata)) != OFP_PKT_CONTINUE)
 			return ret;

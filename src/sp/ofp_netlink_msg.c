@@ -499,7 +499,7 @@ static int add_link(struct ifinfomsg *ifinfo_entry, int vlan, int link,
 			return -1;
 		}
 		if (ifinfo_entry->ifi_type == ARPHRD_IPGRE) {
-			dev_root = ofp_get_ifnet(OFP_IFPORT_GRE, 0, 0);
+			dev_root = ofp_get_port_itf(OFP_IFPORT_GRE);
 			if (ofp_get_ifnet_by_ip(tun_loc, vrf) == NULL) {
 				OFP_DBG(" - Tunnel local IP not configured. "
 					"Interface ignored.");
@@ -789,10 +789,6 @@ static int handle_ifinfo(struct nlmsghdr *nlh, int vrf)
 			return -1;
 		}
 		vlan = atoi(name + strlen(OFP_GRE_IFNAME_PREFIX));
-		if (vlan == 0) {
-			OFP_ERR(" ! Invalid tunnel id: %d", vlan);
-			return -1;
-		}
 		OFP_DBG(" - GRE id = %d", vlan);
 	} else if (name &&
 		   !strncmp(name, OFP_VXLAN_IFNAME_PREFIX,
