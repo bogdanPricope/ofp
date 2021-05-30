@@ -122,7 +122,7 @@ static void init_ifnet(void)
 	dev->if_mtu = def_mtu;
 #ifdef SP
 	dev->linux_index = port + 3; /* an if index of Linux != port val */
-	ofp_update_ifindex_lookup_tab(dev);
+	ofp_ifindex_lookup_tab_update(dev);
 #endif /* SP */
 
 	dev->pkt_pool = odp_pool_lookup(pool_name);
@@ -145,7 +145,7 @@ static void init_ifnet(void)
 	dev_vlan->if_mtu = def_mtu;
 #ifdef SP
 	dev_vlan->linux_index = port + 4; /* an if index of Linux != port val */
-	ofp_update_ifindex_lookup_tab(dev_vlan);
+	ofp_ifindex_lookup_tab_update(dev_vlan);
 #endif /* SP */
 
 	dev_vlan->pkt_pool = odp_pool_lookup(pool_name);

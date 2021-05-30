@@ -206,6 +206,7 @@ struct ODP_ALIGNED_CACHE ofp_ifnet {
 	};
 
 #ifdef SP
+	odp_bool_t          sp;
 	int                 linux_index;
 
 	ofp_itf_sp_state_t  sp_status;
@@ -371,7 +372,9 @@ int ofp_get_linuxindex(const char *name);
 int ofp_free_port_alloc(void);
 
 #ifdef SP
-void ofp_update_ifindex_lookup_tab(struct ofp_ifnet *ifnet);
+void ofp_ifindex_lookup_tab_update(struct ofp_ifnet *ifnet);
+void ofp_ifindex_lookup_tab_cleanup(struct ofp_ifnet *ifnet);
+struct ofp_linux_interface_param *ofp_ifindex_lookup_tab_get(int ix);
 #endif /* SP */
 
 int ofp_vlan_get_by_key(void *root, void *key, void **value_address);

@@ -112,7 +112,7 @@ void f_ifconfig(ofp_print_t *pr, const char *s)
 	if (OFP_IFPORT_IS_NET(port))
 		err = ofp_ifport_net_ipv4_up(port, vlan, vrf, addr, m);
 	else
-		err = ofp_ifport_local_ipv4_up(vlan, vrf, addr, m);
+		err = ofp_ifport_local_ipv4_up(vlan, vrf, addr, m, 0);
 	if (err != NULL)
 		ofp_print(pr, err);
 }

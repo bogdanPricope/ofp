@@ -145,6 +145,9 @@ int ofp_portconf_init_global(void)
 		/* Port number. */
 		ifnet->if_mac[1] = i;
 		memset(ifnet->ip_addr_info, 0, sizeof(ifnet->ip_addr_info));
+#ifdef SP
+		ifnet->sp = 1;
+#endif /* SP */
 	}
 
 #ifdef SP

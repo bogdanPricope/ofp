@@ -622,7 +622,7 @@ int ofp_initialize(ofp_initialize_param_t *params)
 					 0x00, 0x00, 0x00, 0x01};
 #endif /* INET6 */
 
-		err = ofp_ifport_local_ipv4_up(0, 0, loop_addr, 8);
+		err = ofp_ifport_local_ipv4_up(0, 0, loop_addr, 8, 0);
 		if (err != NULL) {
 			OFP_ERR("Failed to set IPv4 loopback interface: %s.",
 				err);

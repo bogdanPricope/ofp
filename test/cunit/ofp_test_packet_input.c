@@ -214,7 +214,7 @@ test_init_ifnet(void)
 
 #ifdef SP
 	ifnet->linux_index = port + 3; /* an if index of Linux != port val */
-	ofp_update_ifindex_lookup_tab(ifnet);
+	ofp_ifindex_lookup_tab_update(ifnet);
 
 	sprintf(str, "slow path stack port:%d", port);
 	ifnet->spq_def = odp_queue_create(str, NULL);

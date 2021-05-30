@@ -245,7 +245,7 @@ static int add_ipv4v6_addr(struct ifaddrmsg *if_entry, struct ofp_ifnet *dev,
 		bcast_addr = bcast ? *(uint32_t *)bcast : 0;
 		dev->sp_status = OFP_SP_UP;
 		/* update quick access table */
-		ofp_update_ifindex_lookup_tab(dev);
+		ofp_ifindex_lookup_tab_update(dev);
 
 		if (ofp_if_type(dev) == OFP_IFT_VXLAN) {
 			struct ofp_ifnet *dev_root =
@@ -298,7 +298,7 @@ static int add_ipv4v6_addr(struct ifaddrmsg *if_entry, struct ofp_ifnet *dev,
 				ofp_ifaddr6_elem_add(dev);
 		}
 		/* update quick access table */
-		ofp_update_ifindex_lookup_tab(dev);
+		ofp_ifindex_lookup_tab_update(dev);
 	}
 #endif /* INET6 */
 
@@ -537,6 +537,7 @@ static int add_link(struct ifinfomsg *ifinfo_entry, int vlan, int link,
 			dev->if_csum_offload_flags =
 				dev_root->if_csum_offload_flags;
 			dev->sp_status = OFP_SP_UP;
+			dev->sp = 1;
 #ifdef INET6
 			memcpy(dev->link_local, dev_root->link_local, 16);
 #endif /* INET6 */
@@ -550,7 +551,7 @@ static int add_link(struct ifinfomsg *ifinfo_entry, int vlan, int link,
 		/* when linux interface index was not available yet (cli) */
 		if (!dev->linux_index) {
 			dev->linux_index = ifinfo_entry->ifi_index;
-			ofp_update_ifindex_lookup_tab(dev);
+			ofp_ifindex_lookup_tab_update(dev);
 		}
 
 		if (ifinfo_entry->ifi_type == ARPHRD_VXLAN) {

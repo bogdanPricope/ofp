@@ -316,12 +316,13 @@ const char *ofp_ifport_vxlan_ipv4_up(int subport_vni, uint32_t group,
  * @param vrf Virtual routing table
  * @param addr IPv4 address to set
  * @param masklen Mask length
+ * @param sp Slow path interface management
  *
  * @retval NULL on success
  * @retval error message on error
  */
 const char *ofp_ifport_local_ipv4_up(uint16_t subport_id, uint16_t vrf,
-				     uint32_t addr, int masklen);
+				     uint32_t addr, int masklen, odp_bool_t sp);
 
 /**
  * Configure IPv6 address on a local port interface

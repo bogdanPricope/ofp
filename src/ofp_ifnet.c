@@ -351,7 +351,7 @@ int ofp_ifnet_net_create(char *if_name,
 	HANDLE_ERROR(sp_setup_device(ifnet));
 
 	/* Maintain table to access ifnet from linux ifindex */
-	ofp_update_ifindex_lookup_tab(ifnet);
+	ofp_ifindex_lookup_tab_update(ifnet);
 #ifdef INET6
 	/* ifnet MAC was set in sp_setup_device() */
 	ofp_mac_to_link_local(ifnet->if_mac, ifnet->link_local);
