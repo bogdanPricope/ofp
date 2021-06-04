@@ -159,11 +159,11 @@ static void init_ifnet(void)
 
 	/* Tunnels */
 	ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, 100, 0, dev_ip, tun_rem_ip,
-			       tun_p2p, tun_addr, tun_mask);
+			       tun_p2p, tun_addr, tun_mask, 1);
 
 	/* No nexthop for tunnel remote address */
 	ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, 200, 0, dev_ip, 0x08070605,
-			       tun_p2p + 1, tun_addr + 1, tun_mask);
+			       tun_p2p + 1, tun_addr + 1, tun_mask, 1);
 }
 
 static enum ofp_return_code fastpath_hook_out_IPv4(odp_packet_t pkt,

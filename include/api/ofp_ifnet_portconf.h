@@ -277,6 +277,7 @@ const char *ofp_ifport_net_ipv4_addr_del(int port, uint16_t subport_vlan,
  * @param p2p Peer address
  * @param addr IPv4 address to set
  * @param masklen Mask length
+ * @param sp_itf_mgmt Slow path interface management
  *
  * @retval NULL on success
  * @retval error message on error
@@ -284,7 +285,8 @@ const char *ofp_ifport_net_ipv4_addr_del(int port, uint16_t subport_vlan,
 const char *ofp_ifport_tun_ipv4_up(int port, uint16_t subport,
 				   uint16_t vrf, uint32_t tun_loc,
 				   uint32_t tun_rem, uint32_t p2p,
-				   uint32_t addr, int masklen);
+				   uint32_t addr, int masklen,
+				   odp_bool_t sp_itf_mgmt);
 
 /**
  * Configure an IPv4 VXLAN interface
@@ -316,13 +318,14 @@ const char *ofp_ifport_vxlan_ipv4_up(int subport_vni, uint32_t group,
  * @param vrf Virtual routing table
  * @param addr IPv4 address to set
  * @param masklen Mask length
- * @param sp Slow path interface management
+ * @param sp_itf_mgmt Slow path interface management
  *
  * @retval NULL on success
  * @retval error message on error
  */
 const char *ofp_ifport_local_ipv4_up(uint16_t subport_id, uint16_t vrf,
-				     uint32_t addr, int masklen, odp_bool_t sp);
+				     uint32_t addr, int masklen,
+				     odp_bool_t sp_itf_mgmt);
 
 /**
  * Configure IPv6 address on a local port interface

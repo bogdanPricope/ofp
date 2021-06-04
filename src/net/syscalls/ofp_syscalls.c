@@ -588,33 +588,6 @@ int ofp_setsockopt(int sockfd, int level, int optname,
 	return 0;
 }
 
-static int get_port_vlan_by_name(const char *name, int *port, int *vlan)
-{
-	if (strncmp(name, OFP_IFNAME_PREFIX,
-		    strlen(OFP_IFNAME_PREFIX)) == 0) {
-		int i;
-		const char *p = NULL;
-		for (i = 0; i < OFP_IFNAMSIZ && name[i]; i++)
-			if (name[i] == '.') {
-				p = &name[i];
-				break;
-			}
-		if (p)
-			*vlan = atoi(p+1);
-		else
-			*vlan = 0;
-
-		*port = atoi(name + strlen(OFP_IFNAME_PREFIX));
-		return 0;
-	} else if (strncmp(name, OFP_GRE_IFNAME_PREFIX,
-			   strlen(OFP_GRE_IFNAME_PREFIX)) == 0) {
-		*port = OFP_IFPORT_GRE;
-		*vlan = atoi(name + strlen(OFP_GRE_IFNAME_PREFIX));
-		return 0;
-	}
-	return -1;
-}
-
 int ofp_ioctl(int sockfd, int request, ...)
 {
 	va_list ap;
@@ -638,20 +611,23 @@ int ofp_ioctl(int sockfd, int request, ...)
 		int port, vlan = 0;
 		char *name = data;
 
-		if (get_port_vlan_by_name(name, &port, &vlan) < 0) {
+		port = ofp_name_to_port_vlan(name, &vlan);
+		if (port < 0) {
 			ofp_errno = OFP_EBADF;
 			return -1;
 		}
 
 		if (request == (int)(OFP_SIOCSIFTUN)) {
 			struct ofp_in_tunreq *treq = data;
+
 			const char *retstr =
 				ofp_ifport_tun_ipv4_up
 				(port, vlan, treq->iftun_vrf,
 				 treq->iftun_local_addr.sin_addr.s_addr,
 				 treq->iftun_remote_addr.sin_addr.s_addr,
 				 treq->iftun_p2p_addr.sin_addr.s_addr,
-				 treq->iftun_addr.sin_addr.s_addr, 30);
+				 treq->iftun_addr.sin_addr.s_addr, 32,
+				 treq->iftun_sp_itf_mgmt);
 			if (!retstr)
 				ofp_errno = 0;
 			else
@@ -682,7 +658,8 @@ int ofp_ioctl(int sockfd, int request, ...)
 
 		if (request == (int)OFP_SIOCADDRT) {
 			if (rt->rt_dev) {
-				if (get_port_vlan_by_name(rt->rt_dev, &port, &vlan) < 0) {
+				port = ofp_name_to_port_vlan(rt->rt_dev, &vlan);
+				if (port < 0) {
 					ofp_errno = OFP_EBADF;
 					return -1;
 				}

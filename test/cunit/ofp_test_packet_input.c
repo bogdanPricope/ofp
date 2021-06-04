@@ -244,7 +244,7 @@ test_init_ifnet(void)
 	odp_queue_context_set(interface_queue[port], ifnet, sizeof(ifnet));
 
 	ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, 100 + port, vrf, local_ip,
-			       tun_rem_ip, tun_p2p, tun_addr, tun_mask);
+			       tun_rem_ip, tun_p2p, tun_addr, tun_mask, 1);
 }
 
 static int

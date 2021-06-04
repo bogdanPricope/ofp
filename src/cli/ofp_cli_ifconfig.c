@@ -153,7 +153,7 @@ void f_ifconfig_tun(ofp_print_t *pr, const char *s)
 	}
 
 	err = ofp_ifport_tun_ipv4_up(port, vlan, vrf, tun_loc, tun_rem, p2p,
-				     addr, masklen);
+				     addr, masklen, 1);
 	if (err != NULL)
 		ofp_print(pr, err);
 }

@@ -214,11 +214,17 @@ ofp_in_control(struct socket *so, uint32_t cmd, char *data, struct ofp_ifnet *if
 	case OFP_SIOCSIFNETMASK:
 	case OFP_SIOCSIFFIB:
 		if (ofp_if_type(ifp) == OFP_IFT_GRE) {
+			odp_bool_t sp_itf_mgmt = 0;
+
+#ifdef SP
+			sp_itf_mgmt = ifp->sp_itf_mgmt;
+#endif /*SP*/
+
 			ofp_ifport_tun_ipv4_up
 				(ifp->port, ifp->vlan,
 				 vrf, ifp->ip_local,
 				 ifp->ip_remote, if_p2p,
-				 if_addr, if_masklen);
+				 if_addr, if_masklen, sp_itf_mgmt);
 		} else {
 			ofp_ifport_ifnet_down(ifp->port, ifp->vlan);
 			ofp_ifport_net_ipv4_up(ifp->port, ifp->vlan, vrf,

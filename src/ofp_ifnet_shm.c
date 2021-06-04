@@ -146,7 +146,8 @@ int ofp_portconf_init_global(void)
 		ifnet->if_mac[1] = i;
 		memset(ifnet->ip_addr_info, 0, sizeof(ifnet->ip_addr_info));
 #ifdef SP
-		ifnet->sp = 1;
+		ifnet->sp_itf_mgmt = 1;
+		ifnet->sp_status = OFP_SP_UP;
 #endif /* SP */
 	}
 

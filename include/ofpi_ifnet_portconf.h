@@ -206,10 +206,10 @@ struct ODP_ALIGNED_CACHE ofp_ifnet {
 	};
 
 #ifdef SP
-	odp_bool_t          sp;
 	int                 linux_index;
 
 	ofp_itf_sp_state_t  sp_status;
+	odp_bool_t          sp_itf_mgmt;
 	int                 sp_fd;
 	odp_queue_t         spq_def;
 	odph_odpthread_t    rx_tbl[1];

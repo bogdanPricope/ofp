@@ -383,7 +383,7 @@ static int iter_vlan(void *key, void *iter_arg)
 #ifdef SP
 		ofp_print(pr, "lo%d  (%d) slowpath: %s\r\n", iface->vlan,
 			  iface->linux_index,
-			  iface->sp ? "on" : "off");
+			  iface->sp_status ? "on" : "off");
 #else
 		ofp_print(pr, "lo%d\r\n", iface->vlan);
 #endif /* SP */
@@ -845,18 +845,20 @@ const char *ofp_ifport_net_ipv4_addr_del(int port, uint16_t vlan, int vrf,
 const char *ofp_ifport_tun_ipv4_up(int port, uint16_t greid,
 				   uint16_t vrf, uint32_t tun_loc,
 				   uint32_t tun_rem, uint32_t p2p,
-				   uint32_t addr, int mlen)
+				   uint32_t addr, int mlen,
+				   odp_bool_t sp_itf_mgmt)
 {
 #ifdef SP
 	char cmd[200];
-	int ret = 0, new = 0;
+	int new_tun = 0;
 #endif /* SP */
 	struct ofp_ifnet *data, *dev_root;
 
 #ifdef SP
-	(void)ret;
-	(void)new;
+	(void)new_tun;
 #endif /*SP*/
+
+	(void)sp_itf_mgmt;
 
 	if (!OFP_IFPORT_IS_GRE(port))
 		return "Wrong port number.";
@@ -877,7 +879,7 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t greid,
 
 	if (data == NULL) {
 #ifdef SP
-		new = 1;
+		new_tun = 1;
 #endif /* SP */
 		data = ofp_get_ifnet(port, greid, 1);
 		data->if_type = OFP_IFT_GRE;
@@ -885,12 +887,14 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t greid,
 		ofp_set_route_params(OFP_ROUTE_DEL, data->vrf, greid, port,
 				     data->ip_p2p, data->ip_addr_info[0].masklen, 0, 0);
 #ifdef SP
-		snprintf(cmd, sizeof(cmd),
-			 "ip addr del dev %s %s peer %s",
-			 ofp_port_vlan_to_ifnet_name(port, greid),
-			 ofp_print_ip_addr(data->ip_addr_info[0].ip_addr),
-			 ofp_print_ip_addr(data->ip_p2p));
-		ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
+		if (data->sp_itf_mgmt) {	/*old interface*/
+			snprintf(cmd, sizeof(cmd),
+				 "ip addr del dev %s %s peer %s",
+				 ofp_port_vlan_to_ifnet_name(port, greid),
+				 ofp_print_ip_addr(data->ip_addr_info[0].ip_addr),
+				 ofp_print_ip_addr(data->ip_p2p));
+			exec_sys_call_depending_on_vrf(cmd, data->vrf);
+		}
 #endif /* SP */
 	}
 
@@ -901,6 +905,9 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t greid,
 	data->ip_addr_info[0].ip_addr = addr;
 	data->ip_addr_info[0].masklen = mlen;
 	data->if_mtu = dev_root->if_mtu - sizeof(struct ofp_greip);
+#ifdef SP
+	data->sp_itf_mgmt = sp_itf_mgmt;
+#endif /*SP*/
 
 	ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, greid, port,
 			     data->ip_p2p, data->ip_addr_info[0].masklen, 0,
@@ -912,24 +919,31 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t greid,
 	else
 		data->sp_status = OFP_SP_DOWN;
 
-	snprintf(cmd, sizeof(cmd),
-		 "ip tunnel %s %s mode gre local %s remote %s ttl 255",
-		 (new ? "add" : "change"),
-		 ofp_port_vlan_to_ifnet_name(port, greid),
-		 ofp_print_ip_addr(tun_loc), ofp_print_ip_addr(tun_rem));
-	ret = exec_sys_call_depending_on_vrf(cmd, vrf);
+	if (data->sp_itf_mgmt) {
+		snprintf(cmd, sizeof(cmd),
+			 "ip tunnel %s %s mode gre local %s remote %s ttl 255",
+			 (new_tun ? "add" : "change"),
+			 ofp_port_vlan_to_ifnet_name(port, greid),
+			 ofp_print_ip_addr(tun_loc),
+			 ofp_print_ip_addr(tun_rem));
+		exec_sys_call_depending_on_vrf(cmd, vrf);
 
-	snprintf(cmd, sizeof(cmd),
-		 "ip link set dev %s up",
-		 ofp_port_vlan_to_ifnet_name(port, greid));
-	ret = exec_sys_call_depending_on_vrf(cmd, vrf);
+		snprintf(cmd, sizeof(cmd),
+			 "ip link set dev %s up",
+			 ofp_port_vlan_to_ifnet_name(port, greid));
+		exec_sys_call_depending_on_vrf(cmd, vrf);
 
-	snprintf(cmd, sizeof(cmd),
-		 "ip addr add dev %s %s peer %s",
-		 ofp_port_vlan_to_ifnet_name(port, greid),
-		 ofp_print_ip_addr(addr), ofp_print_ip_addr(p2p));
-	ret = exec_sys_call_depending_on_vrf(cmd, vrf);
+		snprintf(cmd, sizeof(cmd),
+			 "ip addr add dev %s %s peer %s",
+			 ofp_port_vlan_to_ifnet_name(port, greid),
+			 ofp_print_ip_addr(addr), ofp_print_ip_addr(p2p));
+		exec_sys_call_depending_on_vrf(cmd, vrf);
+	} else
 #endif /* SP */
+	{
+		ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, greid, port,
+				     addr, 32, 0, OFP_RTF_LOCAL);
+	}
 	return NULL;
 }
 
@@ -1043,7 +1057,8 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint32_t group,
 }
 
 const char *ofp_ifport_local_ipv4_up(uint16_t id, uint16_t vrf,
-				     uint32_t addr, int masklen, odp_bool_t sp)
+				     uint32_t addr, int masklen,
+				     odp_bool_t sp_itf_mgmt)
 {
 #ifdef SP
 	char cmd[200];
@@ -1053,13 +1068,13 @@ const char *ofp_ifport_local_ipv4_up(uint16_t id, uint16_t vrf,
 	struct ofp_ifnet *data;
 	uint32_t mask;
 
-	(void)sp;
+	(void)sp_itf_mgmt;
 
 	if (vrf >= global_param->num_vrf)
 		return "VRF ID too big";
 
 #ifdef SP	/* force only one loopback interface for 'lo' */
-	if (sp) {
+	if (sp_itf_mgmt) {
 		linux_index = ofp_get_linuxindex("lo");
 		if (linux_index == -1)
 			return "Interface 'lo' not found.";
@@ -1088,9 +1103,9 @@ const char *ofp_ifport_local_ipv4_up(uint16_t id, uint16_t vrf,
 	ofp_loopq_create(data);
 
 #ifdef SP
-	data->sp = sp;
+	data->sp_itf_mgmt = sp_itf_mgmt;
 
-	if (data->sp && vrf) {
+	if (data->sp_itf_mgmt && vrf) {
 		/* Create vrf if not exist using dummy call */
 		exec_sys_call_depending_on_vrf("", vrf);
 	}
@@ -1103,14 +1118,14 @@ const char *ofp_ifport_local_ipv4_up(uint16_t id, uint16_t vrf,
 			     addr, masklen, 0, OFP_RTF_LOCAL | OFP_RTF_HOST);
 
 #ifdef SP
-	if (data->sp) {
+	if (vrf == 0)
+		data->sp_status = OFP_SP_UP;
+	else
+		data->sp_status = OFP_SP_DOWN;
+
+	if (data->sp_itf_mgmt) {
 		data->linux_index = linux_index;
 		ofp_ifindex_lookup_tab_update(data);
-
-		if (vrf == 0)
-			data->sp_status = OFP_SP_UP;
-		else
-			data->sp_status = OFP_SP_DOWN;
 
 		exec_sys_call_depending_on_vrf("ip link set lo up", vrf);
 		snprintf(cmd, sizeof(cmd), "ip addr add %s/%d dev lo",
@@ -1257,7 +1272,7 @@ const char *ofp_ifport_local_ipv6_up(uint16_t id, uint8_t *addr, int masklen)
 
 	if (ofp_ip6_is_set(data->ip6_addr)) {
 #ifdef SP
-		if (data->sp) {
+		if (data->sp_itf_mgmt) {
 			snprintf(cmd, sizeof(cmd),
 				 "ip -f inet6 addr del %s/%d dev lo",
 				 ofp_print_ip6_addr(data->ip6_addr),
@@ -1281,17 +1296,17 @@ const char *ofp_ifport_local_ipv6_up(uint16_t id, uint8_t *addr, int masklen)
 			      data->ip6_addr, 128, gw6,
 			      OFP_RTF_LOCAL);
 #ifdef SP
-		if (data->sp) {
-			if (data->vrf == 0)
-				data->sp_status = OFP_SP_UP;
-			else
-				data->sp_status = OFP_SP_DOWN;
+	if (data->vrf == 0)
+		data->sp_status = OFP_SP_UP;
+	else
+		data->sp_status = OFP_SP_DOWN;
 
-			snprintf(cmd, sizeof(cmd),
-				 "ip -f inet6 addr add %s/%d dev lo",
-				 ofp_print_ip6_addr(addr), masklen);
-			exec_sys_call_depending_on_vrf(cmd, data->vrf);
-		}
+	if (data->sp_itf_mgmt) {
+		snprintf(cmd, sizeof(cmd),
+			 "ip -f inet6 addr add %s/%d dev lo",
+			 ofp_print_ip6_addr(addr), masklen);
+		exec_sys_call_depending_on_vrf(cmd, data->vrf);
+	}
 #endif /*SP*/
 
 	return NULL;
@@ -1436,7 +1451,7 @@ static int ofp_ifnet_addr_cleanup(struct ofp_ifnet *ifnet)
 
 		ofp_free_ifnet_ip_list(ifnet);
 #ifdef SP
-		if (ifnet->sp) {
+		if (ifnet->sp_itf_mgmt) {
 			if (ifnet->port == OFP_IFPORT_LOCAL) {
 				snprintf(cmd, sizeof(cmd),
 					 "ip addr del %s/%d dev lo",
@@ -1465,7 +1480,7 @@ static int ofp_ifnet_addr_cleanup(struct ofp_ifnet *ifnet)
 				      ifnet->ip6_addr, 128,
 				      gw6, 0);
 #ifdef SP
-		if (ifnet->sp) {
+		if (ifnet->sp_itf_mgmt) {
 			snprintf(cmd, sizeof(cmd),
 				 "ifconfig %s inet6 del %s/%d",
 				 ifnet->port == OFP_IFPORT_LOCAL ? "lo" :
@@ -1550,7 +1565,7 @@ static const char *ofp_ifport_local_down(int port, uint16_t subport)
 	free(ifnet->ii_inet.ii_igmp);
 
 #ifdef SP
-	if (ifnet->sp)
+	if (ifnet->sp_itf_mgmt)
 		ofp_ifindex_lookup_tab_cleanup(ifnet);
 #endif /*SP*/
 
@@ -1619,10 +1634,11 @@ static const char *ofp_ifport_gre_down(int port, uint16_t subport)
 	free(data->ii_inet.ii_igmp);
 
 #ifdef SP
-	snprintf(cmd, sizeof(cmd), "ip tunnel del %s",
-		 ofp_port_vlan_to_ifnet_name(port, subport));
-
-	exec_sys_call_depending_on_vrf(cmd, data->vrf);
+	if (data->sp_itf_mgmt) {
+		snprintf(cmd, sizeof(cmd), "ip tunnel del %s",
+			 ofp_port_vlan_to_ifnet_name(port, subport));
+		exec_sys_call_depending_on_vrf(cmd, data->vrf);
+	}
 #endif /*SP*/
 
 	ofp_del_subport(ifnet_port, subport);
@@ -1696,7 +1712,7 @@ static struct ofp_ifnet *ofp_create_subport(struct ofp_ifnet *ifnet_port,
 #endif
 
 #ifdef SP
-	ifnet->sp = ifnet_port->sp;
+	ifnet->sp_itf_mgmt = ifnet_port->sp_itf_mgmt;
 #endif /*SP*/
 
 	/* Multicast related */

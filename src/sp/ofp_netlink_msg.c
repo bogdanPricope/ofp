@@ -537,7 +537,7 @@ static int add_link(struct ifinfomsg *ifinfo_entry, int vlan, int link,
 			dev->if_csum_offload_flags =
 				dev_root->if_csum_offload_flags;
 			dev->sp_status = OFP_SP_UP;
-			dev->sp = 1;
+			dev->sp_itf_mgmt = 1;
 #ifdef INET6
 			memcpy(dev->link_local, dev_root->link_local, 16);
 #endif /* INET6 */
@@ -549,7 +549,7 @@ static int add_link(struct ifinfomsg *ifinfo_entry, int vlan, int link,
 
 		/* Update linux index in case dev was created by portconf */
 		/* when linux interface index was not available yet (cli) */
-		if (!dev->linux_index) {
+		if (dev->sp_itf_mgmt && !dev->linux_index) {
 			dev->linux_index = ifinfo_entry->ifi_index;
 			ofp_ifindex_lookup_tab_update(dev);
 		}
@@ -598,7 +598,7 @@ static int del_link(struct ifinfomsg *ifinfo_entry, int vlan, int link)
 
 	if (vlan != -1) {
 		if (ifinfo_entry->ifi_type == ARPHRD_IPGRE) {
-			dev_root = ofp_get_ifnet(OFP_IFPORT_GRE, 0, 0);
+			dev_root = ofp_get_port_itf(OFP_IFPORT_GRE);
 		} else if (ifinfo_entry->ifi_type == ARPHRD_VXLAN) {
 			dev_root = ofp_get_port_itf(OFP_IFPORT_VXLAN);
 			OFP_DBG("VXLAN DEL LINK vlan=%d", vlan);
@@ -617,6 +617,9 @@ static int del_link(struct ifinfomsg *ifinfo_entry, int vlan, int link)
 			OFP_DBG(" - Vlan %d not found", vlan);
 			return 0;
 		}
+		if (dev->sp_itf_mgmt)
+			ofp_ifindex_lookup_tab_cleanup(dev);
+
 		vlan_ifnet_delete(dev_root->vlan_structs,
 				  &key,	free_key);
 		OFP_DBG(" - Interface deleted port: %d, vlan: %d, OIF=%d",

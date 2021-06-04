@@ -171,6 +171,7 @@ set_gre_tunnel(int fd, const char *name, uint32_t addr, uint32_t p2p,
 	treq.iftun_local_addr.sin_addr.s_addr = local;
 	treq.iftun_remote_addr.sin_addr.s_addr = remote;
 	treq.iftun_vrf = vrf;
+	treq.iftun_sp_itf_mgmt = 1;
 
 	if (ofp_ioctl(fd, OFP_SIOCSIFTUN, &treq) < 0) {
 		OFP_ERR("ofp_ioctl failed, err='%s'",

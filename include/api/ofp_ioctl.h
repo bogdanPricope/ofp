@@ -151,6 +151,7 @@ struct ofp_in_tunreq {
 	struct	ofp_sockaddr_in iftun_local_addr;
 	struct	ofp_sockaddr_in iftun_remote_addr;
 	int	iftun_vrf;
+	int iftun_sp_itf_mgmt;
 };
 
 /*

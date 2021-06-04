@@ -214,14 +214,14 @@ test_gre_port(void)
 
 	/* Non-existent endpoint in vrf */
 	res = ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, greid, vrf + 1, ifaddr,
-				     ifaddr + 1, greaddr, grep2p, gre_ml);
+				     ifaddr + 1, greaddr, grep2p, gre_ml, 1);
 	CU_ASSERT_PTR_NOT_NULL_FATAL(res);
 	dev = ofp_get_ifnet(OFP_IFPORT_GRE, greid, 0);
 	CU_ASSERT_PTR_NULL_FATAL(dev);
 
 	/* Successful test */
 	res = ofp_ifport_tun_ipv4_up(OFP_IFPORT_GRE, greid, vrf, ifaddr,
-				     ifaddr + 1, grep2p, greaddr, gre_ml);
+				     ifaddr + 1, grep2p, greaddr, gre_ml, 1);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 	dev = ofp_get_ifnet(OFP_IFPORT_GRE, greid, 0);
 	CU_ASSERT_PTR_NOT_NULL_FATAL(dev);
