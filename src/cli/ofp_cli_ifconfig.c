@@ -190,7 +190,7 @@ void f_ifconfig_vxlan(ofp_print_t *pr, const char *s)
 	/* vrf is copied from the physical port */
 	err = ofp_ifport_vxlan_ipv4_up(subport_vni, vxlan_group,
 				       physport, physvlan,
-				       addr, m);
+				       addr, m, 1);
 	if (err != NULL)
 		ofp_print(pr, err);
 }

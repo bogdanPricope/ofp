@@ -975,19 +975,16 @@ void ofp_leave_multicast_group(struct ofp_ifnet *dev_vxlan)
 
 const char *ofp_ifport_vxlan_ipv4_up(int vni, uint32_t group,
 				     int physport, int physvlan,
-				     uint32_t addr, int mlen)
+				     uint32_t addr, int mlen,
+					 odp_bool_t sp_itf_mgmt)
 {
 #ifdef SP
 	char cmd[200];
-	int ret = 0, new = 0;
 #endif /* SP */
 	struct ofp_ifnet *data, *dev_root;
 	uint32_t mask;
 
-#ifdef SP
-	(void)ret;
-	(void)new;
-#endif /*SP*/
+	(void)sp_itf_mgmt;
 
 	mask = ~0;
 	mask = odp_cpu_to_be_32(mask << (32 - mlen));
@@ -1020,6 +1017,9 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint32_t group,
 	data->physport = physport;
 	data->physvlan = physvlan;
 	data->pkt_pool = V_ifnet_port[OFP_IFPORT_VXLAN].pkt_pool;
+#ifdef SP
+	data->sp_itf_mgmt = sp_itf_mgmt;
+#endif /*SP*/
 
 	ofp_set_route_params(OFP_ROUTE_ADD, data->vrf, vni, OFP_IFPORT_VXLAN,
 			     addr, 32, 0, OFP_RTF_LOCAL);
@@ -1036,21 +1036,24 @@ const char *ofp_ifport_vxlan_ipv4_up(int vni, uint32_t group,
 	else
 		data->sp_status = OFP_SP_DOWN;
 
-	snprintf(cmd, sizeof(cmd),
-		 "ip link add vxlan%d type vxlan id %d group %s dev %s dstport %d",
-		 vni, vni, ofp_print_ip_addr(group),
-		 ofp_port_vlan_to_ifnet_name(physport, physvlan), VXLAN_PORT);
-	ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
+	if (data->sp_itf_mgmt) {
+		snprintf(cmd, sizeof(cmd),
+			 "ip link add vxlan%d type vxlan id %d group %s dev %s dstport %d",
+			 vni, vni, ofp_print_ip_addr(group),
+			 ofp_port_vlan_to_ifnet_name(physport, physvlan),
+			 VXLAN_PORT);
+		exec_sys_call_depending_on_vrf(cmd, data->vrf);
 
-	snprintf(cmd, sizeof(cmd),
-		 "ip link set dev vxlan%d address %s up",
-		 vni, ofp_print_mac(data->if_mac));
-	ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
+		snprintf(cmd, sizeof(cmd),
+			 "ip link set dev vxlan%d address %s up",
+			 vni, ofp_print_mac(data->if_mac));
+		exec_sys_call_depending_on_vrf(cmd, data->vrf);
 
-	snprintf(cmd, sizeof(cmd),
-		 "ip addr add dev vxlan%d %s/%d", vni,
-		 ofp_print_ip_addr(addr), mlen);
-	ret = exec_sys_call_depending_on_vrf(cmd, data->vrf);
+		snprintf(cmd, sizeof(cmd),
+			 "ip addr add dev vxlan%d %s/%d", vni,
+			 ofp_print_ip_addr(addr), mlen);
+		exec_sys_call_depending_on_vrf(cmd, data->vrf);
+	}
 #endif /* SP */
 
 	return NULL;
@@ -1601,10 +1604,11 @@ static const char *ofp_ifport_vxlan_down(int port, uint16_t subport)
 	free(data->ii_inet.ii_igmp);
 
 #ifdef SP
-	snprintf(cmd, sizeof(cmd), "ip link del %s",
-		 ofp_port_vlan_to_ifnet_name(port, subport));
-
-	exec_sys_call_depending_on_vrf(cmd, data->vrf);
+	if (data->sp_itf_mgmt) {
+		snprintf(cmd, sizeof(cmd), "ip link del %s",
+			 ofp_port_vlan_to_ifnet_name(port, subport));
+		exec_sys_call_depending_on_vrf(cmd, data->vrf);
+	}
 #endif /*SP*/
 
 	ofp_del_subport(ifnet_port, subport);

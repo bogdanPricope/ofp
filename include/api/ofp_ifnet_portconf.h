@@ -300,13 +300,15 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t subport,
  * @param endpoint_subport Endpoint interface sub-port
  * @param addr IPv4 address to set
  * @param masklen Mask length
+ * @param sp_itf_mgmt Slow path interface management
  *
  * @retval NULL on success
  * @retval error message on error
  */
 const char *ofp_ifport_vxlan_ipv4_up(int subport_vni, uint32_t group,
 				     int endpoint_port, int endpoint_subport,
-				     uint32_t addr, int masklen);
+				     uint32_t addr, int masklen,
+				     odp_bool_t sp_itf_mgmt);
 
 /**
  * Configure IPv4 address on a local port interface
