@@ -184,7 +184,8 @@ enum ofp_return_code ofp_nd6_na_output(struct ofp_ifnet *dev,
 	struct ofp_icmp6_hdr *icmp;
 	odp_packet_t pkt;
 
-	if (dev->vlan)
+	if (OFP_IFPORT_IS_NET(dev->port) &&
+	    dev->vlan != OFP_IFPORT_NET_SUBPORT_ITF)
 		size = sizeof(struct ofp_ether_vlan_header);
 	else
 		size = sizeof(struct ofp_ether_header);
@@ -200,7 +201,8 @@ enum ofp_return_code ofp_nd6_na_output(struct ofp_ifnet *dev,
 	odp_packet_has_eth_set(pkt, 1);
 	odp_packet_l2_offset_set(pkt, iter);
 
-	if (dev->vlan) {
+	if (OFP_IFPORT_IS_NET(dev->port) &&
+	    dev->vlan != OFP_IFPORT_NET_SUBPORT_ITF) {
 		e2 = (struct ofp_ether_vlan_header *)odp_packet_l2_ptr(pkt,
 			NULL);
 		iter += sizeof(*e2);

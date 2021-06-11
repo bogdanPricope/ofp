@@ -114,7 +114,7 @@ static void init_ifnet(void)
 {
 	char str[256];
 
-	ofp_ifport_net_ipv4_up(port, subport_itf, vrf, dev_ip, 24);
+	ofp_ifport_net_ipv4_up(port, subport_itf, vrf, dev_ip, 24, 1);
 
 	/* port 0 */
 	dev = ofp_get_ifnet(port, subport_itf, 0);
@@ -138,7 +138,7 @@ static void init_ifnet(void)
 	dev->out_queue_type = OFP_OUT_QUEUE_TYPE_QUEUE;
 
 	/* port 0 vlan 1 */
-	ofp_ifport_net_ipv4_up(port, subport_vlan, vrf, dev_ip + 1, 24);
+	ofp_ifport_net_ipv4_up(port, subport_vlan, vrf, dev_ip + 1, 24, 1);
 
 	dev_vlan = ofp_get_ifnet(port, subport_vlan, 0);
 	memcpy(dev_vlan->if_mac, dev_vlan_mac, OFP_ETHER_ADDR_LEN);

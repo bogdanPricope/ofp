@@ -421,6 +421,7 @@ static int configure_interface_addresses(appl_arg_ifs_t *itf_param)
 	int port = 0;
 	uint16_t subport = 0;
 	int i, ret = 0;
+	const char *res = NULL;
 
 	for (i = 0; i < itf_param->if_count && i < OFP_FP_INTERFACE_MAX; i++) {
 		ifarg = &itf_param->if_array[i];
@@ -459,11 +460,12 @@ static int configure_interface_addresses(appl_arg_ifs_t *itf_param)
 			break;
 		}
 
-		if (ofp_ifport_net_ipv4_up(port, subport, 0, addr,
-					   ifarg->if_address_masklen) != NULL) {
+		res = ofp_ifport_net_ipv4_up(port, subport, 0, addr,
+					     ifarg->if_address_masklen, 1);
+		if (res != NULL) {
 			OFP_ERR("Error: Failed to set IPv4 address %s "
-				"on interface %s",
-				ifarg->if_address, ifarg->if_name);
+				"on interface %s: %s",
+				ifarg->if_address, ifarg->if_name, res);
 			ret = -1;
 			break;
 		}

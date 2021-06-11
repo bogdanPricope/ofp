@@ -426,6 +426,7 @@ ofp_icmp6_input(odp_packet_t *m, int *offp, int *nxt)
 	int off = *offp;
 	int code, sum;
 	struct ofp_ifnet *ifp;
+	int send_na;
 
 	*nxt = OFP_IPPROTO_DONE;
 	ifp = odp_packet_user_ptr(*m);
@@ -503,7 +504,6 @@ ofp_icmp6_input(odp_packet_t *m, int *offp, int *nxt)
 	if (icmp6->icmp6_type < ICMP6_INFOMSG_MASK)
 		icmp6_ifstat_inc(ifp, ifs6_in_error);
 #endif
-
 	switch (icmp6->icmp6_type) {
 	case OFP_ICMP6_DST_UNREACH:
 		ofp_icmp6_ifstat_inc(ifp, ifs6_in_dstunreach);
@@ -791,23 +791,34 @@ ofp_icmp6_input(odp_packet_t *m, int *offp, int *nxt)
 			goto badcode;
 		if (icmp6len < sizeof(struct ofp_nd_neighbor_solicit))
 			goto badlen;
+
 		ofp_nd6_ns_input(*m, off, icmp6len);
-#ifndef SP
-		if (icmp6len < (sizeof(struct ofp_nd_neighbor_solicit)  + 8) &&
-			icmp6->ofp_icmp6_data8[20] !=
+
+		/* Send reply */
+		send_na = 1;
+#ifdef SP
+		if (OFP_IFPORT_IS_NET(ifp->port) &&
+		    ifp->vlan == OFP_IFPORT_NET_SUBPORT_ITF &&
+		    ifp->sp_itf_mgmt)
+			send_na = 0;
+#endif /* SP */
+
+		if (send_na) {
+			if (icmp6len < (sizeof(struct ofp_nd_neighbor_solicit) + 8) &&
+			    icmp6->ofp_icmp6_data8[20] !=
 				OFP_ND_OPT_SOURCE_LINKADDR)
-			goto badlen;
+				goto badlen;
 
-		ofp_nd6_na_output(ifp, ip6->ip6_src.ofp_s6_addr,
-			&icmp6->ofp_icmp6_data8[4],
-			&icmp6->ofp_icmp6_data8[22]);
+			ofp_nd6_na_output(ifp, ip6->ip6_src.ofp_s6_addr,
+					  &icmp6->ofp_icmp6_data8[4],
+					  &icmp6->ofp_icmp6_data8[22]);
 
-		odp_packet_free(*m);
+			odp_packet_free(*m);
 
-		return OFP_PKT_PROCESSED;
-#else
+			return OFP_PKT_PROCESSED;
+		}
+
 		break;
-#endif
 
 	case OFP_ND_NEIGHBOR_ADVERT:
 		ofp_icmp6_ifstat_inc(ifp, ifs6_in_neighboradvert);

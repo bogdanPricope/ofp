@@ -364,7 +364,8 @@ int main(int argc, char *argv[])
 	uint32_t vlan;
 	for (vlan = 0; vlan <= arg.vlans; vlan++)
 		ASSERT(!ofp_ifport_net_ipv4_up(C_PORT, vlan, C_VRF,
-					       odp_cpu_to_be_32(C_L_ADDR), 24));
+					       odp_cpu_to_be_32(C_L_ADDR),
+					       24, 1));
 
 	vlan = arg.vlans;
 

@@ -207,7 +207,7 @@ test_init_ifnet(void)
 {
 	char str[256];
 
-	ofp_ifport_net_ipv4_up(port, vlan, vrf, local_ip, 24);
+	ofp_ifport_net_ipv4_up(port, vlan, vrf, local_ip, 24, 1);
 
 	ifnet = ofp_get_ifnet(port, vlan, 0);
 	ifnet->pkt_pool = odp_pool_lookup("packet_pool");

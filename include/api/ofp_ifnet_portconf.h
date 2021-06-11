@@ -200,12 +200,15 @@ int ofp_ifport_count(void);
  * @param vrf Virtual routing table
  * @param addr IPv4 address to set
  * @param masklen Mask length
+ * @param sp_itf_mgmt Slow path interface management for the newly
+ * created VLAN interface
  *
  * @retval NULL on success
  * @retval error message on error
  */
 const char *ofp_ifport_net_ipv4_up(int port, uint16_t subport_vlan,
-				   uint16_t vrf, uint32_t addr, int masklen);
+				   uint16_t vrf, uint32_t addr, int masklen,
+				   odp_bool_t sp_itf_mgmt);
 
 /**
  * Configure IPv6 address on network port interface
@@ -219,12 +222,15 @@ const char *ofp_ifport_net_ipv4_up(int port, uint16_t subport_vlan,
  * @param vrf Virtual routing table
  * @param addr IPv6 address to set
  * @param masklen Mask length
+ * @param sp_itf_mgmt Slow path interface management for the newly
+ * created VLAN interface
  *
  * @retval NULL on success
  * @retval error message on error
  */
 const char *ofp_ifport_net_ipv6_up(int port, uint16_t subport_vlan,
-				   uint8_t *addr, int masklen);
+				   uint8_t *addr, int masklen,
+				   odp_bool_t sp_itf_mgmt);
 
 /**
  * Add an IPv4 address on network port interface

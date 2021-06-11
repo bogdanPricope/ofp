@@ -127,7 +127,7 @@ test_single_port_basic(void)
 	struct ofp_nh_entry *nh;
 	const char *res;
 
-	res = ofp_ifport_net_ipv4_up(port, vlan, vrf, ifaddr, masklen);
+	res = ofp_ifport_net_ipv4_up(port, vlan, vrf, ifaddr, masklen, 1);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
 	dev = ofp_get_ifnet(port, vlan, 0);
@@ -160,9 +160,9 @@ test_two_ports_vlan(void)
 	struct ofp_nh_entry *nh;
 	const char *res;
 
-	res = ofp_ifport_net_ipv4_up(port, vlan, vrf, ifaddr, masklen);
+	res = ofp_ifport_net_ipv4_up(port, vlan, vrf, ifaddr, masklen, 1);
 	CU_ASSERT_PTR_NULL_FATAL(res);
-	res = ofp_ifport_net_ipv4_up(port, vlan1, vrf1, ifaddr1, masklen1);
+	res = ofp_ifport_net_ipv4_up(port, vlan1, vrf1, ifaddr1, masklen1, 1);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
 	dev = ofp_get_ifnet(port, vlan, 0);
@@ -209,7 +209,7 @@ test_gre_port(void)
 	struct ofp_nh_entry *nh;
 	const char *res;
 
-	res = ofp_ifport_net_ipv4_up(port, vlan, vrf, ifaddr, masklen);
+	res = ofp_ifport_net_ipv4_up(port, vlan, vrf, ifaddr, masklen, 1);
 	CU_ASSERT_PTR_NULL_FATAL(res);
 
 	/* Non-existent endpoint in vrf */

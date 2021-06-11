@@ -64,7 +64,7 @@ static void init_ifnet(void)
 {
 	char str[256];
 
-	ofp_ifport_net_ipv4_up(port, vlan, vrf, dev_ip, 24);
+	ofp_ifport_net_ipv4_up(port, vlan, vrf, dev_ip, 24, 1);
 
 	dev = ofp_get_ifnet(port, vlan, 0);
 	memcpy(dev->if_mac, dev_mac, OFP_ETHER_ADDR_LEN);

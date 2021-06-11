@@ -226,9 +226,16 @@ ofp_in_control(struct socket *so, uint32_t cmd, char *data, struct ofp_ifnet *if
 				 ifp->ip_remote, if_p2p,
 				 if_addr, if_masklen, sp_itf_mgmt);
 		} else {
+			odp_bool_t sp_itf_mgmt = 0;
+
+#ifdef SP
+			sp_itf_mgmt = ifp->sp_itf_mgmt;
+#endif /*SP*/
+
 			ofp_ifport_ifnet_down(ifp->port, ifp->vlan);
 			ofp_ifport_net_ipv4_up(ifp->port, ifp->vlan, vrf,
-					       if_addr, if_masklen);
+					       if_addr, if_masklen,
+					       sp_itf_mgmt);
 		}
 		break;
 	case OFP_SIOCDIFADDR:
