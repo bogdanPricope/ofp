@@ -1026,7 +1026,7 @@ int main(int argc, char *argv[])
 
 	if (ofp_ifport_net_create(gbl_args->appl.if_name,
 				  &pktio_param, &pktin_param, &pktout_param,
-				  NULL, NULL) < 0) {
+				  1, NULL, NULL) < 0) {
 		OFP_ERR("Error: failed to init interface %s",
 			gbl_args->appl.if_name);
 		exit(EXIT_FAILURE);

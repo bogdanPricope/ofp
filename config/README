@@ -34,6 +34,7 @@ ofp_global_param: {
 
     linux_core_id = integer
 
+	if_sp_mgmt = boolean
     pktin_mode = "direct" | "sched" | "queue" | "disabled"
     pktout_mode = "direct" | "queue" | "tm" | "disabled"
     sched_sync = "parallel" | "atomic" | ordered"
@@ -139,6 +140,11 @@ if_names: Names of the interfaces to be initialized.
 
 linux_core_id: CPU core to which internal OFP control threads are pinned.
 	Default value is 0.
+
+if_sp_mgmt: Enable/disable slow path interface management of the interfaces
+created during OFP initialization. That is create/configure/destroy of the SP
+interfaces.
+	Default value is enable (1).
 
 pktin_mode: Packet input mode of the interfaces initialized by OFP.
 	Default value is ODP_PKTIN_MODE_SCHED.

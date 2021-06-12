@@ -42,6 +42,7 @@ int ofp_ifport_net_create(char *if_name,
 			  odp_pktio_param_t *pktio_param,
 			  odp_pktin_queue_param_t *pktin_param,
 			  odp_pktout_queue_param_t *pktout_param,
+			  odp_bool_t if_sp_mgmt,
 			  int *res_port, uint16_t *res_subport)
 {
 	int port = 0;
@@ -58,8 +59,14 @@ int ofp_ifport_net_create(char *if_name,
 		return -1;
 	}
 
+	if (ifnet->if_state == OFP_IFT_STATE_USED) {
+		OFP_ERR("Interface in use!");
+		return -1;
+	}
+
 	res = ofp_ifnet_net_create(if_name, pktio_param,
-				   pktin_param, pktout_param, ifnet);
+				   pktin_param, pktout_param,
+				   if_sp_mgmt, ifnet);
 	if (res != 0) {
 		OFP_ERR("Error: Failed to create the interface.");
 		return -1;

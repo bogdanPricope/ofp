@@ -196,6 +196,7 @@ static void read_conf_file(ofp_initialize_param_t *params, const char *filename)
 	if (config_lookup_ ## type(&conf, "ofp_global_param." STR(p), &i)) \
 		params->p = i;
 
+	GET_CONF_INT(bool, if_sp_mgmt);
 	GET_CONF_STR(pktin_mode, pktin_mode);
 	GET_CONF_STR(pktout_mode, pktout_mode);
 	GET_CONF_STR(sched_sync, sched_sync);
@@ -277,6 +278,7 @@ void ofp_initialize_param_from_file(ofp_initialize_param_t *params,
 
 	memset(params, 0, sizeof(*params));
 	params->instance = OFP_ODP_INSTANCE_INVALID;
+	params->if_sp_mgmt = 1;
 	params->pktin_mode = ODP_PKTIN_MODE_SCHED;
 	params->pktout_mode = ODP_PKTIN_MODE_DIRECT;
 	params->sched_sync = ODP_SCHED_SYNC_ATOMIC;
@@ -582,7 +584,7 @@ int ofp_initialize(ofp_initialize_param_t *params)
 	for (i = 0; i < params->if_count; ++i) {
 		if (ofp_ifport_net_create(params->if_names[i],
 					  &pktio_param, &pktin_param, NULL,
-					  NULL, NULL)) {
+					  params->if_sp_mgmt, NULL, NULL)) {
 			OFP_LOG_NO_CTX_NO_LEVEL("Error: failed to create "
 					"interface %s.\n", params->if_names[i]);
 			goto init_error;

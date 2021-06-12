@@ -282,6 +282,7 @@ int ofp_ifnet_net_create(char *if_name,
 			 odp_pktio_param_t *pktio_param,
 			 odp_pktin_queue_param_t *pktin_param,
 			 odp_pktout_queue_param_t *pktout_param,
+			 odp_bool_t if_sp_mgmt,
 			 struct ofp_ifnet *ifnet)
 {
 	odp_pktio_param_t pktio_param_local;
@@ -290,6 +291,8 @@ int ofp_ifnet_net_create(char *if_name,
 #ifdef SP
 	odph_odpthread_params_t thr_params;
 #endif /* SP */
+
+	(void)if_sp_mgmt;
 
 	if (!shm_global)	/* OFP not initialized */
 		return -1;
@@ -301,6 +304,9 @@ int ofp_ifnet_net_create(char *if_name,
 	strncpy(ifnet->if_name, if_name, OFP_IFNAMSIZ);
 	ifnet->if_name[OFP_IFNAMSIZ-1] = 0;
 	ifnet->pkt_pool = ofp_get_packet_pool();
+#ifdef SP
+	ifnet->sp_itf_mgmt = if_sp_mgmt;
+#endif /*SP*/
 
 	if (!pktio_param) {
 		pktio_param = &pktio_param_local;
@@ -345,19 +351,25 @@ int ofp_ifnet_net_create(char *if_name,
 	ofp_igmp_attach(ifnet);
 
 #ifdef SP
-	HANDLE_ERROR(ofp_sp_inq_create(ifnet));
+	if (ifnet->sp_itf_mgmt) {
+		HANDLE_ERROR(ofp_sp_inq_create(ifnet));
 
-	/* Create the kernel representation of the FP interface. */
-	HANDLE_ERROR(sp_setup_device(ifnet));
+		/* Create the kernel representation of the FP interface. */
+		HANDLE_ERROR(sp_setup_device(ifnet));
 
-	/* Maintain table to access ifnet from linux ifindex */
-	ofp_ifindex_lookup_tab_update(ifnet);
+		/* Maintain table to access ifnet from linux ifindex */
+		ofp_ifindex_lookup_tab_update(ifnet);
+
 #ifdef INET6
-	/* ifnet MAC was set in sp_setup_device() */
-	ofp_mac_to_link_local(ifnet->if_mac, ifnet->link_local);
+		/* ifnet MAC was set in sp_setup_device() */
+		ofp_mac_to_link_local(ifnet->if_mac, ifnet->link_local);
 #endif /* INET6 */
-
+	} else {
+		ifnet->spq_def = ODP_QUEUE_INVALID;
+		ifnet->sp_fd = -1;
+	}
 #endif /* SP */
+
 	/* Start packet receiver or transmitter */
 	if (odp_pktio_start(ifnet->pktio) != 0) {
 		OFP_ERR("Failed to start pktio.");
@@ -390,23 +402,25 @@ int ofp_ifnet_net_create(char *if_name,
 	odp_pktio_stats_reset(ifnet->pktio);
 
 #ifdef SP
-	/* Start VIF slowpath receiver thread */
-	thr_params.start = sp_rx_thread;
-	thr_params.arg = ifnet;
-	thr_params.thr_type = ODP_THREAD_CONTROL;
-	thr_params.instance = V_global_odp_instance;
-	odph_odpthreads_create(ifnet->rx_tbl,
-			       &V_global_linux_cpumask,
-			       &thr_params);
+	if (ifnet->sp_itf_mgmt) {
+		/* Start VIF slowpath receiver thread */
+		thr_params.start = sp_rx_thread;
+		thr_params.arg = ifnet;
+		thr_params.thr_type = ODP_THREAD_CONTROL;
+		thr_params.instance = V_global_odp_instance;
+		odph_odpthreads_create(ifnet->rx_tbl,
+				       &V_global_linux_cpumask,
+				       &thr_params);
 
-	/* Start VIF slowpath transmitter thread */
-	thr_params.start = sp_tx_thread;
-	thr_params.arg = ifnet;
-	thr_params.thr_type = ODP_THREAD_CONTROL;
-	thr_params.instance = V_global_odp_instance;
-	odph_odpthreads_create(ifnet->tx_tbl,
-			       &V_global_linux_cpumask,
-			       &thr_params);
+		/* Start VIF slowpath transmitter thread */
+		thr_params.start = sp_tx_thread;
+		thr_params.arg = ifnet;
+		thr_params.thr_type = ODP_THREAD_CONTROL;
+		thr_params.instance = V_global_odp_instance;
+		odph_odpthreads_create(ifnet->tx_tbl,
+				       &V_global_linux_cpumask,
+				       &thr_params);
+	}
 #endif /* SP */
 
 	return 0;
@@ -433,10 +447,14 @@ int ofp_ifnet_net_cleanup(struct ofp_ifnet *ifnet)
 
 	CHECK_ERROR(odp_pktio_stop(ifnet->pktio), rc);
 #ifdef SP
-	odph_odpthreads_join(ifnet->rx_tbl);
-	odph_odpthreads_join(ifnet->tx_tbl);
-	close(ifnet->sp_fd);
-	ifnet->sp_fd = -1;
+	if (ifnet->sp_itf_mgmt) {
+		odph_odpthreads_join(ifnet->rx_tbl);
+		odph_odpthreads_join(ifnet->tx_tbl);
+		if (ifnet->sp_fd != -1) {
+			close(ifnet->sp_fd);
+			ifnet->sp_fd = -1;
+		}
+	}
 #endif /*SP*/
 
 	if (ofp_destroy_subports(ifnet)) {

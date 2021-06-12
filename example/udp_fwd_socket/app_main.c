@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
 
 		if (ofp_ifport_net_create(params.if_names[i], &pktio_param,
 					  &pktin_param, &pktout_param,
-					  NULL, NULL) < 0) {
+					  1, NULL, NULL) < 0) {
 			OFP_ERR("Failed to init interface %s",
 				params.if_names[i]);
 			ofp_terminate();

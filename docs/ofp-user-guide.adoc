@@ -522,7 +522,7 @@ non-default parameters and create packet IO objects:
                                  &pktio_param,
                                  &pktin_param,
                                  &pktout_param,
-								 NULL, NULL) < 0) {
+                                 1, NULL, NULL) < 0) {
                          OFP_ERR("Failed to init interface %s",
                                  if_names[i]);
                          return -1;

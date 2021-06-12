@@ -14,6 +14,7 @@ int ofp_ifnet_net_create(char *if_name,
 			 odp_pktio_param_t *pktio_param,
 			 odp_pktin_queue_param_t *pktin_param,
 			 odp_pktout_queue_param_t *pktout_param,
+			 odp_bool_t if_sp_mgmt,
 			 struct ofp_ifnet *ifnet);
 
 int ofp_ifnet_net_cleanup(struct ofp_ifnet *ifnet);

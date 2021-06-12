@@ -136,6 +136,13 @@ typedef struct ofp_initialize_param_t {
 	 */
 	char if_names[OFP_FP_INTERFACE_MAX][OFP_IFNAMSIZ];
 
+	/** Enable/disable the slow path interface management on the
+	 * interfaces initialized by OFP.
+	 *
+	 * Default value is enable (1).
+	 */
+	odp_bool_t if_sp_mgmt;
+
 	/**
 	 * Packet input mode of the interfaces initialized by OFP.
 	 * Must be ODP_PKTIN_MODE_SCHED if default_event_dispatcher()

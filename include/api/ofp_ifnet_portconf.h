@@ -91,6 +91,7 @@ enum {
  *        this interface
  * @param pktout_param Specify packet output queue parameters for
  *        this interface
+ * @param if_sp_mgmt Enable slow path interface management.
  * @param port Get the port value of the created interface.
  * @param subport Get the sub-port value of the created interface.
  *        The value is always OFP_IFPORT_NET_SUBPORT_ITF.
@@ -103,6 +104,7 @@ enum {
 int ofp_ifport_net_create(char *if_name, odp_pktio_param_t *pktio_param,
 			  odp_pktin_queue_param_t *pktin_param,
 			  odp_pktout_queue_param_t *pktout_param,
+			  odp_bool_t if_sp_mgmt,
 			  int *port, uint16_t *subport);
 
 /**
@@ -200,7 +202,7 @@ int ofp_ifport_count(void);
  * @param vrf Virtual routing table
  * @param addr IPv4 address to set
  * @param masklen Mask length
- * @param sp_itf_mgmt Slow path interface management for the newly
+ * @param if_sp_mgmt Slow path interface management for the newly
  * created VLAN interface
  *
  * @retval NULL on success
@@ -208,7 +210,7 @@ int ofp_ifport_count(void);
  */
 const char *ofp_ifport_net_ipv4_up(int port, uint16_t subport_vlan,
 				   uint16_t vrf, uint32_t addr, int masklen,
-				   odp_bool_t sp_itf_mgmt);
+				   odp_bool_t if_sp_mgmt);
 
 /**
  * Configure IPv6 address on network port interface
@@ -222,7 +224,7 @@ const char *ofp_ifport_net_ipv4_up(int port, uint16_t subport_vlan,
  * @param vrf Virtual routing table
  * @param addr IPv6 address to set
  * @param masklen Mask length
- * @param sp_itf_mgmt Slow path interface management for the newly
+ * @param if_sp_mgmt Slow path interface management for the newly
  * created VLAN interface
  *
  * @retval NULL on success
@@ -230,7 +232,7 @@ const char *ofp_ifport_net_ipv4_up(int port, uint16_t subport_vlan,
  */
 const char *ofp_ifport_net_ipv6_up(int port, uint16_t subport_vlan,
 				   uint8_t *addr, int masklen,
-				   odp_bool_t sp_itf_mgmt);
+				   odp_bool_t if_sp_mgmt);
 
 /**
  * Add an IPv4 address on network port interface
@@ -283,7 +285,7 @@ const char *ofp_ifport_net_ipv4_addr_del(int port, uint16_t subport_vlan,
  * @param p2p Peer address
  * @param addr IPv4 address to set
  * @param masklen Mask length
- * @param sp_itf_mgmt Slow path interface management
+ * @param if_sp_mgmt Slow path interface management
  *
  * @retval NULL on success
  * @retval error message on error
@@ -292,7 +294,7 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t subport,
 				   uint16_t vrf, uint32_t tun_loc,
 				   uint32_t tun_rem, uint32_t p2p,
 				   uint32_t addr, int masklen,
-				   odp_bool_t sp_itf_mgmt);
+				   odp_bool_t if_sp_mgmt);
 
 /**
  * Configure an IPv4 VXLAN interface
@@ -306,7 +308,7 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t subport,
  * @param endpoint_subport Endpoint interface sub-port
  * @param addr IPv4 address to set
  * @param masklen Mask length
- * @param sp_itf_mgmt Slow path interface management
+ * @param if_sp_mgmt Slow path interface management
  *
  * @retval NULL on success
  * @retval error message on error
@@ -314,7 +316,7 @@ const char *ofp_ifport_tun_ipv4_up(int port, uint16_t subport,
 const char *ofp_ifport_vxlan_ipv4_up(int subport_vni, uint32_t group,
 				     int endpoint_port, int endpoint_subport,
 				     uint32_t addr, int masklen,
-				     odp_bool_t sp_itf_mgmt);
+				     odp_bool_t if_sp_mgmt);
 
 /**
  * Configure IPv4 address on a local port interface
@@ -326,14 +328,14 @@ const char *ofp_ifport_vxlan_ipv4_up(int subport_vni, uint32_t group,
  * @param vrf Virtual routing table
  * @param addr IPv4 address to set
  * @param masklen Mask length
- * @param sp_itf_mgmt Slow path interface management
+ * @param if_sp_mgmt Slow path interface management
  *
  * @retval NULL on success
  * @retval error message on error
  */
 const char *ofp_ifport_local_ipv4_up(uint16_t subport_id, uint16_t vrf,
 				     uint32_t addr, int masklen,
-				     odp_bool_t sp_itf_mgmt);
+				     odp_bool_t if_sp_mgmt);
 
 /**
  * Configure IPv6 address on a local port interface
