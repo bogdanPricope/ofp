@@ -195,6 +195,8 @@ int main(int argc, char *argv[])
 	/* Configure IP addresses */
 	if (configure_interface_addresses(&params.itf_param)) {
 		OFP_ERR("Error: Failed to configure addresses");
+		ofp_stop_processing();
+		ofp_thread_join(thread_tbl, num_workers);
 		ofp_terminate();
 		parse_args_cleanup(&params);
 		return EXIT_FAILURE;

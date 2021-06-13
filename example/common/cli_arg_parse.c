@@ -128,6 +128,9 @@ void ofpexpl_parse_interfaces_param_cleanup(appl_arg_ifs_t *itf_param)
 	if (!itf_param)
 		return;
 
+	if (!itf_param->if_count)
+		return;
+
 	for (i = 0; i < itf_param->if_count; i++) {
 		if (itf_param->if_array[i].if_name)
 			free(itf_param->if_array[i].if_name);
