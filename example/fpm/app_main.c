@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
 	}
 
 	/*
-	 * Further, we will process the CLI commands file (if defined).
+	 * Process the CLI commands file (if defined).
 	 * This is an alternative way to set the IP addresses and other
 	 * parameters.
 	 */
@@ -415,6 +415,12 @@ static void usage(char *progname)
 		);
 }
 
+/** Configure IPv4 addresses
+ *
+ * @param itf_param appl_arg_ifs_t Interfaces to configure
+ * @return int 0 on success, -1 on error
+ *
+ */
 static int configure_interface_addresses(appl_arg_ifs_t *itf_param)
 {
 	struct appl_arg_if *ifarg = NULL;
