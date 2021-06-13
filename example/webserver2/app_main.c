@@ -16,6 +16,7 @@
 #include "ofp.h"
 #include "linux_sigaction.h"
 #include "linux_resources.h"
+#include "cli_arg_parse.h"
 #include "httpd.h"
 
 #define MAX_WORKERS		32
@@ -40,8 +41,7 @@ typedef struct {
 	enum execution_mode mode;
 	int core_count;
 	int core_start;
-	int if_count;		/**< Number of interfaces to be used */
-	char **if_names;	/**< Array of pointers to interface names */
+	appl_arg_ifs_t itf_param;
 	char *cli_file;
 	char *root_dir;
 	char *laddr;
@@ -53,8 +53,14 @@ struct worker_arg {
 	odp_pktin_queue_t pktin[OFP_FP_INTERFACE_MAX];
 };
 
+struct interface_id {
+	int port;
+	uint16_t subport;
+};
+
 /* helper funcs */
 static int parse_args(int argc, char *argv[], appl_args_t *appl_args);
+static void parse_args_cleanup(appl_args_t *appl_args);
 static void print_info(char *progname, appl_args_t *appl_args);
 static void usage(char *progname);
 static int validate_cores_settings(int req_core_start, int req_core_count,
@@ -130,17 +136,19 @@ static int pkt_io_direct_mode_recv(void *arg)
  * pktios open in direct mode, thread unsafe and using RSS with
  * hashing by IPv4 addresses and TCP ports
  *
- * @param if_count int  Interface count
- * @param if_names char** Interface names
+ * @param itf_param appl_arg_ifs_t Interfaces to configure
  * @param tx_queue int Number of requested transmision queues
  *    per interface
  * @param rx_queue int Number of requested reciver queues per
  *    interface
+ * @param itf_id struct interface_id IDs (port and subport) of
+ *    the configured interfaces
  * @return int 0 on success, -1 on error
  *
  */
-static int create_interfaces_direct_rss(int if_count, char **if_names,
-					int tx_queues, int rx_queues)
+static int create_interfaces_direct_rss(appl_arg_ifs_t *itf_param,
+					int tx_queues, int rx_queues,
+					struct interface_id *itf_id)
 {
 	odp_pktio_param_t pktio_param;
 	odp_pktin_queue_param_t pktin_param;
@@ -161,12 +169,14 @@ static int create_interfaces_direct_rss(int if_count, char **if_names,
 	pktout_param.op_mode    = ODP_PKTIO_OP_MT_UNSAFE;
 	pktout_param.num_queues = tx_queues;
 
-	for (i = 0; i < if_count; i++)
-		if (ofp_ifport_net_create(if_names[i], &pktio_param,
-					  &pktin_param, &pktout_param,
-					  1, NULL, NULL) < 0) {
+	for (i = 0; i < itf_param->if_count; i++)
+		if (ofp_ifport_net_create(itf_param->if_array[i].if_name,
+					  &pktio_param, &pktin_param,
+					  &pktout_param, 1,
+					  &itf_id[i].port,
+					  &itf_id[i].subport) < 0) {
 			OFP_ERR("Failed to init interface %s",
-				if_names[i]);
+				itf_param->if_array[i].if_name);
 			return -1;
 		}
 
@@ -176,34 +186,35 @@ static int create_interfaces_direct_rss(int if_count, char **if_names,
 /** configure_workers_arg_direct_rss() Configure workers
  *  argument
  *
+ * @param itf_param appl_arg_ifs_t Interfaces parameters
  * @param num_workers int  Number of workers
  * @param workers_arg struct worker_arg* Array of workers
  *    argument
- * @param if_count int  Interface count
- * @param if_names char** Interface names
  * @return int 0 on success, -1 on error
  *
  */
-static int configure_workers_arg_direct_rss(int num_workers,
-	struct worker_arg *workers_arg,
-	int if_count, char **if_names)
+static int configure_workers_arg_direct_rss(appl_arg_ifs_t *itf_param,
+					    int num_workers,
+					    struct worker_arg *workers_arg)
 {
 	int i, j;
 	odp_pktio_t pktio;
 	odp_pktin_queue_t pktin[MAX_WORKERS];
 
 	for (i = 0; i < num_workers; i++)
-		workers_arg[i].num_pktin = if_count;
+		workers_arg[i].num_pktin = itf_param->if_count;
 
-	for (i = 0; i < if_count; i++) {
-		pktio = odp_pktio_lookup(if_names[i]);
+	for (i = 0; i < itf_param->if_count; i++) {
+		pktio = odp_pktio_lookup(itf_param->if_array[i].if_name);
 		if (pktio == ODP_PKTIO_INVALID) {
-			OFP_ERR("Failed locate pktio %s", if_names[i]);
+			OFP_ERR("Failed locate pktio %s",
+				itf_param->if_array[i].if_name);
 			return -1;
 		}
 
 		if (odp_pktin_queue(pktio, pktin, num_workers) != num_workers) {
-			OFP_ERR("Too few pktin queues for %s", if_names[i]);
+			OFP_ERR("Too few pktin queues for %s",
+				itf_param->if_array[i].if_name);
 			return -1;
 		}
 
@@ -219,17 +230,19 @@ static int configure_workers_arg_direct_rss(int num_workers,
  * pktios open in  scheduler mode and using RSS
  * with hashing by IPv4 addresses and TCP ports
  *
- * @param if_count int  Interface count
- * @param if_names char** Interface names
+ * @param itf_param appl_arg_ifs_t Interfaces to configure
  * @param tx_queue int Number of requested transmision queues
  *    per interface
  * @param rx_queue int Number of requested reciver queues per
  *    interface
+ * @param itf_id struct interface_id IDs (port and subport) of
+ *    the configured interfaces
  * @return int 0 on success, -1 on error
  *
  */
-static int create_interfaces_sched_rss(int if_count, char **if_names,
-				       int tx_queues, int rx_queues)
+static int create_interfaces_sched_rss(appl_arg_ifs_t *itf_param,
+				       int tx_queues, int rx_queues,
+					   struct interface_id *itf_id)
 {
 	odp_pktio_param_t pktio_param;
 	odp_pktin_queue_param_t pktin_param;
@@ -260,16 +273,121 @@ static int create_interfaces_sched_rss(int if_count, char **if_names,
 	pktout_param.op_mode    = ODP_PKTIO_OP_MT_UNSAFE;
 	pktout_param.num_queues = tx_queues;
 
-	for (i = 0; i < if_count; i++)
-		if (ofp_ifport_net_create(if_names[i], &pktio_param,
-					  &pktin_param, &pktout_param,
-					  1, NULL, NULL) < 0) {
+	for (i = 0; i < itf_param->if_count; i++)
+		if (ofp_ifport_net_create(itf_param->if_array[i].if_name,
+					  &pktio_param,
+					  &pktin_param,
+					  &pktout_param, 1,
+					  &itf_id[i].port,
+					  &itf_id[i].subport) < 0) {
 			OFP_ERR("Failed to init interface %s",
-				if_names[i]);
+				itf_param->if_array[i].if_name);
 			return -1;
 		}
 
 	return 0;
+}
+
+/** get_interfaces_id() Get interfaces IDs by name
+ *
+ * @param itf_param appl_arg_ifs_t Interfaces parameters
+ * @param itf_id struct interface_id IDs (port and subport) of
+ *     the configured interfaces
+ * @return int 0 on success, -1 on error
+ *
+ */
+static int get_interfaces_id(appl_arg_ifs_t *itf_param,
+			     struct interface_id *itf_id)
+{
+	struct appl_arg_if *ifarg = NULL;
+	ofp_ifnet_t ifnet = OFP_IFNET_INVALID;
+	int i, ret = 0;
+
+	for (i = 0; i < itf_param->if_count; i++) {
+		ifarg = &itf_param->if_array[i];
+
+		if (!ifarg->if_name) {
+			OFP_ERR("Error: Invalid interface name: null");
+			ret = -1;
+			break;
+		}
+
+		if (!ifarg->if_address)
+			continue; /* Not set through application parameters*/
+
+		ifnet = ofp_ifport_net_ifnet_get_by_name(ifarg->if_name);
+		if (ifnet == OFP_IFNET_INVALID) {
+			OFP_ERR("Error: interface not found: %s",
+				ifarg->if_name);
+			ret = -1;
+			break;
+		}
+
+		if (ofp_ifnet_port_get(ifnet,
+				       &itf_id[i].port,
+				       &itf_id[i].subport)) {
+			OFP_ERR("Error: Failed to get <port, sub-port>: %s",
+				ifarg->if_name);
+			ret = -1;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+/** configure_interface_addresses() Configure IPv4 addresses
+ *
+ * @param itf_param appl_arg_ifs_t Interfaces to configure
+ * @param itf_id struct interface_id IDs (port and subport) of
+ *     the configured interfaces
+ * @return int 0 on success, -1 on error
+ *
+ */
+static int configure_interface_addresses(appl_arg_ifs_t *itf_param,
+					 struct interface_id *itf_id)
+{
+	struct appl_arg_if *ifarg = NULL;
+	uint32_t addr = 0;
+	int i, ret = 0;
+	const char *res = NULL;
+
+	for (i = 0; i < itf_param->if_count && i < OFP_FP_INTERFACE_MAX; i++) {
+		ifarg = &itf_param->if_array[i];
+
+		if (!ifarg->if_name) {
+			OFP_ERR("Error: Invalid interface name: null");
+			ret = -1;
+			break;
+		}
+
+		if (!ifarg->if_address)
+			continue; /* Not set through application parameters*/
+
+		OFP_DBG("Setting %s/%d on %s", ifarg->if_address,
+			ifarg->if_address_masklen, ifarg->if_name);
+
+		if (!ofp_parse_ip_addr(ifarg->if_address, &addr)) {
+			OFP_ERR("Error: Failed to parse IPv4 address: %s",
+				ifarg->if_address);
+			ret = -1;
+			break;
+		}
+
+		res = ofp_ifport_net_ipv4_up(itf_id[i].port, itf_id[i].subport,
+					     0,
+					     addr, ifarg->if_address_masklen,
+					     1);
+		if (res != NULL) {
+			OFP_ERR("Error: Failed to set IPv4 address %s "
+				"on interface %s: %s",
+				ifarg->if_address, ifarg->if_name, res);
+			ret = -1;
+			break;
+		}
+	}
+
+	return ret;
 }
 
 
@@ -292,6 +410,7 @@ int main(int argc, char *argv[])
 	ofp_thread_param_t thread_param;
 	int num_workers, first_worker, linux_sp_core, i;
 	struct worker_arg workers_arg_direct_rss[MAX_WORKERS];
+	struct interface_id itf_id[OFP_FP_INTERFACE_MAX];
 	odp_cpumask_t cpu_mask;
 
 	/* Setup system resources */
@@ -304,7 +423,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Parse application arguments */
-	if (parse_args(argc, argv, &params))
+	if (parse_args(argc, argv, &params) != EXIT_SUCCESS)
 		return EXIT_FAILURE;
 
 	/*
@@ -322,10 +441,11 @@ int main(int argc, char *argv[])
 	app_init_params.cli.os_thread.start_on_init = 1;
 	app_init_params.linux_core_id = linux_sp_core;
 	if (params.mode == EXEC_MODE_SCHEDULER) {
-		app_init_params.if_count = params.if_count;
-		for (i = 0; i < params.if_count &&
+		app_init_params.if_count = params.itf_param.if_count;
+		for (i = 0; i < params.itf_param.if_count &&
 		     i < OFP_FP_INTERFACE_MAX; i++) {
-			strncpy(app_init_params.if_names[i], params.if_names[i],
+			strncpy(app_init_params.if_names[i],
+				params.itf_param.if_array[i].if_name,
 				OFP_IFNAMSIZ);
 			app_init_params.if_names[i][OFP_IFNAMSIZ - 1] = '\0';
 		}
@@ -333,6 +453,7 @@ int main(int argc, char *argv[])
 
 	if (ofp_initialize(&app_init_params)) {
 		OFP_ERR("Error: OFP global init failed.\n");
+		parse_args_cleanup(&params);
 		exit(EXIT_FAILURE);
 	}
 
@@ -340,6 +461,7 @@ int main(int argc, char *argv[])
 	if (validate_cores_settings(params.core_start, params.core_count,
 				    &first_worker, &num_workers) < 0) {
 		ofp_terminate();
+		parse_args_cleanup(&params);
 		exit(EXIT_FAILURE);
 	}
 
@@ -350,30 +472,46 @@ int main(int argc, char *argv[])
 		"Workers core count: %d\n",
 		linux_sp_core, first_worker, num_workers);
 
+	odp_memset(itf_id, 0, sizeof(itf_id));
 	if (params.mode == EXEC_MODE_DIRECT_RSS) {
-		if (create_interfaces_direct_rss(params.if_count,
-						 params.if_names,
-						 num_workers, num_workers)) {
+		if (create_interfaces_direct_rss(&params.itf_param,
+						 num_workers, num_workers,
+						 itf_id)) {
 			OFP_ERR("Failed to initialize interfaces.");
 			ofp_terminate();
+			parse_args_cleanup(&params);
 			exit(EXIT_FAILURE);
 		}
 
-		if (configure_workers_arg_direct_rss(num_workers,
-			workers_arg_direct_rss,
-			params.if_count, params.if_names)) {
+		if (configure_workers_arg_direct_rss(&params.itf_param,
+						     num_workers,
+						     workers_arg_direct_rss)) {
 			OFP_ERR("Failed to initialize workers arguments.");
 			ofp_terminate();
+			parse_args_cleanup(&params);
 			exit(EXIT_FAILURE);
 		}
 	} else if (params.mode == EXEC_MODE_SCHEDULER_RSS) {
-		if (create_interfaces_sched_rss(params.if_count,
-						params.if_names,
-						num_workers, num_workers)) {
+		if (create_interfaces_sched_rss(&params.itf_param,
+						num_workers, num_workers,
+						itf_id)) {
 			OFP_ERR("Failed to initialize interfaces.");
 			ofp_terminate();
+			parse_args_cleanup(&params);
 			exit(EXIT_FAILURE);
 		}
+	} else if (params.mode == EXEC_MODE_SCHEDULER) {
+		if (get_interfaces_id(&params.itf_param, itf_id)) {
+			OFP_ERR("Failed to get the interfaces IDs.");
+			ofp_terminate();
+			parse_args_cleanup(&params);
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		OFP_ERR("Unknown execution mode.");
+		ofp_terminate();
+		parse_args_cleanup(&params);
+		exit(EXIT_FAILURE);
 	}
 
 	/* Create worker threads */
@@ -405,11 +543,33 @@ int main(int argc, char *argv[])
 		if (i > 0)
 			ofp_thread_join(thread_tbl, i);
 		ofp_terminate();
+		parse_args_cleanup(&params);
 		return EXIT_FAILURE;
 	}
 
-	/* Process CLI file */
-	ofp_cli_process_file(params.cli_file);
+	/* Configure IP addresses */
+	if (configure_interface_addresses(&params.itf_param, itf_id)) {
+		OFP_ERR("Error: Failed to configure addresses");
+		ofp_stop_processing();
+		ofp_thread_join(thread_tbl, num_workers);
+		ofp_terminate();
+		parse_args_cleanup(&params);
+		return EXIT_FAILURE;
+	}
+
+	/*
+	 * Process the CLI commands file (if defined).
+	 * This is an alternative way to set the IP addresses and other
+	 * parameters.
+	 */
+	if (ofp_cli_process_file(params.cli_file)) {
+		OFP_ERR("Error: Failed to process CLI file.");
+		ofp_stop_processing();
+		ofp_thread_join(thread_tbl, num_workers);
+		ofp_terminate();
+		parse_args_cleanup(&params);
+		return EXIT_FAILURE;
+	}
 	sleep(2);
 
 	/* webserver */
@@ -418,6 +578,7 @@ int main(int argc, char *argv[])
 		ofp_stop_processing();
 		ofp_thread_join(thread_tbl, num_workers);
 		ofp_terminate();
+		parse_args_cleanup(&params);
 		exit(EXIT_FAILURE);
 	}
 
@@ -426,6 +587,7 @@ int main(int argc, char *argv[])
 	if (ofp_terminate() < 0)
 		printf("Error: ofp_terminate failed.\n");
 
+	parse_args_cleanup(&params);
 	printf("End Main()\n");
 	return 0;
 }
@@ -488,11 +650,9 @@ static int validate_cores_settings(int req_core_start, int req_core_count,
  */
 static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 {
-	int opt;
+	int opt, res = 0;
 	int long_index;
-	char *names, *str, *token, *save;
 	size_t len;
-	int i;
 	static struct option longopts[] = {
 		{"mode", required_argument, NULL, 'm'},
 		{"core_count", required_argument, NULL, 'c'},
@@ -511,7 +671,7 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 	appl_args->core_start = 1;
 	appl_args->core_count = 0; /* all above core start */
 
-	while (1) {
+	while (res == 0) {
 		opt = getopt_long(argc, argv, "+c:s:i:hf:r:l:p:m:",
 				  longopts, &long_index);
 
@@ -525,7 +685,8 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 
 			if (mode_arg < 0 || mode_arg > EXEC_MODE_MAX) {
 				usage(argv[0]);
-				return -1;
+				res = -1;
+				break;
 			}
 			appl_args->mode = mode_arg;
 			break;
@@ -538,49 +699,17 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			break;
 			/* parse packet-io interface names */
 		case 'i':
-			len = strlen(optarg);
-			if (len == 0) {
+			res = ofpexpl_parse_interfaces(optarg,
+						       &appl_args->itf_param);
+			if (res == EXIT_FAILURE) {
 				usage(argv[0]);
-				return -1;
-			}
-			len += 1;	/* add room for '\0' */
-
-			names = malloc(len);
-			if (names == NULL) {
-				usage(argv[0]);
-				return -1;
-			}
-
-			/* count the number of tokens separated by ',' */
-			strcpy(names, optarg);
-			for (str = names, i = 0;; str = NULL, i++) {
-				token = strtok_r(str, ",", &save);
-				if (token == NULL)
-					break;
-			}
-			appl_args->if_count = i;
-
-			if (appl_args->if_count == 0) {
-				usage(argv[0]);
-				return -1;
-			}
-
-			/* allocate storage for the if names */
-			appl_args->if_names =
-				calloc(appl_args->if_count, sizeof(char *));
-
-			/* store the if names (reset names string) */
-			strcpy(names, optarg);
-			for (str = names, i = 0;; str = NULL, i++) {
-				token = strtok_r(str, ",", &save);
-				if (token == NULL)
-					break;
-				appl_args->if_names[i] = token;
+				res = -1;
 			}
 			break;
 
 		case 'h':
 			usage(argv[0]);
+			parse_args_cleanup(appl_args);
 			exit(EXIT_SUCCESS);
 			break;
 
@@ -588,14 +717,16 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
-				return -1;
+				res = -1;
+				break;
 			}
 			len += 1;	/* add room for '\0' */
 
 			appl_args->cli_file = malloc(len);
 			if (appl_args->cli_file == NULL) {
 				usage(argv[0]);
-				return -1;
+				res = -1;
+				break;
 			}
 
 			strcpy(appl_args->cli_file, optarg);
@@ -604,14 +735,16 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
-				return -1;
+				res = -1;
+				break;
 			}
 			len += 1;	/* add room for '\0' */
 
 			appl_args->root_dir = malloc(len);
 			if (appl_args->root_dir == NULL) {
 				usage(argv[0]);
-				return -1;
+				res = -1;
+				break;
 			}
 
 			strcpy(appl_args->root_dir, optarg);
@@ -620,14 +753,16 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
-				return -1;
+				res = -1;
+				break;
 			}
 			len += 1;	/* add room for '\0' */
 
 			appl_args->laddr = malloc(len);
 			if (appl_args->laddr == NULL) {
 				usage(argv[0]);
-				return -1;
+				res = -1;
+				break;
 			}
 
 			strcpy(appl_args->laddr, optarg);
@@ -636,7 +771,8 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
-				return -1;
+				res = -1;
+				break;
 			}
 			len += 1;	/* add room for '\0' */
 
@@ -648,19 +784,36 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		}
 	}
 
-	if (appl_args->if_count == 0) {
-		usage(argv[0]);
-		return -1;
+	if (res == -1) {
+		parse_args_cleanup(appl_args);
+		return EXIT_FAILURE;
 	}
 
-	if (appl_args->if_count > OFP_FP_INTERFACE_MAX) {
+	if (appl_args->itf_param.if_count == 0) {
+		usage(argv[0]);
+		parse_args_cleanup(appl_args);
+		return EXIT_FAILURE;
+	}
+
+	if (appl_args->itf_param.if_count > OFP_FP_INTERFACE_MAX) {
 		printf("Error: Invalid number of interfaces: maximum %d\n",
 		       OFP_FP_INTERFACE_MAX);
-		return -1;
+		parse_args_cleanup(appl_args);
+		return EXIT_FAILURE;
 	}
 
 	optind = 1;		/* reset 'extern optind' from the getopt lib */
-	return 0;
+	return EXIT_SUCCESS;
+}
+
+/**
+ * Cleanup the stored command line arguments
+ *
+ * @param appl_args  application arguments
+ */
+static void parse_args_cleanup(appl_args_t *appl_args)
+{
+	ofpexpl_parse_interfaces_param_cleanup(&appl_args->itf_param);
 }
 
 /**
@@ -687,9 +840,9 @@ static void print_info(char *progname, appl_args_t *appl_args)
 		   "-----------------\n"
 		   "IF-count:        %i\n"
 		   "Using IFs:      ",
-		   progname, appl_args->if_count);
-	for (i = 0; i < appl_args->if_count; ++i)
-		printf(" %s", appl_args->if_names[i]);
+		   progname, appl_args->itf_param.if_count);
+	for (i = 0; i < appl_args->itf_param.if_count; ++i)
+		printf(" %s", appl_args->itf_param.if_array[i].if_name);
 	printf("\n");
 
 	printf("Execution mode: ");
@@ -719,7 +872,11 @@ static void usage(char *progname)
 		   "ODPFastpath application.\n"
 		   "\n"
 		   "Mandatory OPTIONS:\n"
-		   "  -i, --interface Eth interfaces (comma-separated, no spaces)\n"
+		   "  -i, --interface <interfaces> Ethernet interface list"
+		   " (comma-separated, no spaces)\n"
+		   "  Example:\n"
+		   "    eth1,eth2\n"
+		   "    eth1@192.168.100.10/24,eth2@172.24.200.10/16\n"
 		   "\n"
 		   "Optional OPTIONS\n"
 		   "  -m, --mode <number> Execution mode:\n"
