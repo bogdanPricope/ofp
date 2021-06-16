@@ -21,6 +21,27 @@ union ofp_sigval {          /* Data passed with notification */
 	void   *sival_ptr;         /* Pointer value */
 };
 
+/**
+ * struct ofp_sock_sigval is the argument of notification function
+ *
+ * sigev_value: "ofp_sigevent.sigev_value" argument configured with
+ * ofp_socket_sigevent().
+ *
+ * ofp_sock_sigval.event:  indicates the type of event received. Valid values
+ * are OFP_EVENT_ACCEPT, OFP_EVENT_RECV or OFP_EVENT_SEND.
+ *
+ * sockfd: socket on which event occurred
+ *
+ * sockfd2: additional socket e.g. (accepted socket on OFP_EVENT_ACCEPT event)
+ *
+ * pkt: the packet triggering the event (OFP_EVENT_RECV only)
+ *
+ * Note: On OFP_EVENT_RECV events, the packet is considered
+ * processed 'outside the stack' if the 'pkt' is set to ODP_PACKET_INVALID
+ * at the return of notification function. One may inspect, process the
+ * packet in different ways or even delete it in the notification function.
+ */
+
 struct ofp_sock_sigval {
 	union ofp_sigval    sigev_value; /* Data passed with notification
 					from event configuration api
@@ -53,29 +74,28 @@ struct ofp_sigevent {
 };
 
 /**
- * Configures the event notification on a socket
+ * Configures the event notification on a socket.
  *
- * The function takes a "struct ofp_sigevent *" as argument.
+ * Notification mechanism is configured through a "struct ofp_sigevent"
+ * argument:
  * ofp_sigevent.sigev_notify specifies the type of notification that is
- * requested. At this moment, only OFP_SIGEV_HOOK type is supported.
+ * requested. In current version, only OFP_SIGEV_HOOK type is supported.
  *
- * ofp_sigevent.sigev_notify_func represents the function that is called
- * on events. The argument of this function has a "union ofp_sigval *" type but
- * actually a "struct ofp_sock_sigval *" is returned.
- *
- * ofp_sock_sigval.event indicates the type of event received. Valid values are
- * OFP_EVENT_ACCEPT, OFP_EVENT_RECV or OFP_EVENT_SEND.
+ * ofp_sigevent.sigev_notify_func is the callback function.
+ * The argument of this function has a "union ofp_sigval *" type but
+ * the actual type depends on ofp_sigevent.sigev_notify field.
+ * In current version, a "struct ofp_sock_sigval *" is returned.
  *
  * In the future, the function's argument may differ depending on
  * "ofp_sock_sigval.event" type (base type + derived type model).
  *
  * ofp_sigevent.sigev_value is a field that will be passed to
- * "ofp_sigevent.sigev_notify_func" function as (part of the) function's
- * argument (e.g. ofp_sock_sigval.sigev_value).
+ * the callback function as (part of the) function's argument
+ * (e.g. ofp_sock_sigval.sigev_value).
  *
  * The rest of "struct ofp_sigevent" fields are not used.
  *
- * Note: On TCP, the event notification configuration will be passed from
+ * Note: On TCP, the event notification configuration will be inherited from
  * listening socket to accepted socket.
  *
  * @param sd            Socket descriptor
