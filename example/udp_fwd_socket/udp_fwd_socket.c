@@ -18,9 +18,6 @@
 #include "ofp.h"
 #include "udp_fwd_socket.h"
 
-#define TEST_LPORT 5001
-#define TEST_RPORT 5000
-
 struct ofp_sockaddr_in *raddr = NULL;
 int *sock_array;
 int sock_array_size;

@@ -465,6 +465,7 @@ static int validate_cores_settings(int req_core_start, int req_core_count,
  * @param argc       argument count
  * @param argv[]     argument vector
  * @param appl_args  Store application arguments here
+ * @return EXIT_SUCCESS on success, EXIT_FAILURE on error
  */
 static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 {

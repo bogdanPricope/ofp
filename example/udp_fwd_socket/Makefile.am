@@ -5,7 +5,9 @@ noinst_PROGRAMS = udp_fwd_socket
 udp_fwd_socket_LDFLAGS = $(AM_LDFLAGS) -static
 
 dist_udp_fwd_socket_SOURCES = app_main.c udp_fwd_socket.c \
-			      ../common/linux_sigaction.c
+			      ../common/linux_sigaction.c \
+			      ../common/cli_arg_parse.c
 
 noinst_HEADERS = ${srcdir}/udp_fwd_socket.h \
-		 ../common/linux_sigaction.h
+		 ../common/linux_sigaction.h \
+		 ../common/cli_arg_parse.h

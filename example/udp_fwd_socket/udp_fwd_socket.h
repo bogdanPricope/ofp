@@ -8,6 +8,9 @@
 #ifndef _UDP_FWD_H_
 #define _UDP_FWD_H_
 
+#define TEST_LPORT 5001
+#define TEST_RPORT 5000
+
 int udp_fwd_cfg(int sock_count, char *laddr_txt, char *raddr_txt);
 int udp_fwd_cleanup(void);
 
