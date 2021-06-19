@@ -121,7 +121,7 @@ int udpecho_config(void *arg)
 
 	memset(&my_addr, 0, sizeof(my_addr));
 	my_addr.sin_family = OFP_AF_INET;
-	my_addr.sin_port = odp_cpu_to_be_16(2048);
+	my_addr.sin_port = odp_cpu_to_be_16(UDP_LPORT);
 	my_addr.sin_addr.s_addr = my_ip_addr;
 	my_addr.sin_len = sizeof(my_addr);
 

@@ -10,6 +10,8 @@
 
 #include <odp_api.h>
 
+#define UDP_LPORT 2048
+
 int udpecho_config(void *arg);
 int udpecho_cleanup(void);
 

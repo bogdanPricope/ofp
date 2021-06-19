@@ -256,10 +256,11 @@ int main(int argc, char *argv[])
  * @param argc       argument count
  * @param argv[]     argument vector
  * @param appl_args  Store application arguments here
+ * @return EXIT_SUCCESS on success, EXIT_FAILURE on error
  */
 static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 {
-	int opt, res;
+	int opt, res = 0;
 	int long_index;
 	size_t len;
 	static struct option longopts[] = {
@@ -291,12 +292,14 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 						       &appl_args->itf_param);
 			if (res == EXIT_FAILURE) {
 				usage(argv[0]);
+				parse_args_cleanup(appl_args);
 				return EXIT_FAILURE;
 			}
 			break;
 
 		case 'h':
 			usage(argv[0]);
+			parse_args_cleanup(appl_args);
 			return EXIT_FAILURE;
 
 		case 'p':
@@ -307,6 +310,7 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
+				parse_args_cleanup(appl_args);
 				return EXIT_FAILURE;
 			}
 			len += 1;	/* add room for '\0' */
@@ -314,6 +318,7 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			appl_args->cli_file = malloc(len);
 			if (appl_args->cli_file == NULL) {
 				usage(argv[0]);
+				parse_args_cleanup(appl_args);
 				return EXIT_FAILURE;
 			}
 
@@ -327,11 +332,11 @@ static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 
 	if (appl_args->itf_param.if_count == 0) {
 		usage(argv[0]);
+		parse_args_cleanup(appl_args);
 		return EXIT_FAILURE;
 	}
 
 	optind = 1;		/* reset 'extern optind' from the getopt lib */
-
 	return EXIT_SUCCESS;
 }
 
