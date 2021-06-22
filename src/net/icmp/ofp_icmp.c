@@ -572,8 +572,10 @@ icmp_reflect(odp_packet_t pkt)
 	struct ofp_ip *ip = (struct ofp_ip *)odp_packet_l3_ptr(pkt, NULL);
 	struct ofp_in_addr t;
 	struct ofp_nh_entry *nh = NULL;
+	struct ofp_nh_entry *nh_src = NULL;
 	struct ofp_ifnet *dev_out, *ifp = odp_packet_user_ptr(pkt);
 	int optlen = (ip->ip_hl << 2) - sizeof(*ip);
+	uint32_t flags = 0;
 
 /*	if (IN_MULTICAST(odp_be_to_cpu_32(ip->ip_src.s_addr)) ||
 	    IN_EXPERIMENTAL(odp_be_to_cpu_32(ip->ip_src.s_addr)) ||
@@ -595,9 +597,9 @@ icmp_reflect(odp_packet_t pkt)
 	 * If the incoming packet was addressed directly to one of our
 	 * own addresses, use dst as the src for the reply.
 	 */
-	if ((dev_out = ofp_get_ifnet_match(t.s_addr, ifp->vrf, ifp->vlan))) {
+	nh_src = ofp_get_next_hop(ifp->vrf, t.s_addr, &flags);
+	if (nh_src && (nh_src->flags & OFP_RTF_LOCAL))
 		goto match;
-	}
 
 	/*
 	 * If the incoming packet was addressed to one of our broadcast
@@ -636,7 +638,6 @@ icmp_reflect(odp_packet_t pkt)
 	 * When we don't have a route back to the packet source, stop here
 	 * and drop the packet.
 	 */
-	uint32_t flags;
 	nh = ofp_get_next_hop(ifp->vrf, ip->ip_dst.s_addr, &flags);
 	if (nh == NULL) {
 /*		ICMPSTAT_INC(icps_noroute);*/

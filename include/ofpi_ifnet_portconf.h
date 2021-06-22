@@ -392,9 +392,6 @@ struct ofp_ifnet *ofp_get_ifnet_by_linux_ifindex(int ix);
 struct ofp_ifnet *ofp_get_ifnet_pktio(odp_pktio_t pktio);
 struct ofp_ifnet *ofp_get_port_itf(int port);
 
-/* Finds the node interface by the local ip assigned */
-struct ofp_ifnet *ofp_get_ifnet_match(uint32_t ip, uint16_t vrf, uint16_t vlan);
-
 struct ofp_ifconf;
 void ofp_get_interfaces(struct ofp_ifconf *ifc);
 

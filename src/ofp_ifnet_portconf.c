@@ -226,17 +226,6 @@ int ofp_vlan_get_by_key(
 	return avl_get_by_key(root, key, value_address);
 }
 
-static int vlan_match_ip(void *key, void *iter_arg)
-{
-	struct ofp_ifnet *iface = key;
-	uint32_t ip = *((uint32_t *)iter_arg);
-
-	if (-1 != ofp_ifnet_ip_find(iface, ip))
-		return iface->vlan;
-	else
-		return 0;
-}
-
 int ofp_free_port_alloc(void)
 {
 	int port = (int)odp_atomic_fetch_inc_u32(&V_ifnet_free_port);
@@ -1972,34 +1961,6 @@ struct ofp_ifnet *ofp_get_ifnet_by_linux_ifindex(int ix)
 	return NULL;
 }
 #endif /* SP */
-
-struct ofp_ifnet *ofp_get_ifnet_match(uint32_t ip,
-		uint16_t vrf,
-		uint16_t vlan)
-{
-	uint16_t port;
-
-	if (vlan == OFP_IFPORT_NET_SUBPORT_ITF) {
-		for (port = 0; port < OFP_FP_INTERFACE_MAX; port++) {
-			struct ofp_ifnet *ifnet =
-				&V_ifnet_port[port];
-
-			if (ifnet->vrf == vrf)
-				if (-1 != ofp_ifnet_ip_find(ifnet, ip))
-					return ifnet;
-		}
-	} else {
-		for (port = 0; port < OFP_FP_INTERFACE_MAX; port++) {
-			uint16_t vlan_id = vlan_iterate_inorder(
-				V_ifnet_port[port].vlan_structs,
-				vlan_match_ip, &ip);
-
-			if (vlan_id)
-				return ofp_get_ifnet(port, vlan, 0);
-		}
-	}
-	return NULL;
-}
 
 static int iter_interface(void *key, void *iter_arg)
 {
