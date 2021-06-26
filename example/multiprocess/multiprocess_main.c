@@ -12,6 +12,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "ofp.h"
+#include "cli_arg_parse.h"
 #include "odp/helper/linux.h"
 
 #define MAX_WORKERS		64
@@ -35,8 +36,7 @@ typedef enum {
  */
 typedef struct {
 	int core_count;
-	int if_count;		/**< Number of interfaces to use */
-	char **if_names;	/**< Array of pointers to interface names */
+	appl_arg_ifs_t itf_param;
 	char *cli_file;
 	char *laddr;
 	int lport;
@@ -44,7 +44,9 @@ typedef struct {
 	uint64_t recv_count;
 } appl_args_t;
 
-static void parse_args(int argc, char *argv[], appl_args_t *appl_args);
+static int parse_args(int argc, char *argv[], appl_args_t *appl_args);
+static void parse_args_cleanup(appl_args_t *appl_args);
+static int configure_interface_addresses(appl_arg_ifs_t *itf_param);
 static void print_info(char *progname, appl_args_t *appl_args);
 static void usage(char *progname);
 
@@ -69,7 +71,8 @@ int main(int argc, char *argv[])
 	char cpumaskstr[64];
 
 	/* Parse and store the application arguments */
-	parse_args(argc, argv, &params);
+	if (parse_args(argc, argv, &params) !=  EXIT_SUCCESS)
+		return EXIT_FAILURE;
 
 	/*
 	 * This example assumes that core LINUX_CONTROL_CPU runs Linux kernel
@@ -81,9 +84,11 @@ int main(int argc, char *argv[])
 	ofp_initialize_param(&app_init_params);
 	app_init_params.linux_core_id = LINUX_CONTROL_CPU;
 	app_init_params.cli.os_thread.start_on_init = 1;
-	app_init_params.if_count = params.if_count;
-	for (i = 0; i < params.if_count && i < OFP_FP_INTERFACE_MAX; i++) {
-		strncpy(app_init_params.if_names[i], params.if_names[i],
+	app_init_params.if_count = params.itf_param.if_count;
+	for (i = 0; i < params.itf_param.if_count &&
+	     i < OFP_FP_INTERFACE_MAX; i++) {
+		strncpy(app_init_params.if_names[i],
+			params.itf_param.if_array[i].if_name,
 			OFP_IFNAMSIZ);
 		app_init_params.if_names[i][OFP_IFNAMSIZ - 1] = '\0';
 	}
@@ -95,6 +100,7 @@ int main(int argc, char *argv[])
 
 	if (ofp_initialize(&app_init_params) != 0) {
 		printf("Error: OFP global init failed.\n");
+		parse_args_cleanup(&params);
 		return EXIT_FAILURE;
 	}
 
@@ -119,6 +125,7 @@ int main(int argc, char *argv[])
 		printf("Error: Too small buffer provided to "
 		       "odp_cpumask_to_str\n");
 		ofp_terminate();
+		parse_args_cleanup(&params);
 		return EXIT_FAILURE;
 	}
 
@@ -137,17 +144,38 @@ int main(int argc, char *argv[])
 		printf("Error: Failed to start children processes.\n");
 		ofp_stop_processing();
 		ofp_terminate();
+		parse_args_cleanup(&params);
 		return EXIT_FAILURE;
 	}
 
 	if (ret == 0) {
 		default_event_dispatcher(ofp_eth_vlan_processing);
+		parse_args_cleanup(&params);
 		exit(0);
 	}
 
+	/* Configure IP addresses */
+	if (configure_interface_addresses(&params.itf_param)) {
+		OFP_ERR("Error: Failed to configure addresses");
+		ofp_stop_processing();
+		ofp_process_wait_n(proc_tbl, num_workers);
+		ofp_terminate();
+		parse_args_cleanup(&params);
+		return EXIT_FAILURE;
+	}
+
+	/*
+	 * Process the CLI commands file (if defined).
+	 * This is an alternative way to set the IP addresses and other
+	 * parameters.
+	 */
 	if (ofp_cli_process_file(params.cli_file)) {
 		OFP_ERR("Error: Failed to process CLI file");
-		exit(0);
+		ofp_stop_processing();
+		ofp_process_wait_n(proc_tbl, num_workers);
+		ofp_terminate();
+		parse_args_cleanup(&params);
+		return EXIT_FAILURE;
 	}
 
 	if (params.mode == APP_MODE_UDP)
@@ -162,17 +190,24 @@ int main(int argc, char *argv[])
 	if (ofp_terminate() < 0)
 		printf("Error: ofp_terminate failed\n");
 
+	parse_args_cleanup(&params);
 	printf("End Main().\n");
 	return 0;
 }
 
-static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
+/**
+ * Parse and store the command line arguments
+ *
+ * @param argc       argument count
+ * @param argv[]     argument vector
+ * @param appl_args  Store application arguments here
+ * @return int EXIT_SUCCESS on success, EXIT_FAILURE on error
+ */
+static int parse_args(int argc, char *argv[], appl_args_t *appl_args)
 {
-	int opt;
+	int opt, res = 0;
 	int long_index;
-	char *names, *str, *token, *save;
 	size_t len;
-	int i;
 	static struct option longopts[] = {
 		{"count", required_argument, NULL, 'c'},
 		{"interface", required_argument, NULL, 'i'},	/* return 'i' */
@@ -194,7 +229,7 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 	appl_args->lport = LPORT_DEFAULT;
 	appl_args->recv_count = 0;
 
-	while (1) {
+	while (res == 0) {
 		opt = getopt_long(argc, argv, "+c:i:hf:l:p:m:n:",
 				  longopts, &long_index);
 
@@ -207,64 +242,33 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			break;
 			/* parse packet-io interface names */
 		case 'i':
-			len = strlen(optarg);
-			if (len == 0) {
+			res = ofpexpl_parse_interfaces(optarg,
+						       &appl_args->itf_param);
+			if (res == EXIT_FAILURE) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
-			}
-			len += 1;	/* add room for '\0' */
-
-			names = malloc(len);
-			if (names == NULL) {
-				usage(argv[0]);
-				exit(EXIT_FAILURE);
-			}
-
-			/* count the number of tokens separated by ',' */
-			strcpy(names, optarg);
-			for (str = names, i = 0;; str = NULL, i++) {
-				token = strtok_r(str, ",", &save);
-				if (token == NULL)
-					break;
-			}
-			appl_args->if_count = i;
-
-			if (appl_args->if_count == 0) {
-				usage(argv[0]);
-				exit(EXIT_FAILURE);
-			}
-
-			/* allocate storage for the if names */
-			appl_args->if_names =
-				calloc(appl_args->if_count, sizeof(char *));
-
-			/* store the if names (reset names string) */
-			strcpy(names, optarg);
-			for (str = names, i = 0;; str = NULL, i++) {
-				token = strtok_r(str, ",", &save);
-				if (token == NULL)
-					break;
-				appl_args->if_names[i] = token;
+				res = -1;
 			}
 			break;
 
 		case 'h':
 			usage(argv[0]);
+			parse_args_cleanup(appl_args);
 			exit(EXIT_SUCCESS);
-			break;
 
 		case 'f':
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				res = -1;
+				break;
 			}
 			len += 1;	/* add room for '\0' */
 
 			appl_args->cli_file = malloc(len);
 			if (appl_args->cli_file == NULL) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				res = -1;
+				break;
 			}
 
 			strcpy(appl_args->cli_file, optarg);
@@ -273,13 +277,15 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				res = -1;
+				break;
 			}
 			len += 1;	/* add room for '\0' */
 			appl_args->laddr = malloc(len);
 			if (appl_args->laddr == NULL) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				res = -1;
+				break;
 			}
 
 			strcpy(appl_args->laddr, optarg);
@@ -288,7 +294,8 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				res = -1;
+				break;
 			}
 			appl_args->lport = atoi(optarg);
 			break;
@@ -296,7 +303,8 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				res = -1;
+				break;
 			}
 			appl_args->recv_count = (uint64_t)atoll(optarg);
 			break;
@@ -304,7 +312,8 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 			len = strlen(optarg);
 			if (len == 0) {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				res = -1;
+				break;
 			}
 			if (!strcmp("u", optarg)) {
 				appl_args->mode = APP_MODE_UDP;
@@ -312,7 +321,8 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 				appl_args->mode = APP_MODE_TCP;
 			} else {
 				usage(argv[0]);
-				exit(EXIT_FAILURE);
+				res = -1;
+				break;
 			}
 			break;
 		default:
@@ -320,15 +330,22 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		}
 	}
 
-	if (appl_args->if_count == 0) {
-		usage(argv[0]);
-		exit(EXIT_FAILURE);
+	if (res == -1) {
+		parse_args_cleanup(appl_args);
+		return EXIT_FAILURE;
 	}
 
-	if (appl_args->if_count > OFP_FP_INTERFACE_MAX) {
+	if (appl_args->itf_param.if_count == 0) {
+		usage(argv[0]);
+		parse_args_cleanup(appl_args);
+		return EXIT_FAILURE;
+	}
+
+	if (appl_args->itf_param.if_count > OFP_FP_INTERFACE_MAX) {
 		OFP_ERR("Error: Invalid number of interfaces: maximum %d\n",
 			OFP_FP_INTERFACE_MAX);
-		exit(EXIT_FAILURE);
+		parse_args_cleanup(appl_args);
+		return EXIT_FAILURE;
 	}
 
 	if (!appl_args->recv_count) {
@@ -339,6 +356,17 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 	}
 
 	optind = 1;		/* reset 'extern optind' from the getopt lib */
+	return EXIT_SUCCESS;
+}
+
+/**
+ * Cleanup the stored command line arguments
+ *
+ * @param appl_args  application arguments
+ */
+static void parse_args_cleanup(appl_args_t *appl_args)
+{
+	ofpexpl_parse_interfaces_param_cleanup(&appl_args->itf_param);
 }
 
 /**
@@ -347,13 +375,16 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 static void usage(char *progname)
 {
 	printf("\n"
+		   "Receives UDP/TCP packets in a worker-per-proccess scenario.\n\n"
 		   "Usage: %s OPTIONS\n"
 		   "  E.g. %s -i eth1,eth2,eth3\n"
 		   "\n"
-		   "ODPFastpath application.\n"
-		   "\n"
 		   "Mandatory OPTIONS:\n"
-		   "  -i, --interface Eth interfaces (comma-separated, no spaces)\n"
+		   "  -i, --interface <interfaces> Ethernet interface list"
+		   " (comma-separated, no spaces)\n"
+		   "  Example:\n"
+		   "    eth1,eth2\n"
+		   "    eth1@192.168.100.10/24,eth2@172.24.200.10/16\n"
 		   "\n"
 		   "Optional OPTIONS\n"
 		   "  -f, --cli-file <file name> CLI commands file\n"
@@ -370,7 +401,7 @@ static void usage(char *progname)
 		   "  -n, --rcv_count <number> Received data before exit.\n"
 		   "    Argument represents:\n"
 		   "      number of datagrams - UDP test. Default %d\n"
-		   "      number of bytes - TCP test\n. Default: %d"
+		   "      number of bytes - TCP test. Default: %d\n"
 		   "  -h, --help           Display help and exit.\n"
 		   "\n", NO_PATH(progname), NO_PATH(progname), LPORT_DEFAULT,
 		   CNT_UDP, CNT_TCP);
@@ -400,9 +431,9 @@ static void print_info(char *progname, appl_args_t *appl_args)
 		   "-----------------\n"
 		   "IF-count:        %i\n"
 		   "Using IFs:      ",
-		   progname, appl_args->if_count);
-	for (i = 0; i < appl_args->if_count; ++i)
-		printf(" %s", appl_args->if_names[i]);
+		   progname, appl_args->itf_param.if_count);
+	for (i = 0; i < appl_args->itf_param.if_count; ++i)
+		printf(" %s", appl_args->itf_param.if_array[i].if_name);
 	printf("\n\n");
 	fflush(NULL);
 }
@@ -574,3 +605,69 @@ int tcp_test(appl_args_t *arg)
 	return 0;
 }
 
+/** Configure IPv4 addresses
+ *
+ * @param itf_param appl_arg_ifs_t Interfaces to configure
+ * @return int 0 on success, -1 on error
+ *
+ */
+static int configure_interface_addresses(appl_arg_ifs_t *itf_param)
+{
+	struct appl_arg_if *ifarg = NULL;
+	ofp_ifnet_t ifnet = OFP_IFNET_INVALID;
+	uint32_t addr = 0;
+	int port = 0;
+	uint16_t subport = 0;
+	int i, ret = 0;
+	const char *res = NULL;
+
+	for (i = 0; i < itf_param->if_count && i < OFP_FP_INTERFACE_MAX; i++) {
+		ifarg = &itf_param->if_array[i];
+
+		if (!ifarg->if_name) {
+			OFP_ERR("Error: Invalid interface name: null");
+			ret = -1;
+			break;
+		}
+
+		if (!ifarg->if_address)
+			continue; /* Not set through application parameters*/
+
+		OFP_DBG("Setting %s/%d on %s", ifarg->if_address,
+			ifarg->if_address_masklen, ifarg->if_name);
+
+		ifnet = ofp_ifport_net_ifnet_get_by_name(ifarg->if_name);
+		if (ifnet == OFP_IFNET_INVALID) {
+			OFP_ERR("Error: interface not found: %s",
+				ifarg->if_name);
+			ret = -1;
+			break;
+		}
+
+		if (ofp_ifnet_port_get(ifnet, &port, &subport)) {
+			OFP_ERR("Error: Failed to get <port, sub-port>: %s",
+				ifarg->if_name);
+			ret = -1;
+			break;
+		}
+
+		if (!ofp_parse_ip_addr(ifarg->if_address, &addr)) {
+			OFP_ERR("Error: Failed to parse IPv4 address: %s",
+				ifarg->if_address);
+			ret = -1;
+			break;
+		}
+
+		res = ofp_ifport_net_ipv4_up(port, subport, 0, addr,
+					     ifarg->if_address_masklen, 1);
+		if (res != NULL) {
+			OFP_ERR("Error: Failed to set IPv4 address %s "
+				"on interface %s: %s",
+				ifarg->if_address, ifarg->if_name, res);
+			ret = -1;
+			break;
+		}
+	}
+
+	return ret;
+}
