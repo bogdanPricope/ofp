@@ -151,6 +151,7 @@ int main(int argc, char *argv[])
 	if (ret == 0) {
 		default_event_dispatcher(ofp_eth_vlan_processing);
 		parse_args_cleanup(&params);
+		odp_term_local();
 		exit(0);
 	}
 
